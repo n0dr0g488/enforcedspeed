@@ -1,0 +1,28 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f8f8f8;
+}
+.nav a {
+    margin-right: 15px;
+}
+.container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+}
+.post, .comment {
+    padding: 10px;
+    margin: 10px 0;
+    border-bottom: 1px solid #ccc;
+}
+.flash {
+    padding: 10px;
+    margin-bottom: 15px;
+}
+.flash.success {
+    background-color: #d4edda;
+}
+.flash.danger {
+    background-color: #f8d7da;
+}

@@ -6,15 +6,15 @@ from datetime import datetime
 import os
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a real secret key
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/site.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# ---------------------------
-# Redirect www → root domain
-# ---------------------------
+# -----------------------------------
+# Redirect www.enforcedspeed.com → enforcedspeed.com
+# -----------------------------------
 @app.before_request
 def redirect_to_naked_domain():
     url = request.url
@@ -22,14 +22,13 @@ def redirect_to_naked_domain():
         new_url = url.replace("://www.", "://", 1)
         return redirect(new_url, code=301)
 
-# ---------------------------
-# Models
-# ---------------------------
+# --------------------
+# Database Models
+# --------------------
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(128), nullable=False)
+    password = db.Column(db.String(120), nullable=False)
     posts = db.relationship('Post', backref='author', lazy=True)
     comments = db.relationship('Comment', backref='author', lazy=True)
 
@@ -45,12 +44,12 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-# ---------------------------
+# --------------------
 # Routes
-# ---------------------------
+# --------------------
 @app.route('/')
 def index():
     posts = Post.query.order_by(Post.timestamp.desc()).all()
@@ -61,7 +60,7 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_pw = generate_password_hash(form.password.data)
-        user = User(username=form.username.data, email=form.email.data, password=hashed_pw)
+        user = User(username=form.username.data, password=hashed_pw)
         db.session.add(user)
         db.session.commit()
         flash('Account created! You can now log in.', 'success')
@@ -75,17 +74,33 @@ def login():
         user = User.query.filter_by(username=form.username.data).first()
         if user and check_password_hash(user.password, form.password.data):
             session['user_id'] = user.id
-            flash('You are now logged in.', 'success')
+            flash('Logged in successfully!', 'success')
             return redirect(url_for('index'))
         else:
-            flash('Login unsuccessful. Check username and password.', 'danger')
+            flash('Login failed. Check username and password.', 'danger')
     return render_template('login.html', form=form)
 
 @app.route('/logout')
 def logout():
     session.pop('user_id', None)
-    flash('Logged out successfully.', 'info')
+    flash('Logged out.', 'info')
     return redirect(url_for('index'))
+
+@app.route('/create', methods=['GET', 'POST'])
+def create_post():
+    if 'user_id' not in session:
+        flash('Please log in to create a post.', 'warning')
+        return redirect(url_for('login'))
+
+    form = PostForm()
+    if form.validate_on_submit():
+        post = Post(title=form.title.data, content=form.content.data, user_id=session['user_id'])
+        db.session.add(post)
+        db.session.commit()
+        flash('Post created!', 'success')
+        return redirect(url_for('index'))
+
+    return render_template('create_post.html', form=form)
 
 @app.route('/post/<int:post_id>', methods=['GET', 'POST'])
 def post(post_id):
@@ -95,38 +110,21 @@ def post(post_id):
         if 'user_id' not in session:
             flash('Please log in to comment.', 'warning')
             return redirect(url_for('login'))
-        comment = Comment(content=form.content.data, user_id=session['user_id'], post_id=post.id)
+        comment = Comment(content=form.content.data, post_id=post.id, user_id=session['user_id'])
         db.session.add(comment)
         db.session.commit()
         flash('Comment added!', 'success')
         return redirect(url_for('post', post_id=post.id))
     return render_template('post.html', post=post, form=form)
 
-@app.route('/create', methods=['GET', 'POST'])
-def create_post():
-    form = PostForm()
-    if form.validate_on_submit():
-        if 'user_id' not in session:
-            flash('Please log in to create a post.', 'warning')
-            return redirect(url_for('login'))
-        post = Post(title=form.title.data, content=form.content.data, user_id=session['user_id'])
-        db.session.add(post)
-        db.session.commit()
-        flash('Post created!', 'success')
-        return redirect(url_for('index'))
-    return render_template('create_post.html', form=form)
-
-# ---------------------------
-# DB Create on First Request
-# ---------------------------
-@app.before_first_request
-def create_tables():
-    os.makedirs(os.path.join(app.root_path, 'instance'), exist_ok=True)
+# -------------------------------
+# Create database tables on startup
+# -------------------------------
+with app.app_context():
     db.create_all()
 
-# ---------------------------
-# Run the App Locally
-# ---------------------------
+# -------------------------------
+# Run locally
+# -------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
-    # temp change to trigger git

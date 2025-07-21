@@ -114,7 +114,7 @@ def post(post_id):
         db.session.commit()
         flash('Comment added!', 'success')
         return redirect(url_for('post', post_id=post.id))
-    return render_template('post.html', post=post, form=form)
+    return render_template('post.html', post=post, form=form, comments=post.comments)
 
 # -------------------------------
 # Create database tables on startup

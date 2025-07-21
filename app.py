@@ -5,22 +5,23 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import os
 
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a real secret key
+app.config['SECRET_KEY'] = 'your-secret-key'
 
-# Get the DB URI
-uri = os.environ.get("DATABASE_URL")
-if uri is None:
-    raise RuntimeError("DATABASE_URL not set in environment")
-
-# Fix prefix if needed (Render sometimes uses old-style URI)
+uri = os.environ.get("DATABASE_URL", "")
 if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql+psycopg://", 1)
+elif uri.startswith("postgresql://") and "psycopg" not in uri:
+    uri = uri.replace("postgresql://", "postgresql+psycopg://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
 
 # -----------------------------------
 # Redirect www.enforcedspeed.com → enforcedspeed.com

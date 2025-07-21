@@ -1,11 +1,14 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h2>Recent Posts</h2>
-{% for post in posts %}
+  <h1>Recent Posts</h1>
+  {% for post in posts %}
     <div class="post">
-        <h3><a href="{{ url_for('post_detail', post_id=post.id) }}">{{ post.title }}</a></h3>
-        <p>by {{ post.author.username }} on {{ post.timestamp.strftime('%Y-%m-%d %H:%M') }}</p>
-        <p>{{ post.content[:200] }}...</p>
+      <h3><a href="{{ url_for('post', post_id=post.id) }}">{{ post.title }}</a></h3>
+      <p>{{ post.content[:200] }}{% if post.content|length > 200 %}...{% endif %}</p>
+      <hr>
     </div>
-{% endfor %}
+  {% else %}
+    <p>No posts yet.</p>
+  {% endfor %}
 {% endblock %}

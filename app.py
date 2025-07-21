@@ -7,9 +7,16 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a real secret key
-uri = os.environ.get("DATABASE_URL", "")
+
+# Get the DB URI
+uri = os.environ.get("DATABASE_URL")
+if uri is None:
+    raise RuntimeError("DATABASE_URL not set in environment")
+
+# Fix prefix if needed (Render sometimes uses old-style URI)
 if uri.startswith("postgres://"):
-    uri = uri.replace("postgres://", "postgresql+psycopg://")
+    uri = uri.replace("postgres://", "postgresql+psycopg://", 1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

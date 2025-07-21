@@ -17,9 +17,8 @@ db = SQLAlchemy(app)
 # -----------------------------------
 @app.before_request
 def redirect_to_naked_domain():
-    url = request.url
     if request.host.startswith("www."):
-        new_url = url.replace("://www.", "://", 1)
+        new_url = request.url.replace("://www.", "://", 1)
         return redirect(new_url, code=301)
 
 # --------------------

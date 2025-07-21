@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a real secret key
 uri = os.environ.get("DATABASE_URL", "")
 if uri.startswith("postgres://"):
-    uri = uri.replace("postgres://", "postgresql+psycopg")
+    uri = uri.replace("postgres://", "postgresql+psycopg://")
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

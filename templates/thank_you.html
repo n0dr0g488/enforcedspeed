@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your Result • EnforcedSpeed MVP</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        margin: 0;
+        background: #f6f7f9;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 40px auto;
+        padding: 0 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: 1.2fr 0.8fr;
+        }
+      }
+      .card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 8px 26px rgba(0,0,0,.08);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 24px;
+      }
+      h2 {
+        margin: 16px 0 6px;
+        font-size: 16px;
+        color: #111827;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #444;
+        line-height: 1.45;
+      }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #111827;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 13px;
+      }
+      .kvs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .kv {
+        padding: 12px;
+        border: 1px solid #e6e8eb;
+        border-radius: 12px;
+        background: #fafafa;
+      }
+      .kv .k {
+        font-size: 12px;
+        color: #6b7280;
+        margin-bottom: 4px;
+      }
+      .kv .v {
+        font-size: 18px;
+        font-weight: 800;
+        color: #111827;
+      }
+      .barwrap {
+        margin-top: 10px;
+      }
+      .bar {
+        height: 10px;
+        background: #e5e7eb;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .bar > div {
+        height: 100%;
+        background: #111827;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th, td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid #eceef1;
+        font-size: 14px;
+      }
+      th {
+        color: #6b7280;
+        font-weight: 700;
+      }
+      .btnrow {
+        margin-top: 14px;
+      }
+      a.btn {
+        display: inline-block;
+        text-decoration: none;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 800;
+        background: #111827;
+        color: #fff;
+      }
+      .split {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid #eceef1;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="grid">
+
+        <!-- LEFT COLUMN -->
+        <div class="card">
+          <h1>Your Ticket</h1>
+
+          <p>
+            State: <span class="pill">{{ state_group }}</span>
+            Road: <span class="pill">{{ report.road_name }}</span>
+            Posted: <span class="pill">{{ report.posted_speed }} mph</span>
+          </p>
+
+          <div class="kvs">
+            <div class="kv">
+              <div class="k">Your ticketed speed</div>
+              <div class="v">{{ report.ticketed_speed }} mph</div>
+            </div>
+            <div class="kv">
+              <div class="k">Road grouping key</div>
+              <div class="v" style="font-size:14px">{{ report.road_key }}</div>
+            </div>
+          </div>
+
+          {% if report.notes %}
+            <h2>Your notes</h2>
+            <p>{{ report.notes }}</p>
+          {% endif %}
+
+          <div class="btnrow">
+            <a class="btn" href="{{ url_for('home') }}">Submit another</a>
+          </div>
+
+          <!-- COMPARISON A -->
+          <div class="split">
+            <h2>How your ticket compares on this road</h2>
+            <p class="muted">
+              Same road and posted speed
+              (<code>{{ state_group }}</code> · <code>{{ report.road_key }}</code> · <code>{{ report.posted_speed }}</code>)
+            </p>
+
+            <div class="kvs">
+              <div class="kv">
+                <div class="k">Typical enforced speed</div>
+                <div class="v">{{ stats_a.enforced_speed }} mph</div>
+              </div>
+              <div class="kv">
+                <div class="k">Your percentile</div>
+                <div class="v">{{ stats_a.percentile }}%</div>
+              </div>
+            </div>
+
+            <div class="barwrap">
+              <div class="bar">
+                <div style="width: {{ stats_a.percentile }}%;"></div>
+              </div>
+            </div>
+
+            <p class="muted">Based on {{ stats_a.n }} ticket(s).</p>
+          </div>
+
+          <!-- COMPARISON B -->
+          <div class="split">
+            <h2>How your ticket compares across the state</h2>
+            <p class="muted">
+              Same posted speed, all roads in {{ state_group }}
+            </p>
+
+            <div class="kvs">
+              <div class="kv">
+                <div class="k">Typical enforced speed</div>
+                <div class="v">{{ stats_b.enforced_speed }} mph</div>
+              </div>
+              <div class="kv">
+                <div class="k">Your percentile</div>
+                <div class="v">{{ stats_b.percentile }}%</div>
+              </div>
+            </div>
+
+            <div class="barwrap">
+              <div class="bar">
+                <div style="width: {{ stats_b.percentile }}%;"></div>
+              </div>
+            </div>
+
+            <p class="muted">Based on {{ stats_b.n }} ticket(s).</p>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="card">
+          <h2>Local comparison details</h2>
+          <table>
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Min</td><td>{{ stats_a.min }} mph</td></tr>
+            <tr><td>Median</td><td>{{ stats_a.median }} mph</td></tr>
+            <tr><td>Mean</td><td>{{ stats_a.mean }} mph</td></tr>
+            <tr><td>Max</td><td>{{ stats_a.max }} mph</td></tr>
+          </table>
+
+          <p class="muted">Raw speeds: {{ stats_a.speeds_sorted }}</p>
+
+          <h2 style="margin-top:16px;">Statewide comparison details</h2>
+          <table>
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Min</td><td>{{ stats_b.min }} mph</td></tr>
+            <tr><td>Median</td><td>{{ stats_b.median }} mph</td></tr>
+            <tr><td>Mean</td><td>{{ stats_b.mean }} mph</td></tr>
+            <tr><td>Max</td><td>{{ stats_b.max }} mph</td></tr>
+          </table>
+
+          <p class="muted">Raw speeds: {{ stats_b.speeds_sorted }}</p>
+        </div>
+
+      </div>
+    </div>
+  </body>
+</html>

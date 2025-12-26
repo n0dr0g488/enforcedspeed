@@ -2,33 +2,46 @@
 import os
 
 
+def _normalize_database_url(url: str) -> str:
+    """
+    Render typically provides DATABASE_URL like:
+      postgres://...
+      postgresql://...
+
+    We are using psycopg v3, so SQLAlchemy must use:
+      postgresql+psycopg://...
+
+    This prevents SQLAlchemy from trying to import psycopg2.
+    """
+    if not url:
+        return url
+
+    url = url.strip()
+
+    # Render/Heroku legacy scheme
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+
+    # Common postgres scheme
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+
+    # If user already set a SQLAlchemy dialect (keep it)
+    return url
+
+
 class Config:
-    """
-    App configuration:
-    - Local default: SQLite file at instance/enforcedspeed.db
-    - Production (Render): DATABASE_URL provided by Render (Postgres)
-    """
+    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
-    # Secret key (Render should set SECRET_KEY in env)
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
+    # Local default (SQLite) for dev
+    default_sqlite = "sqlite:///instance/enforcedspeed.db"
 
-    # Database
-    # Render typically provides DATABASE_URL (often starting with postgres://)
-    database_url = os.getenv("DATABASE_URL", "").strip()
-
-    if database_url:
-        # SQLAlchemy expects postgresql:// not postgres://
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql://", 1)
-        SQLALCHEMY_DATABASE_URI = database_url
-    else:
-        # Local SQLite in /instance (Flask-friendly)
-        base_dir = os.path.abspath(os.path.dirname(__file__))
-        instance_dir = os.path.join(base_dir, "instance")
-        os.makedirs(instance_dir, exist_ok=True)
-        SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(instance_dir, "enforcedspeed.db")
+    raw_db_url = os.environ.get("DATABASE_URL", "").strip()
+    SQLALCHEMY_DATABASE_URI = _normalize_database_url(raw_db_url) or default_sqlite
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Useful defaults
-    WTF_CSRF_ENABLED = True
+    # Good defaults for managed Postgres
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+    }

@@ -1,5 +1,6 @@
 # config.py
 import os
+from pathlib import Path
 
 
 def _normalize_database_url(url: str) -> str:
@@ -18,30 +19,32 @@ def _normalize_database_url(url: str) -> str:
 
     url = url.strip()
 
-    # Render/Heroku legacy scheme
     if url.startswith("postgres://"):
         return "postgresql+psycopg://" + url[len("postgres://") :]
 
-    # Common postgres scheme
     if url.startswith("postgresql://"):
         return "postgresql+psycopg://" + url[len("postgresql://") :]
 
-    # If user already set a SQLAlchemy dialect (keep it)
     return url
 
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
-    # Local default (SQLite) for dev
-    default_sqlite = "sqlite:///instance/enforcedspeed.db"
+    # ----- Local default (SQLite) for dev -----
+    BASEDIR = Path(__file__).resolve().parent
+    INSTANCE_DIR = BASEDIR / "instance"
+    INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
 
+    SQLITE_PATH = (INSTANCE_DIR / "enforcedspeed.db").resolve()
+    default_sqlite = f"sqlite:///{SQLITE_PATH.as_posix()}"
+
+    # ----- Production (Render Postgres) -----
     raw_db_url = os.environ.get("DATABASE_URL", "").strip()
     SQLALCHEMY_DATABASE_URI = _normalize_database_url(raw_db_url) or default_sqlite
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Good defaults for managed Postgres
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
     }

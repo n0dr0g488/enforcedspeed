@@ -1,7 +1,7 @@
 # forms.py
 import re
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, TextAreaField, SubmitField
+from wtforms import StringField, IntegerField, TextAreaField, SubmitField, DecimalField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 
 US_STATE_CODES = {
@@ -32,12 +32,10 @@ def normalize_state_input(value: str) -> str:
         return ""
     v = value.strip()
 
-    # If it starts with 2 letters, treat as code
     m = re.match(r"^\s*([A-Za-z]{2})\b", v)
     if m:
         return m.group(1).upper()
 
-    # Otherwise normalize as name
     name = v.lower().strip()
     name = re.sub(r"[^a-z\s]", " ", name)
     name = re.sub(r"\s+", " ", name).strip()
@@ -60,7 +58,7 @@ class SpeedReportForm(FlaskForm):
             DataRequired(message="Please enter the road/location."),
             Length(max=200, message="Keep it under 200 characters."),
         ],
-        render_kw={"placeholder": "e.g., I-70 near Exit 10, Broadway Ave, K-10 EB, etc."},
+        render_kw={"placeholder": "e.g., I-95, US-50, VA-288, Main St"},
     )
 
     posted_speed = IntegerField(
@@ -79,6 +77,13 @@ class SpeedReportForm(FlaskForm):
             NumberRange(min=0, max=150, message="Enter a reasonable speed (0–150)."),
         ],
         render_kw={"placeholder": "e.g., 79"},
+    )
+
+    total_paid = DecimalField(
+        "Total amount paid (optional)",
+        validators=[Optional(), NumberRange(min=0, max=50000, message="Enter a reasonable amount.")],
+        places=2,
+        render_kw={"placeholder": "e.g., 245.00"},
     )
 
     notes = TextAreaField(

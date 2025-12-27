@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Your Result • EnforcedSpeed MVP</title>
+    <title>Your Result • EnforcedSpeed</title>
     <style>
       body {
         font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -17,13 +17,8 @@
       }
       .grid {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1.3fr;
         gap: 16px;
-      }
-      @media (min-width: 900px) {
-        .grid {
-          grid-template-columns: 1.2fr 0.8fr;
-        }
       }
       .card {
         background: #fff;
@@ -31,43 +26,30 @@
         padding: 20px;
         box-shadow: 0 8px 26px rgba(0,0,0,.08);
       }
-      h1 {
-        margin: 0 0 8px;
-        font-size: 24px;
-      }
-      h2 {
-        margin: 16px 0 6px;
-        font-size: 16px;
-        color: #111827;
-      }
-      p {
-        margin: 0 0 12px;
-        color: #444;
-        line-height: 1.45;
-      }
+      h1 { margin: 0 0 10px; font-size: 26px; }
+      h2 { margin: 18px 0 8px; font-size: 18px; }
+      p { margin: 0 0 14px; color: #444; line-height: 1.45; }
       .pill {
         display: inline-block;
         padding: 4px 10px;
         border-radius: 999px;
-        background: #111827;
-        color: #fff;
+        background: #eef2ff;
+        color: #3730a3;
         font-size: 12px;
         font-weight: 700;
+        margin-right: 6px;
       }
-      .muted {
-        color: #6b7280;
-        font-size: 13px;
-      }
+      .muted { color: #6b7280; font-size: 12px; }
       .kvs {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 14px;
       }
       .kv {
-        padding: 12px;
         border: 1px solid #e6e8eb;
         border-radius: 12px;
+        padding: 12px;
         background: #fafafa;
       }
       .kv .k {
@@ -89,47 +71,31 @@
         border-radius: 999px;
         overflow: hidden;
       }
-      .bar > div {
+      .fill {
         height: 100%;
+        width: 0%;
         background: #111827;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-      }
-      th, td {
-        text-align: left;
-        padding: 10px 8px;
-        border-bottom: 1px solid #eceef1;
-        font-size: 14px;
-      }
-      th {
-        color: #6b7280;
-        font-weight: 700;
-      }
-      .btnrow {
-        margin-top: 14px;
-      }
-      a.btn {
+      .btnrow { margin-top: 16px; display: flex; gap: 10px; }
+      .btn {
         display: inline-block;
-        text-decoration: none;
         padding: 10px 12px;
         border-radius: 12px;
-        font-weight: 800;
         background: #111827;
         color: #fff;
+        text-decoration: none;
+        font-weight: 800;
+        font-size: 14px;
       }
-      .split {
-        margin-top: 18px;
-        padding-top: 18px;
-        border-top: 1px solid #eceef1;
+      .btn.secondary {
+        background: #fff;
+        color: #111827;
+        border: 1px solid #d1d5db;
       }
-      code {
-        background: #f3f4f6;
-        padding: 2px 6px;
-        border-radius: 8px;
-        font-size: 12px;
+      .split { margin-top: 18px; padding-top: 14px; border-top: 1px solid #eef2f7; }
+      .footer { margin-top: 18px; text-align: center; color: #6b7280; font-size: 12px; }
+      @media (max-width: 860px) {
+        .grid { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -153,27 +119,35 @@
               <div class="k">Your ticketed speed</div>
               <div class="v">{{ report.ticketed_speed }} mph</div>
             </div>
+
+            {% if report.total_paid is not none %}
+            <div class="kv">
+              <div class="k">Total amount paid</div>
+              <div class="v">${{ "%.2f"|format(report.total_paid) }}</div>
+            </div>
+            {% endif %}
+
             <div class="kv">
               <div class="k">Road grouping key</div>
-              <div class="v" style="font-size:14px">{{ report.road_key }}</div>
+              <div class="v" style="font-size:14px">{{ format_road_bucket(report.road_key) }}</div>
             </div>
           </div>
 
-          {% if report.notes %}
-            <h2>Your notes</h2>
-            <p>{{ report.notes }}</p>
-          {% endif %}
-
           <div class="btnrow">
             <a class="btn" href="{{ url_for('home') }}">Submit another</a>
+            <a class="btn secondary" href="{{ url_for('home') }}">Back home</a>
           </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="card">
+          <h1>Your Result</h1>
 
           <!-- COMPARISON A -->
-          <div class="split">
+          <div class="split" style="border-top:none; padding-top:0; margin-top:0;">
             <h2>How your ticket compares on this road</h2>
             <p class="muted">
-              Same road and posted speed
-              (<code>{{ state_group }}</code> · <code>{{ report.road_key }}</code> · <code>{{ report.posted_speed }}</code>)
+              Same state, same road bucket, same posted speed
             </p>
 
             <div class="kvs">
@@ -181,15 +155,29 @@
                 <div class="k">Typical enforced speed</div>
                 <div class="v">{{ stats_a.enforced_speed }} mph</div>
               </div>
+
+              {% if paid_a.n %}
+              <div class="kv">
+                <div class="k">Typical total paid</div>
+                <div class="v">${{ "%.2f"|format(paid_a.median) }}</div>
+              </div>
+              {% endif %}
+
               <div class="kv">
                 <div class="k">Your percentile</div>
                 <div class="v">{{ stats_a.percentile }}%</div>
               </div>
+
+              <div class="kv">
+                <div class="k">Tickets in this group</div>
+                <div class="v">{{ stats_a.n }}</div>
+              </div>
             </div>
 
             <div class="barwrap">
+              <div class="muted">Where you fall</div>
               <div class="bar">
-                <div style="width: {{ stats_a.percentile }}%;"></div>
+                <div class="fill" style="width: {{ stats_a.percentile }}%;"></div>
               </div>
             </div>
 
@@ -208,15 +196,29 @@
                 <div class="k">Typical enforced speed</div>
                 <div class="v">{{ stats_b.enforced_speed }} mph</div>
               </div>
+
+              {% if paid_b.n %}
+              <div class="kv">
+                <div class="k">Typical total paid</div>
+                <div class="v">${{ "%.2f"|format(paid_b.median) }}</div>
+              </div>
+              {% endif %}
+
               <div class="kv">
                 <div class="k">Your percentile</div>
                 <div class="v">{{ stats_b.percentile }}%</div>
               </div>
+
+              <div class="kv">
+                <div class="k">Tickets in this group</div>
+                <div class="v">{{ stats_b.n }}</div>
+              </div>
             </div>
 
             <div class="barwrap">
+              <div class="muted">Where you fall</div>
               <div class="bar">
-                <div style="width: {{ stats_b.percentile }}%;"></div>
+                <div class="fill" style="width: {{ stats_b.percentile }}%;"></div>
               </div>
             </div>
 
@@ -224,31 +226,10 @@
           </div>
         </div>
 
-        <!-- RIGHT COLUMN -->
-        <div class="card">
-          <h2>Local comparison details</h2>
-          <table>
-            <tr><th>Metric</th><th>Value</th></tr>
-            <tr><td>Min</td><td>{{ stats_a.min }} mph</td></tr>
-            <tr><td>Median</td><td>{{ stats_a.median }} mph</td></tr>
-            <tr><td>Mean</td><td>{{ stats_a.mean }} mph</td></tr>
-            <tr><td>Max</td><td>{{ stats_a.max }} mph</td></tr>
-          </table>
+      </div>
 
-          <p class="muted">Raw speeds: {{ stats_a.speeds_sorted }}</p>
-
-          <h2 style="margin-top:16px;">Statewide comparison details</h2>
-          <table>
-            <tr><th>Metric</th><th>Value</th></tr>
-            <tr><td>Min</td><td>{{ stats_b.min }} mph</td></tr>
-            <tr><td>Median</td><td>{{ stats_b.median }} mph</td></tr>
-            <tr><td>Mean</td><td>{{ stats_b.mean }} mph</td></tr>
-            <tr><td>Max</td><td>{{ stats_b.max }} mph</td></tr>
-          </table>
-
-          <p class="muted">Raw speeds: {{ stats_b.speeds_sorted }}</p>
-        </div>
-
+      <div class="footer">
+        © 2025 EnforcedSpeed · Developed by Conor Gordon · Gordon Capital Holdings LLC
       </div>
     </div>
   </body>

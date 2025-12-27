@@ -44,7 +44,7 @@ def normalize_state_input(value: str) -> str:
 
 class SpeedReportForm(FlaskForm):
     state = StringField(
-        "State (type to search)",
+        "State",
         validators=[
             DataRequired(message="Please enter a state (e.g., VA or Virginia)."),
             Length(max=100, message="Keep it under 100 characters."),
@@ -53,7 +53,7 @@ class SpeedReportForm(FlaskForm):
     )
 
     road_name = StringField(
-        "Road / Location (free text)",
+        "Road / Location",
         validators=[
             DataRequired(message="Please enter the road/location."),
             Length(max=200, message="Keep it under 200 characters."),
@@ -62,7 +62,7 @@ class SpeedReportForm(FlaskForm):
     )
 
     posted_speed = IntegerField(
-        "Posted speed limit (mph)",
+        "Posted speed limit",
         validators=[
             DataRequired(message="Please enter the posted speed."),
             NumberRange(min=0, max=120, message="Enter a reasonable speed (0–120)."),
@@ -71,19 +71,12 @@ class SpeedReportForm(FlaskForm):
     )
 
     ticketed_speed = IntegerField(
-        "Ticketed speed (mph)",
+        "Ticketed speed",
         validators=[
             DataRequired(message="Please enter the ticketed speed."),
             NumberRange(min=0, max=150, message="Enter a reasonable speed (0–150)."),
         ],
         render_kw={"placeholder": "e.g., 79"},
-    )
-
-    total_paid = DecimalField(
-        "Total amount paid (optional)",
-        validators=[Optional(), NumberRange(min=0, max=50000, message="Enter a reasonable amount.")],
-        places=2,
-        render_kw={"placeholder": "e.g., 245.00"},
     )
 
     notes = TextAreaField(

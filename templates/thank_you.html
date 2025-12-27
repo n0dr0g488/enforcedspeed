@@ -120,13 +120,6 @@
               <div class="v">{{ report.ticketed_speed }} mph</div>
             </div>
 
-            {% if report.total_paid is not none %}
-            <div class="kv">
-              <div class="k">Total amount paid</div>
-              <div class="v">${{ "%.2f"|format(report.total_paid) }}</div>
-            </div>
-            {% endif %}
-
             <div class="kv">
               <div class="k">Road grouping key</div>
               <div class="v" style="font-size:14px">{{ format_road_bucket(report.road_key) }}</div>
@@ -155,13 +148,6 @@
                 <div class="k">Typical enforced speed</div>
                 <div class="v">{{ stats_a.enforced_speed }} mph</div>
               </div>
-
-              {% if paid_a.n %}
-              <div class="kv">
-                <div class="k">Typical total paid</div>
-                <div class="v">${{ "%.2f"|format(paid_a.median) }}</div>
-              </div>
-              {% endif %}
 
               <div class="kv">
                 <div class="k">Your percentile</div>
@@ -196,13 +182,6 @@
                 <div class="k">Typical enforced speed</div>
                 <div class="v">{{ stats_b.enforced_speed }} mph</div>
               </div>
-
-              {% if paid_b.n %}
-              <div class="kv">
-                <div class="k">Typical total paid</div>
-                <div class="v">${{ "%.2f"|format(paid_b.median) }}</div>
-              </div>
-              {% endif %}
 
               <div class="kv">
                 <div class="k">Your percentile</div>

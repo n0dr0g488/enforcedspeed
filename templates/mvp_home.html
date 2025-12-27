@@ -122,10 +122,6 @@
           <label for="ticketed_speed">{{ form.ticketed_speed.label.text }}</label>
           {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
 
-          <label for="total_paid">{{ form.total_paid.label.text }}</label>
-          {{ form.total_paid(id="total_paid", type="text", inputmode="decimal", autocomplete="off", spellcheck="false") }}
-          <div class="subtle" style="margin-top: 6px;">Optional. If you know the total you paid (fine + fees), enter it.</div>
-
           <div class="blocks">
             <div class="block">
               <strong>Most enforced (all time)</strong>
@@ -179,7 +175,6 @@
 
       const postedEl = document.getElementById("posted_speed");
       const ticketedEl = document.getElementById("ticketed_speed");
-      const paidEl = document.getElementById("total_paid");
       const formEl = document.getElementById("ticketForm");
 
       let t = null;
@@ -260,9 +255,8 @@
 
       postedEl.addEventListener("blur", () => applyMph(postedEl));
       ticketedEl.addEventListener("blur", () => applyMph(ticketedEl));
-      paidEl.addEventListener("blur", () => applyDollar(paidEl));
 
-      [postedEl, ticketedEl, paidEl].forEach(el => {
+      [postedEl, ticketedEl].forEach(el => {
         el.addEventListener("focus", () => stripField(el));
       });
 
@@ -270,7 +264,6 @@
       formEl.addEventListener("submit", () => {
         stripField(postedEl);
         stripField(ticketedEl);
-        stripField(paidEl);
       });
 
       stateEl.addEventListener("input", schedulePreview);

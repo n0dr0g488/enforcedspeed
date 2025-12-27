@@ -126,11 +126,6 @@ def create_app() -> Flask:
         )
         return db.session.execute(q, {"t": table_name, "c": column_name}).first() is not None
 
-    def ensure_schema_patches() -> None:
-        if not column_exists("speed_reports", "total_paid"):
-            db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN total_paid NUMERIC(10,2)"))
-            db.session.commit()
-
     def most_enforced_rows(since: datetime | None) -> List[Dict]:
         q = (
             db.session.query(
@@ -194,7 +189,6 @@ def create_app() -> Flask:
             road_name=form.road_name.data,
             posted_speed=form.posted_speed.data,
             ticketed_speed=form.ticketed_speed.data,
-            total_paid=form.total_paid.data,
             notes=None,
         )
         report.refresh_road_key()
@@ -216,12 +210,6 @@ def create_app() -> Flask:
         enforced = round(median(speeds_sorted), 1)
         return {"n": n, "enforced_speed": enforced, "percentile": percentile}
 
-    def compute_money_stats(values: List[float], user_value: float | None) -> Dict:
-        vals = sorted(values)
-        n = len(vals)
-        if n == 0:
-            return {"n": 0, "median": None, "percentile": None}
-
         med = round(median(vals), 2)
         if user_value is None:
             pct = None
@@ -242,7 +230,6 @@ def create_app() -> Flask:
                 SpeedReport.road_key,
                 SpeedReport.posted_speed,
                 SpeedReport.ticketed_speed,
-                SpeedReport.total_paid,
             )
             .filter(SpeedReport.posted_speed == report.posted_speed)
             .all()
@@ -250,39 +237,24 @@ def create_app() -> Flask:
 
         speeds_state_posted: List[int] = []
         speeds_state_road_posted: List[int] = []
-        paid_state_posted: List[float] = []
-        paid_state_road_posted: List[float] = []
 
-        for st, road_key, posted, ticketed, total_paid in rows:
+        for st, road_key, posted, ticketed in rows:
             if normalize_state_group(st) != state_group:
                 continue
 
             speeds_state_posted.append(ticketed)
-            if total_paid is not None:
-                paid_state_posted.append(float(total_paid))
 
             if road_key == report.road_key:
                 speeds_state_road_posted.append(ticketed)
-                if total_paid is not None:
-                    paid_state_road_posted.append(float(total_paid))
 
         stats_a = compute_distribution_stats(speeds_state_road_posted, report.ticketed_speed)
         stats_b = compute_distribution_stats(speeds_state_posted, report.ticketed_speed)
-
-        paid_a = compute_money_stats(
-            paid_state_road_posted, float(report.total_paid) if report.total_paid is not None else None
-        )
-        paid_b = compute_money_stats(
-            paid_state_posted, float(report.total_paid) if report.total_paid is not None else None
-        )
 
         return render_template(
             "thank_you.html",
             report=report,
             stats_a=stats_a,
             stats_b=stats_b,
-            paid_a=paid_a,
-            paid_b=paid_b,
             state_group=state_group,
         )
 

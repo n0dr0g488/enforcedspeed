@@ -129,9 +129,6 @@ class SpeedReport(db.Model):
     posted_speed = db.Column(db.Integer, nullable=False, index=True)
     ticketed_speed = db.Column(db.Integer, nullable=False)
 
-    # NEW: total amount paid (fine + fees)
-    total_paid = db.Column(db.Numeric(10, 2), nullable=True)
-
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
@@ -147,5 +144,4 @@ class SpeedReport(db.Model):
         return (
             f"<SpeedReport id={self.id} state={self.state!r} road_name={self.road_name!r} "
             f"road_key={self.road_key!r} posted={self.posted_speed} ticketed={self.ticketed_speed} "
-            f"total_paid={self.total_paid}>"
         )

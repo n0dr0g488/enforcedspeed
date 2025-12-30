@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EnforcedSpeed · {{ profile_user.username }}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
+    .wrap { max-width: 720px; margin: 40px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 8px 26px rgba(0,0,0,.08); }
+    .subtle { color:#6b7280; font-size:12px; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; font-weight:700; margin-right:6px; }
+    .row { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+    .list { margin-top: 14px; }
+    .item { border: 1px solid #e6e8eb; border-radius: 12px; padding: 12px; background:#fafafa; margin-bottom: 10px; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="row">
+        <div>
+          <h1 style="margin:0;">@{{ profile_user.username }}</h1>
+          <div class="subtle" style="margin-top:6px;">
+            Joined: {{ profile_user.created_at.strftime("%b %d, %Y") }}
+          </div>
+        </div>
+
+        <div class="subtle">
+          <a href="{{ url_for('home') }}">Home</a>
+          · <a href="{{ url_for('home') }}#ticketForm">Post a ticket</a>
+
+          {% if current_user.is_authenticated and current_user.id == profile_user.id %}
+              · <a href="{{ url_for('logout') }}">Log out</a>
+          {% endif %}
+        </div>  
+      </div>
+
+      <div style="margin-top:12px;">
+        <span class="pill">Tickets posted: {{ ticket_count }}</span>
+      </div>
+
+      <div class="list">
+        <h3 style="margin: 14px 0 10px;">Tickets</h3>
+
+        {% if reports %}
+          {% for r in reports %}
+            <div class="item">
+              <div class="row">
+                <div>
+                  <span class="pill">{{ r.state }}</span>
+                  <span class="pill">{{ format_road_bucket(r.road_key) }}</span>
+                </div>
+                <div class="subtle">{{ r.created_at.strftime("%b %d, %Y") }}</div>
+              </div>
+
+              <div style="margin-top:10px;">
+                Posted: <strong>{{ r.posted_speed }} mph</strong> ·
+                Ticketed: <strong>{{ r.ticketed_speed }} mph</strong> ·
+                Over: <strong>+{{ (r.ticketed_speed - r.posted_speed) }} mph</strong>
+              </div>
+
+              <div class="subtle" style="margin-top:8px;">
+                <a href="{{ url_for('result', report_id=r.id) }}">View report</a>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="subtle">No tickets posted yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

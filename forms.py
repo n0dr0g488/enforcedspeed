@@ -1,8 +1,8 @@
 # forms.py
 import re
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, TextAreaField, SubmitField, DecimalField
-from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
+from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField
+from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError, Email, EqualTo, Regexp
 
 US_STATE_CODES = {
     "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA",
@@ -94,3 +94,26 @@ class SpeedReportForm(FlaskForm):
         if norm in US_STATE_NAMES:
             return
         raise ValidationError("Pick a real U.S. state (e.g., 'VA' or 'Virginia'). Don’t leave it partial like 'virg'.")
+class RegisterForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=255)])
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(),
+            Length(min=3, max=20),
+            Regexp(r"^[a-z0-9_]+$", message="Username can only use a-z, 0-9, and underscores."),
+        ],
+        render_kw={"placeholder": "e.g., fastticketguy"},
+    )
+    password = PasswordField("Password", validators=[DataRequired(), Length(min=8, max=128)])
+    confirm_password = PasswordField(
+        "Confirm Password",
+        validators=[DataRequired(), EqualTo("password", message="Passwords must match.")],
+    )
+    submit = SubmitField("Create Account")
+
+
+class LoginForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=255)])
+    password = PasswordField("Password", validators=[DataRequired()])
+    submit = SubmitField("Log In")

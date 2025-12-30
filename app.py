@@ -6,12 +6,13 @@ from datetime import datetime, timedelta
 from statistics import median
 from typing import Dict, List
 
-from flask import Flask, render_template, redirect, url_for, jsonify, request
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
+from flask_login import LoginManager, login_user, logout_user, current_user
 from sqlalchemy import text, func
 
 from config import Config
-from forms import SpeedReportForm
-from models import db, SpeedReport, normalize_road, state_code_from_value
+from forms import SpeedReportForm, RegisterForm, LoginForm
+from models import db, SpeedReport, User, normalize_road, state_code_from_value
 
 
 STATE_OPTIONS = [
@@ -67,7 +68,7 @@ def format_road_bucket(road_key: str) -> str:
     m_dir = re.search(r"-(nb|sb|eb|wb)$", k)
     if m_dir:
         dir_suffix = " " + m_dir.group(1).upper()
-        k = k[: -(len(m_dir.group(0)))]
+        k = k[: -(len(m_dir.group(0)))]  # remove "-nb"
 
     m = re.fullmatch(r"i(\d{1,3})", k)
     if m:
@@ -89,10 +90,45 @@ def format_road_bucket(road_key: str) -> str:
     return road_key.upper()
 
 
+def column_exists(table_name: str, column_name: str) -> bool:
+    engine = db.engine
+    dialect = engine.dialect.name
+
+    if dialect == "sqlite":
+        rows = db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+        return any(r[1] == column_name for r in rows)
+
+    q = text(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = :t
+          AND column_name = :c
+        LIMIT 1
+        """
+    )
+    return db.session.execute(q, {"t": table_name, "c": column_name}).first() is not None
+
+
+def ensure_schema_patches() -> None:
+    # Add nullable user_id to speed_reports for existing databases.
+    if not column_exists("speed_reports", "user_id"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN user_id INTEGER"))
+        db.session.commit()
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
     db.init_app(app)
+
+    login_manager = LoginManager()
+    login_manager.login_view = "login"
+    login_manager.init_app(app)
+
+    @login_manager.user_loader
+    def load_user(user_id: str):
+        return User.query.get(int(user_id))
 
     @app.context_processor
     def inject_helpers():
@@ -107,24 +143,75 @@ def create_app() -> Flask:
         except Exception:
             db.session.rollback()
 
-    def column_exists(table_name: str, column_name: str) -> bool:
-        engine = db.engine
-        dialect = engine.dialect.name
+    @app.route("/register", methods=["GET", "POST"])
+    def register():
+        if current_user.is_authenticated:
+            return redirect(url_for("home"))
 
-        if dialect == "sqlite":
-            rows = db.session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
-            return any(r[1] == column_name for r in rows)
+        form = RegisterForm()
+        if form.validate_on_submit():
+            email = form.email.data.strip().lower()
+            username = form.username.data.strip().lower()
 
-        q = text(
-            """
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_name = :t
-              AND column_name = :c
-            LIMIT 1
-            """
+            if User.query.filter_by(email=email).first():
+                flash("That email is already registered. Please log in.", "error")
+                return redirect(url_for("login"))
+
+            if User.query.filter_by(username=username).first():
+                flash("That username is taken. Try another.", "error")
+                return render_template("register.html", form=form)
+
+            user = User(email=email, username=username)
+            user.set_password(form.password.data)
+            db.session.add(user)
+            db.session.commit()
+
+            login_user(user)
+            return redirect(url_for("profile", username=user.username))
+
+        return render_template("register.html", form=form)
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if current_user.is_authenticated:
+            return redirect(url_for("home"))
+
+        form = LoginForm()
+        if form.validate_on_submit():
+            email = form.email.data.strip().lower()
+            user = User.query.filter_by(email=email).first()
+
+            if not user or not user.check_password(form.password.data):
+                flash("Invalid email or password.", "error")
+                return render_template("login.html", form=form)
+
+            login_user(user)
+            return redirect(url_for("home"))
+
+        return render_template("login.html", form=form)
+
+    @app.get("/logout")
+    def logout():
+        logout_user()
+        return redirect(url_for("home"))
+
+    @app.get("/u/<username>")
+    def profile(username: str):
+        u = User.query.filter_by(username=username.strip().lower()).first_or_404()
+
+        reports = (
+            SpeedReport.query.filter(SpeedReport.user_id == u.id)
+            .order_by(SpeedReport.created_at.desc())
+            .limit(50)
+            .all()
         )
-        return db.session.execute(q, {"t": table_name, "c": column_name}).first() is not None
+
+        return render_template(
+            "profile.html",
+            profile_user=u,
+            reports=reports,
+            ticket_count=len(reports),
+        )
 
     def most_enforced_rows(since: datetime | None) -> List[Dict]:
         q = (
@@ -190,6 +277,7 @@ def create_app() -> Flask:
             posted_speed=form.posted_speed.data,
             ticketed_speed=form.ticketed_speed.data,
             notes=None,
+            user_id=(current_user.id if current_user.is_authenticated else None),
         )
         report.refresh_road_key()
 

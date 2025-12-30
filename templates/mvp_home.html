@@ -80,6 +80,18 @@
         <h1>Enforced Speed</h1>
         <p>Received a speeding ticket? Submit your details to see how you compare.</p>
 
+        <p class="subtle" style="margin-top:-10px;">
+          {% if current_user.is_authenticated %}
+            Logged in as <strong>@{{ current_user.username }}</strong> ·
+             <a href="{{ url_for('profile', username=current_user.username) }}">My profile</a> ·
+             <a href="{{ url_for('logout') }}">Log out</a>
+          {% else %}
+            <a href="{{ url_for('login') }}">Log in</a> ·
+            <a href="{{ url_for('register') }}">Create account</a>
+          {% endif %}
+</p>
+
+
         {% if form.errors %}
           <div class="errors">
             <strong>Fix these:</strong>

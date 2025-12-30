@@ -2,6 +2,9 @@
 import re
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 db = SQLAlchemy()
 
@@ -111,11 +114,32 @@ def normalize_road(value: str, state_value: str = "") -> str:
     # Fallback: slugify-ish
     return normalize_text_basic(value)
 
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    reports = db.relationship("SpeedReport", backref="user", lazy=True)
+
+    def set_password(self, password: str) -> None:
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return check_password_hash(self.password_hash, password)
+
+    def __repr__(self) -> str:
+        return f"<User id={self.id} username={self.username!r}>"
 
 class SpeedReport(db.Model):
     __tablename__ = "speed_reports"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
 
     # Raw user input
     state = db.Column(db.String(100), nullable=False)

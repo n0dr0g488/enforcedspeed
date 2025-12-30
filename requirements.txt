@@ -4,3 +4,4 @@ Flask-WTF>=1.2
 Flask-Login>=0.6
 gunicorn>=21.2
 psycopg[binary]>=3.2
+email-validator==2.3.0

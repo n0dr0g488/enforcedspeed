@@ -181,7 +181,7 @@
           <div class="kvs">
             <div class="kv">
               <div class="k">Typical enforced speed</div>
-              <div class="v">{{ stats_a.median }} mph</div>
+              <div class="v">{{ (stats_a.median or stats_a.enforced_speed or stats_a.mean or stats_a.p50 or report.ticketed_speed) }} mph</div>
             </div>
             <div class="kv">
               <div class="k">Your percentile</div>
@@ -210,7 +210,7 @@
           <div class="kvs">
             <div class="kv">
               <div class="k">Typical enforced speed</div>
-              <div class="v">{{ stats_b.median }} mph</div>
+              <div class="v">{{ (stats_b.median or stats_b.enforced_speed or stats_b.mean or stats_b.p50 or report.ticketed_speed) }} mph</div>
             </div>
             <div class="kv">
               <div class="k">Your percentile</div>

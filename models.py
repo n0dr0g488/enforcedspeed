@@ -123,6 +123,10 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
+    # Password reset rate limiting (per account)
+    reset_req_window_start = db.Column(db.DateTime, nullable=True)
+    reset_req_count = db.Column(db.Integer, nullable=True)
+
     reports = db.relationship("SpeedReport", backref="user", lazy=True)
 
     def set_password(self, password: str) -> None:

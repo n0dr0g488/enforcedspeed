@@ -29,9 +29,9 @@
 
         <div class="subtle">
           <a href="{{ url_for('home') }}">Home</a>
-          · <a href="{{ url_for('home') }}#ticketForm">Post a ticket</a>
 
           {% if current_user.is_authenticated and current_user.id == profile_user.id %}
+              · <a href="{{ url_for('change_password') }}">Change password</a>
               · <a href="{{ url_for('logout') }}">Log out</a>
           {% endif %}
         </div>  

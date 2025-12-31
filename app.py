@@ -1,17 +1,21 @@
 # app.py
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime, timedelta
 from statistics import median
 from typing import Dict, List
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
-from flask_login import LoginManager, login_user, logout_user, current_user
+from flask_login import LoginManager, login_user, logout_user, current_user, login_required
 from sqlalchemy import text, func
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 from config import Config
-from forms import SpeedReportForm, RegisterForm, LoginForm
+from forms import SpeedReportForm, RegisterForm, LoginForm, ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm
 from models import db, SpeedReport, User, normalize_road, state_code_from_value
 
 
@@ -116,6 +120,16 @@ def ensure_schema_patches() -> None:
         db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN user_id INTEGER"))
         db.session.commit()
 
+    # Add password reset rate limit columns to users for existing databases.
+    if not column_exists("users", "reset_req_window_start"):
+        db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_window_start TIMESTAMP"))
+        db.session.commit()
+
+    if not column_exists("users", "reset_req_count"):
+        db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_count INTEGER"))
+        db.session.commit()
+
+
 
 def create_app() -> Flask:
     app = Flask(__name__)
@@ -178,11 +192,15 @@ def create_app() -> Flask:
 
         form = LoginForm()
         if form.validate_on_submit():
-            email = form.email.data.strip().lower()
-            user = User.query.filter_by(email=email).first()
+            identifier = form.email.data.strip().lower()
+
+            # Allow login via username OR email (username first, then email).
+            user = User.query.filter_by(username=identifier).first()
+            if not user:
+                user = User.query.filter_by(email=identifier).first()
 
             if not user or not user.check_password(form.password.data):
-                flash("Invalid email or password.", "error")
+                flash("Invalid username/email or password.", "error")
                 return render_template("login.html", form=form)
 
             login_user(user)
@@ -194,6 +212,131 @@ def create_app() -> Flask:
     def logout():
         logout_user()
         return redirect(url_for("home"))
+
+
+    def _password_reset_serializer() -> URLSafeTimedSerializer:
+        return URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
+    def _send_password_reset_email(user: User) -> None:
+        api_key = os.environ.get('SENDGRID_API_KEY', '').strip()
+        from_email = os.environ.get('SENDGRID_FROM_EMAIL', 'noreply@enforcedspeed.com').strip()
+        if not api_key:
+            # No API key configured; skip sending (do not error to user).
+            return
+
+        s = _password_reset_serializer()
+        token = s.dumps({'uid': user.id}, salt='password-reset')
+        reset_url = url_for('reset_password', token=token, _external=True)
+
+        subject = 'EnforcedSpeed password reset'
+        content = (
+            "You requested a password reset for your EnforcedSpeed account.\n\n"
+            f"Reset your password here (link expires in 60 minutes):\n{reset_url}\n\n"
+            "If you did not request this, you can ignore this email."
+        )
+
+        message = Mail(from_email=from_email, to_emails=user.email, subject=subject, plain_text_content=content)
+        try:
+            SendGridAPIClient(api_key).send(message)
+        except Exception:
+            # Intentionally swallow errors to avoid breaking UX / leaking info.
+            return
+
+    def _can_issue_reset_email(user: User) -> bool:
+        """Max 5 reset emails per hour per account."""
+        now = datetime.utcnow()
+        window = timedelta(hours=1)
+
+        if not getattr(user, 'reset_req_window_start', None) or not getattr(user, 'reset_req_count', None):
+            user.reset_req_window_start = now
+            user.reset_req_count = 1
+            db.session.commit()
+            return True
+
+        start = user.reset_req_window_start
+        count = int(user.reset_req_count or 0)
+
+        if start is None or (now - start) >= window:
+            user.reset_req_window_start = now
+            user.reset_req_count = 1
+            db.session.commit()
+            return True
+
+        if count >= 5:
+            return False
+
+        user.reset_req_count = count + 1
+        db.session.commit()
+        return True
+
+    @app.route('/change-password', methods=['GET', 'POST'])
+    @login_required
+    def change_password():
+        form = ChangePasswordForm()
+        if form.validate_on_submit():
+            if not current_user.check_password(form.current_password.data):
+                flash('Current password is incorrect.', 'error')
+                return render_template('change_password.html', form=form)
+
+            current_user.set_password(form.new_password.data)
+            db.session.commit()
+            flash('Password updated.', 'success')
+            return redirect(url_for('profile', username=current_user.username))
+
+        return render_template('change_password.html', form=form)
+
+    @app.route('/forgot-password', methods=['GET', 'POST'])
+    def forgot_password():
+        if current_user.is_authenticated:
+            return redirect(url_for('home'))
+
+        form = ForgotPasswordForm()
+        if form.validate_on_submit():
+            identifier = form.identifier.data.strip().lower()
+
+            user = User.query.filter_by(username=identifier).first()
+            if not user:
+                user = User.query.filter_by(email=identifier).first()
+
+            # Always show the same message to avoid revealing whether an account exists.
+            flash('If an account exists for that username/email, a reset link has been sent.', 'success')
+
+            if user and _can_issue_reset_email(user):
+                _send_password_reset_email(user)
+
+            return redirect(url_for('login'))
+
+        return render_template('forgot_password.html', form=form)
+
+    @app.route('/reset-password/<token>', methods=['GET', 'POST'])
+    def reset_password(token: str):
+        if current_user.is_authenticated:
+            return redirect(url_for('home'))
+
+        s = _password_reset_serializer()
+        try:
+            data = s.loads(token, salt='password-reset', max_age=60 * 60)
+        except SignatureExpired:
+            flash('That reset link has expired. Please request a new one.', 'error')
+            return redirect(url_for('forgot_password'))
+        except BadSignature:
+            flash('Invalid reset link. Please request a new one.', 'error')
+            return redirect(url_for('forgot_password'))
+
+        uid = (data or {}).get('uid')
+        user = User.query.get(int(uid)) if uid is not None else None
+        if not user:
+            flash('Invalid reset link. Please request a new one.', 'error')
+            return redirect(url_for('forgot_password'))
+
+        form = ResetPasswordForm()
+        if form.validate_on_submit():
+            user.set_password(form.new_password.data)
+            db.session.commit()
+            flash('Password updated. You can log in now.', 'success')
+            return redirect(url_for('login'))
+
+        return render_template('reset_password.html', form=form, token=token)
 
     @app.get("/u/<username>")
     def profile(username: str):

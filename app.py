@@ -356,47 +356,104 @@ def create_app() -> Flask:
             ticket_count=len(reports),
         )
 
-    def most_enforced_rows(since: datetime | None) -> List[Dict]:
+    def strictness_rows(limit: int, exclude_anonymous: bool) -> Dict[str, List[Dict]]:
+        """Return Most Strict and Least Strict rankings.
+
+        Strictness is based on the MEDIAN overage (ticketed - posted), considering only tickets where
+        ticketed_speed > posted_speed. Lower median overage = more strict.
+        """
         q = (
             db.session.query(
                 SpeedReport.state.label("state"),
                 SpeedReport.road_key.label("road_key"),
-                func.count(SpeedReport.id).label("tickets"),
-                func.avg(SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("avg_overage"),
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("overage"),
+                SpeedReport.created_at.label("created_at"),
+                User.username.label("username"),
+                SpeedReport.user_id.label("user_id"),
             )
-            .group_by(SpeedReport.state, SpeedReport.road_key)
+            .outerjoin(User, User.id == SpeedReport.user_id)
+            .filter(SpeedReport.ticketed_speed > SpeedReport.posted_speed)
         )
 
-        if since is not None:
-            q = q.filter(SpeedReport.created_at >= since)
-
-        q = q.order_by(func.avg(SpeedReport.ticketed_speed - SpeedReport.posted_speed).desc()).limit(5)
+        if exclude_anonymous:
+            q = q.filter(SpeedReport.user_id.isnot(None))
 
         rows = q.all()
-        return [
-            {
-                "state": normalize_state_group(r.state),
-                "road": r.road_key,
-                "avg_overage": round(float(r.avg_overage), 1) if r.avg_overage is not None else 0.0,
-                "tickets": int(r.tickets),
-            }
-            for r in rows
-        ]
+
+        groups: Dict[tuple, Dict] = {}
+        for r in rows:
+            key = (normalize_state_group(r.state), r.road_key)
+            g = groups.get(key)
+            if g is None:
+                g = {
+                    "state": key[0],
+                    "road": key[1],
+                    "overages": [],
+                    "tickets": 0,
+                    "anon_tickets": 0,
+                    "member_tickets": 0,
+                }
+                groups[key] = g
+
+            g["overages"].append(int(r.overage))
+            g["tickets"] += 1
+
+            if r.user_id is None:
+                g["anon_tickets"] += 1
+            else:
+                g["member_tickets"] += 1
+
+        results: List[Dict] = []
+        for g in groups.values():
+            med = float(median(g["overages"])) if g["overages"] else 0.0
+            results.append(
+                {
+                    "state": g["state"],
+                    "road": g["road"],
+                    "median_overage": round(med, 1),
+                    "tickets": int(g["tickets"]),
+                    "anon_pct": int(round((g["anon_tickets"] / g["tickets"]) * 100)) if g["tickets"] else 0,
+                    "member_pct": (100 - int(round((g["anon_tickets"] / g["tickets"]) * 100))) if g["tickets"] else 0,
+                }
+            )
+
+        # Primary sort key: median_overage (asc for strict, desc for least)
+        # Tie-breakers: tickets (desc), then (state, road) alphabetical
+        most_strict = sorted(
+            results,
+            key=lambda x: (x["median_overage"], -x["tickets"], x["state"], x["road"]),
+        )[:limit]
+
+        least_strict = sorted(
+            results,
+            key=lambda x: (-x["median_overage"], -x["tickets"], x["state"], x["road"]),
+        )[:limit]
+
+        return {"most_strict": most_strict, "least_strict": least_strict}
 
     @app.get("/")
     def home():
         form = SpeedReportForm()
         ticket_count = SpeedReport.query.count()
 
-        most_enforced_all = most_enforced_rows(since=None)
-        most_enforced_24h = most_enforced_rows(since=datetime.utcnow() - timedelta(hours=24))
+        hide_anon_requested = (request.args.get("hide_anon") == "1")
+
+        if hide_anon_requested and not current_user.is_authenticated:
+            flash("You must be logged in to hide anonymous posts.", "info")
+
+        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        strictness = strictness_rows(limit=5, exclude_anonymous=hide_anon)
+        most_strict = strictness["most_strict"]
+        least_strict = strictness["least_strict"]
 
         return render_template(
             "mvp_home.html",
             form=form,
             ticket_count=ticket_count,
-            most_enforced_all=most_enforced_all,
-            most_enforced_24h=most_enforced_24h,
+            most_strict=most_strict,
+            least_strict=least_strict,
+            hide_anon=hide_anon,
             state_options=STATE_OPTIONS,
         )
 
@@ -409,8 +466,9 @@ def create_app() -> Flask:
                 "mvp_home.html",
                 form=form,
                 ticket_count=SpeedReport.query.count(),
-                most_enforced_all=most_enforced_rows(since=None),
-                most_enforced_24h=most_enforced_rows(since=datetime.utcnow() - timedelta(hours=24)),
+                most_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["most_strict"],
+                least_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["least_strict"],
+                hide_anon=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"),
                 state_options=STATE_OPTIONS,
             )
 
@@ -449,6 +507,63 @@ def create_app() -> Flask:
             pct = round((le_count / n) * 100, 1)
 
         return {"n": n, "median": med, "percentile": pct}
+
+
+    @app.get("/strictness")
+    def strictness():
+        hide_anon_requested = (request.args.get("hide_anon") == "1")
+
+        if hide_anon_requested and not current_user.is_authenticated:
+            flash("You must be logged in to hide anonymous posts.", "info")
+
+        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+        strictness = strictness_rows(limit=20, exclude_anonymous=hide_anon)
+        most_strict = strictness["most_strict"]
+        least_strict = strictness["least_strict"]
+
+        return render_template(
+            "strictness.html",
+            most_strict=most_strict,
+            least_strict=least_strict,
+            hide_anon=hide_anon,
+        )
+
+    
+    @app.get("/tickets")
+    def bucket_tickets():
+        """Show up to 50 tickets for a given (state, road) combo."""
+        state = (request.args.get("state") or "").strip().upper()
+        road_key = (request.args.get("road") or "").strip()
+
+        if not state or not road_key:
+            flash("Missing state or road.", "error")
+            return redirect(url_for("home"))
+
+        # Match stored state strings like "KS - Kansas" using the two-letter prefix
+        rows = (
+            db.session.query(
+                SpeedReport.state,
+                SpeedReport.road_key,
+                SpeedReport.posted_speed,
+                SpeedReport.ticketed_speed,
+                SpeedReport.created_at,
+                User.username.label("username"),
+                SpeedReport.user_id,
+            )
+            .outerjoin(User, User.id == SpeedReport.user_id)
+            .filter(SpeedReport.state.ilike(f"{state}%"))
+            .filter(SpeedReport.road_key == road_key)
+            .order_by(SpeedReport.ticketed_speed.desc())
+            .limit(50)
+            .all()
+        )
+
+        return render_template(
+            "bucket_tickets.html",
+            state=state,
+            road_key=road_key,
+            rows=rows,
+        )
 
     @app.get("/result/<int:report_id>")
     def result(report_id: int):

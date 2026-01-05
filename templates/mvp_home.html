@@ -87,7 +87,7 @@
              <a href="{{ url_for('logout') }}">Log out</a>
           {% else %}
             <a href="{{ url_for('login') }}">Log in</a> ·
-            <a href="{{ url_for('register') }}">Create account</a>
+            <a href="{{ url_for('register') }}">Create account</a> <span class="subtle">(Log in to hide anonymous and see member-only data)</span>
           {% endif %}
 </p>
 
@@ -132,39 +132,72 @@
           {{ form.posted_speed(id="posted_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
 
           <label for="ticketed_speed">{{ form.ticketed_speed.label.text }}</label>
-          {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
-
-          <div class="blocks">
-            <div class="block">
-              <strong>Most enforced (all time)</strong>
-              <ol>
-                {% for r in most_enforced_all %}
-                  <li>
-                    <span class="pill">{{ r.state }}</span>
-                    <span class="pill">{{ format_road_bucket(r.road) }}</span><br>
-                    +{{ r.avg_overage }} mph (tickets: {{ r.tickets }})
-                  </li>
-                {% endfor %}
-              </ol>
-            </div>
-
-            {% if most_enforced_24h %}
-            <div class="block">
-              <strong>Most enforced (last 24 hours)</strong>
-              <ol>
-                {% for r in most_enforced_24h %}
-                  <li>
-                    <span class="pill">{{ r.state }}</span>
-                    <span class="pill">{{ format_road_bucket(r.road) }}</span><br>
-                    +{{ r.avg_overage }} mph (tickets: {{ r.tickets }})
-                  </li>
-                {% endfor %}
-              </ol>
-            </div>
+          {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}<div class="subtle" style="margin: 6px 0 10px 0;">
+            {% if hide_anon %}
+              Viewing: <strong id="viewingMode">Members only</strong> · <a href="{{ url_for('home') }}">Show anonymous too</a>
+            {% else %}
+              Viewing: <strong id="viewingMode">All posts</strong> · {% if current_user.is_authenticated %}
+              <a href="{{ url_for('home', hide_anon=1) }}">Hide anonymous</a>
+            {% else %}
+              <a href="#" id="hideAnonLink" onclick="
+                var vm=document.getElementById('viewingMode');
+                var old=vm.innerText;
+                vm.innerText='Members only';
+                var msg=document.getElementById('loginRequiredMsg');
+                if(msg){msg.style.display='inline';}
+                setTimeout(function(){ vm.innerText=old; }, 700);
+                return false;
+              ">Hide anonymous</a>
+              <span id="loginRequiredMsg" class="subtle" style="display:none; margin-left:8px;">You must be logged in to hide anonymous posts.</span>
+            {% endif %}
             {% endif %}
           </div>
+<div class="blocks">
+            <div class="block">
+              <strong>Most Strict</strong>
+              <ol>
+                {% for r in most_strict %}
+                  <li>
+                    <span class="pill">{{ r.state }}</span>
+                    <span class="pill">{{ format_road_bucket(r.road) }}</span>
+                    {% if r.member_pct == 0 %}<span class="pill">100% anonymous data</span>{% else %}<span class="pill">{{ r.member_pct }}% member data</span>{% endif %}<br>
+                     +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
+                  </li>
+                {% endfor %}
+              </ol>
 
-          {{ form.submit(class_="btn") }}
+              <div class="subtle right" style="margin-top: 6px;">
+                {% if hide_anon %}
+                  <a href="{{ url_for('strictness', hide_anon=1) }}">more</a>
+                {% else %}
+                  <a href="{{ url_for('strictness') }}">more</a>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="block">
+              <strong>Least Strict</strong>
+              <ol>
+                {% for r in least_strict %}
+                  <li>
+                    <span class="pill">{{ r.state }}</span>
+                    <span class="pill">{{ format_road_bucket(r.road) }}</span>
+                    {% if r.member_pct == 0 %}<span class="pill">100% anonymous data</span>{% else %}<span class="pill">{{ r.member_pct }}% member data</span>{% endif %}<br>
+                     +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
+                  </li>
+                {% endfor %}
+              </ol>
+
+              <div class="subtle right" style="margin-top: 6px;">
+                {% if hide_anon %}
+                  <a href="{{ url_for('strictness', hide_anon=1) }}">more</a>
+                {% else %}
+                  <a href="{{ url_for('strictness') }}">more</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+{{ form.submit(class_="btn") }}
 
           <div class="subtle right" style="margin-top: 8px;">
             Total tickets submitted: <strong>{{ ticket_count }}</strong>

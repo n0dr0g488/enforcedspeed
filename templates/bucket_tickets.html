@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tickets · EnforcedSpeed</title>
+    {# Pull in the same inline CSS from mvp_home.html by embedding _mvp_styles.html #}
+    {% include "_mvp_styles.html" %}
+  </head>
+  <body>
+    <div class="shell">
+      <div class="card">
+        <div class="toprow">
+          <div>
+            <div class="brand">EnforcedSpeed</div>
+            <div class="subtle">Tickets for <span class="pill">{{ state }}</span> <span class="pill">{{ format_road_bucket(road_key) }}</span></div>
+          </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div style="margin-top: 10px;">
+              {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <div style="margin-top: 16px;">
+          {% if rows and rows|length > 0 %}
+            <table class="table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;">Posted</th>
+                  <th style="text-align:left;">Ticketed</th>
+                  <th style="text-align:left;">Overage</th>
+                  <th style="text-align:left;">User</th>
+                  <th style="text-align:left;">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in rows %}
+                  <tr>
+                    <td>{{ r.posted_speed }} mph</td>
+                    <td>{{ r.ticketed_speed }} mph</td>
+                    <td>
+                      {% if r.ticketed_speed and r.posted_speed and r.ticketed_speed > r.posted_speed %}
+                        +{{ (r.ticketed_speed - r.posted_speed) }} mph
+                      {% else %}
+                        0 mph
+                      {% endif %}
+                    </td>
+                    <td>{% if r.username %}<a href="{{ url_for('profile', username=r.username) }}">{{ r.username }}</a>{% else %}Anonymous{% endif %}</td>
+                    <td class="subtle">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else "" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+
+            <div class="subtle right" style="margin-top: 10px;">
+              Showing up to 50 tickets
+            </div>
+          {% else %}
+            <div class="subtle" style="margin-top: 14px;">
+              No tickets yet for this road. Submit one on the home page.
+            </div>
+          {% endif %}
+        </div>
+        <div style="text-align:center; margin-top:18px;">
+          <a href="{{ url_for('home') }}">Home</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

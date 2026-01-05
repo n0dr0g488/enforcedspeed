@@ -61,7 +61,7 @@
                   <li>
                     <span class="pill">{{ r.state }}</span>
                     <span class="pill">{{ format_road_bucket(r.road) }}</span>
-                    {% if r.member_pct == 0 %}<span class="pill">100% anonymous data</span>{% else %}<span class="pill">{{ r.member_pct }}% member data</span>{% endif %}<br>
+	                    <br>
                     +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
                   </li>
                 {% else %}
@@ -80,7 +80,7 @@
                   <li>
                     <span class="pill">{{ r.state }}</span>
                     <span class="pill">{{ format_road_bucket(r.road) }}</span>
-                    {% if r.member_pct == 0 %}<span class="pill">100% anonymous data</span>{% else %}<span class="pill">{{ r.member_pct }}% member data</span>{% endif %}<br>
+	                    <br>
                     +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
                   </li>
                 {% else %}

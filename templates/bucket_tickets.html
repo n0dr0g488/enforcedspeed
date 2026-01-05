@@ -13,7 +13,7 @@
         <div class="toprow">
           <div>
             <div class="brand">EnforcedSpeed</div>
-            <div class="subtle">Tickets for <span class="pill">{{ state }}</span> <span class="pill">{{ format_road_bucket(road_key) }}</span></div>
+	            <div class="subtle">Tickets for <span class="pill">{{ state }}</span> <span class="pill">{{ format_road_bucket(road_key) }}</span>{% if total_tickets and total_tickets > 0 %} <span class="pill">{{ anon_pct }}% anon / {{ member_pct }}% members</span>{% endif %}</div>
           </div>
         </div>
 

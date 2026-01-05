@@ -94,6 +94,14 @@ class SpeedReportForm(FlaskForm):
         if norm in US_STATE_NAMES:
             return
         raise ValidationError("Pick a real U.S. state (e.g., 'VA' or 'Virginia'). Don’t leave it partial like 'virg'.")
+
+    def validate_ticketed_speed(self, field):
+        """EnforcedSpeed only accepts tickets where ticketed speed is above posted speed."""
+        if self.posted_speed.data is None or field.data is None:
+            return
+        if field.data <= self.posted_speed.data:
+            raise ValidationError("Ticketed speed must be higher than the posted speed limit.")
+
 class RegisterForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email(), Length(max=255)])
     username = StringField(

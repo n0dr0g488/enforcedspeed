@@ -558,11 +558,26 @@ def create_app() -> Flask:
             .all()
         )
 
+        total_tickets = len(rows)
+        member_count = sum(1 for r in rows if getattr(r, "username", None))
+        anon_count = total_tickets - member_count
+        if total_tickets > 0:
+            member_pct = int(round((member_count / total_tickets) * 100))
+            # Keep the two-part pill readable and always summing to 100
+            member_pct = max(0, min(100, member_pct))
+            anon_pct = 100 - member_pct
+        else:
+            member_pct = 0
+            anon_pct = 0
+
         return render_template(
             "bucket_tickets.html",
             state=state,
             road_key=road_key,
             rows=rows,
+            total_tickets=total_tickets,
+            member_pct=member_pct,
+            anon_pct=anon_pct,
         )
 
     @app.get("/result/<int:report_id>")

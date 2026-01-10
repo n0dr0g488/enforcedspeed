@@ -1,247 +1,47 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Your Result • EnforcedSpeed</title>
-    <style>
-      body {
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-        margin: 0;
-        background: #f6f7f9;
-      }
-      .wrap {
-        max-width: 720px;
-        margin: 40px auto;
-        padding: 0 16px;
-      }
+{% extends "base.html" %}
+{% block content %}
+<div class="wrap">
 
-      .card {
-        background: #fff;
-        border-radius: 14px;
-        padding: 20px;
-        box-shadow: 0 8px 26px rgba(0,0,0,.08);
-      }
+  <div class="card">
+    <h1>Ticket submitted</h1>
 
-      /* top-right subtle nav (profile-style) */
-      .toplinks {
-        display: flex;
-        justify-content: flex-end;
-        font-size: 13px;
-        color: #6b7280;
-        margin-bottom: 6px;
-      }
-      .toplinks a {
-        color: #6b7280;
-        text-decoration: none;
-        font-weight: 600;
-      }
-      .toplinks a:hover {
-        text-decoration: underline;
-      }
+    <div class="muted" style="margin-top:6px;">
+      <span class="pill">{{ state_group }}</span>
+      <span class="pill">{{ report.road_name }}</span>
+      <span class="pill">{{ report.posted_speed }} mph posted</span>
+      <span class="pill">{{ report.ticketed_speed }} mph ticketed</span>
+    </div>
 
-      h1 { margin: 0 0 10px; font-size: 26px; }
-      h2 { margin: 18px 0 8px; font-size: 18px; }
-      p { margin: 0 0 14px; color: #444; line-height: 1.45; }
-
-      .pill {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: #eef2ff;
-        color: #3730a3;
-        font-size: 12px;
-        font-weight: 700;
-        margin-right: 6px;
-      }
-
-      .muted { color: #6b7280; font-size: 12px; }
-
-      .kvs {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 14px;
-      }
-      .kvs.two {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      @media (max-width: 860px) {
-        .kvs,
-        .kvs.two {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .kv {
-        border: 1px solid #e6e8eb;
-        border-radius: 12px;
-        padding: 12px;
-        background: #fafafa;
-      }
-      .kv .k {
-        font-size: 12px;
-        color: #6b7280;
-        margin-bottom: 4px;
-      }
-      .kv .v {
-        font-size: 18px;
-        font-weight: 800;
-        color: #111827;
-      }
-
-      .barwrap { margin-top: 10px; }
-      .bar {
-        height: 10px;
-        background: #e5e7eb;
-        border-radius: 999px;
-        overflow: hidden;
-      }
-      .fill {
-        height: 100%;
-        width: 0%;
-        background: #111827;
-      }
-
-      .split {
-        margin-top: 18px;
-        padding-top: 14px;
-        border-top: 1px solid #eef2f7;
-      }
-
-      /* bottom buttons */
-      .btnrow {
-        display: flex;
-        justify-content: center;
-        gap: 12px;
-        margin-top: 24px;
-      }
-      .btn {
-        display: inline-block;
-        padding: 10px 14px;
-        border-radius: 12px;
-        background: #111827;
-        color: #fff;
-        text-decoration: none;
-        font-weight: 800;
-        font-size: 14px;
-      }
-      .btn.secondary {
-        background: #fff;
-        color: #111827;
-        border: 1px solid #d1d5db;
-      }
-
-      .footer {
-        margin-top: 18px;
-        text-align: center;
-        color: #6b7280;
-        font-size: 12px;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="wrap">
-      <div class="card">
-
-        <!-- top-right subtle links (conditional) -->
-        <div class="toplinks">
-          <a href="{{ url_for('home') }}">Home</a>
-
-          {% if current_user.is_authenticated %}
-            &nbsp;·&nbsp;
-            <a href="{{ url_for('profile', username=current_user.username) }}">My profile</a>
-          {% endif %}
-        </div>
-
-        <h1>Your Ticket</h1>
-
-        <p>
-          State: <span class="pill">{{ state_group }}</span>
-          Road: <span class="pill">{{ report.road_name }}</span>
-          Posted: <span class="pill">{{ report.posted_speed }} mph</span>
-        </p>
-
-        <div class="kvs two">
-          <div class="kv">
-            <div class="k">Your ticketed speed</div>
-            <div class="v">{{ report.ticketed_speed }} mph</div>
-          </div>
-          <div class="kv">
-            <div class="k">Road grouping key</div>
-            <div class="v" style="font-size:14px">{{ format_road_bucket(report.road_key) }}</div>
-          </div>
-        </div>
-
-        <div class="split">
-          <h2>How your ticket compares on this road</h2>
-          <p class="muted">Same state, same road bucket, same posted speed</p>
-
-          <div class="kvs">
-            <div class="kv">
-              <div class="k">Typical enforced speed</div>
-              <div class="v"> {{ (stats_a.median or stats_a.enforced_speed or stats_a.mean or stats_a.p50 or report.ticketed_speed) | int }} mph</div>
-            </div>
-            <div class="kv">
-              <div class="k">Your percentile</div>
-              <div class="v">{{ stats_a.percentile }}%</div>
-            </div>
-            <div class="kv">
-              <div class="k">Tickets in this group</div>
-              <div class="v">{{ stats_a.n }}</div>
-            </div>
-          </div>
-
-          <div class="barwrap">
-            <div class="muted">Where you fall</div>
-            <div class="bar">
-              <div class="fill" style="width: {{ stats_a.percentile }}%;"></div>
-            </div>
-          </div>
-
-          <p class="muted">Based on {{ stats_a.n }} ticket(s).</p>
-        </div>
-
-        <div class="split">
-          <h2>How your ticket compares across the state</h2>
-          <p class="muted">Same posted speed, all roads in {{ state_group }}</p>
-
-          <div class="kvs">
-            <div class="kv">
-              <div class="k">Typical enforced speed</div>
-              <div class="v">{{ (stats_b.median or stats_b.enforced_speed or stats_b.mean or stats_b.p50 or report.ticketed_speed) | int }} mph</div>
-            </div>
-            <div class="kv">
-              <div class="k">Your percentile</div>
-              <div class="v">{{ stats_b.percentile }}%</div>
-            </div>
-            <div class="kv">
-              <div class="k">Tickets in this group</div>
-              <div class="v">{{ stats_b.n }}</div>
-            </div>
-          </div>
-
-          <div class="barwrap">
-            <div class="muted">Where you fall</div>
-            <div class="bar">
-              <div class="fill" style="width: {{ stats_b.percentile }}%;"></div>
-            </div>
-          </div>
-
-          <p class="muted">Based on {{ stats_b.n }} ticket(s).</p>
-        </div>
-
-        <!-- bottom centered buttons -->
-        <div class="btnrow">
-          <a class="btn" href="{{ url_for('home') }}">Back Home</a>
-        </div>
-
+    <div style="margin-top:16px;">
+      <div class="thermo-row">
+        <div class="thermo-label">Road + State percentile</div>
+        <div class="thermo-pct">{{ stats_a.percentile }}%</div>
       </div>
-
-      <div class="footer">
-        © 2025 EnforcedSpeed · Developed by Conor Gordon · Gordon Capital Holdings LLC
+      <div class="thermo-bar" aria-label="Road and state percentile">
+        <div class="thermo-fill" style="width: {{ stats_a.percentile }}%;"></div>
       </div>
     </div>
-  </body>
-</html>
+
+    <div style="margin-top:16px;">
+      <div class="thermo-row">
+        <div class="thermo-label">State + Posted Speed percentile</div>
+        <div class="thermo-pct">{{ stats_b.percentile }}%</div>
+      </div>
+      <div class="thermo-bar" aria-label="State and posted speed percentile">
+        <div class="thermo-fill" style="width: {{ stats_b.percentile }}%;"></div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<style>
+  /* thank_you: keep it simple + visual */
+  .thermo-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;}
+  .thermo-label{font-weight:600;}
+  .thermo-pct{font-weight:700;}
+  .thermo-bar{height:14px;border-radius:999px;background:#eef0f3;overflow:hidden;border:1px solid rgba(0,0,0,.06);}
+  .thermo-fill{height:100%;border-radius:999px;background:#111;}
+</style>
+{% endblock %}

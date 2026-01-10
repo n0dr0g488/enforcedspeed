@@ -1,18 +1,10 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Tickets · EnforcedSpeed</title>
-    {# Pull in the same inline CSS from mvp_home.html by embedding _mvp_styles.html #}
-    {% include "_mvp_styles.html" %}
-  </head>
-  <body>
+{% extends "base.html" %}
+{% block content %}
+
     <div class="shell">
       <div class="card">
         <div class="toprow">
           <div>
-            <div class="brand">EnforcedSpeed</div>
 	            <div class="subtle">Tickets for <span class="pill">{{ state }}</span> <span class="pill">{{ format_road_bucket(road_key) }}</span>{% if total_tickets and total_tickets > 0 %} <span class="pill">{{ anon_pct }}% anon / {{ member_pct }}% members</span>{% endif %}</div>
           </div>
         </div>
@@ -72,5 +64,4 @@
         </div>
       </div>
     </div>
-  </body>
-</html>
+{% endblock %}

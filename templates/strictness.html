@@ -1,37 +1,17 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Enforced Speed · Strictness</title>
-    <link rel="icon" href="data:," />
-    <style>
-      /* Reuse the MVP home page look by copying its inline styles.
-         NOTE: Keep changes minimal: this page is intentionally aligned with mvp_home.html. */
-    </style>
-  </head>
-  <body>
+{% extends "base.html" %}
+{% block content %}
+
     {# Pull in the same inline CSS from mvp_home.html by embedding a small scriptless copy.
        We keep it simple: include the home page stylesheet by rendering it from the home template's style block. #}
     {% include "_mvp_styles.html" %}
     <div class="wrap">
       <div class="card">
-        <h1 class="title">Enforced Speed</h1>
+        
         <p class="subtle center" style="margin-top: 6px;">
           Rankings based on median ticketed speed over posted speed (only tickets where ticketed &gt; posted).
         </p>
 
-        <p class="subtle center">
-          <a href="{{ url_for('home', hide_anon=(1 if hide_anon else None)) }}">Home</a>
-          {% if current_user.is_authenticated %}
-            · Logged in as <strong>@{{ current_user.username }}</strong> ·
-             <a href="{{ url_for('profile', username=current_user.username) }}">My profile</a> ·
-             <a href="{{ url_for('logout') }}">Log out</a>
-          {% else %}
-            · <a href="{{ url_for('login') }}">Log in</a> ·
-            <a href="{{ url_for('register') }}">Create account</a>
-          {% endif %}
-        </p><div class="subtle" style="margin: 6px 0 10px 0;">
+        <div class="subtle" style="margin: 6px 0 10px 0;">
           {% if hide_anon %}
             Viewing: <strong id="viewingMode">Members only</strong> · <a href="{{ url_for('strictness') }}">Show anonymous too</a>
           {% else %}
@@ -96,5 +76,4 @@
         © 2025 EnforcedSpeed · Developed by Conor Gordon · Gordon Capital Holdings LLC
       </div>
     </div>
-  </body>
-</html>
+{% endblock %}

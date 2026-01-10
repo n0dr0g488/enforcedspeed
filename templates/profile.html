@@ -1,25 +1,9 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>EnforcedSpeed · {{ profile_user.username }}</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
-    .wrap { max-width: 720px; margin: 40px auto; padding: 0 16px; }
-    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 8px 26px rgba(0,0,0,.08); }
-    .subtle { color:#6b7280; font-size:12px; }
-    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; font-weight:700; margin-right:6px; }
-    .row { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
-    .list { margin-top: 14px; }
-    .item { border: 1px solid #e6e8eb; border-radius: 12px; padding: 12px; background:#fafafa; margin-bottom: 10px; }
-    a { color: inherit; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
+
   <div class="wrap">
     <div class="card">
-      <div class="row">
+<div class="row">
         <div>
           <h1 style="margin:0;">@{{ profile_user.username }}</h1>
           <div class="subtle" style="margin-top:6px;">
@@ -72,5 +56,4 @@
       </div>
     </div>
   </div>
-</body>
-</html>
+{% endblock %}

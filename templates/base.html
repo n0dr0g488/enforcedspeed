@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}EnforcedSpeed{% endblock %}</title>
+
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+  {% include "_mvp_styles.html" %}
+  <style>
+    /* v11 header */
+    .search-suggest{position:absolute;left:0;right:0;top:100%;margin-top:8px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.10);overflow:hidden;}
+    .search-suggest a{display:block;padding:10px 12px;color:#111;text-decoration:none;font-size:14px;}
+    .search-suggest a:hover{background:#f3f4f6;}
+    .header-search{position:relative;}
+
+    .site-header{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e5e7eb;}
+    .site-header .inner{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:10px 16px;}
+    .brand-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;}
+    .brand-logo{height:42px;width:auto;display:block;}
+    .header-search{flex:1;display:flex;justify-content:center;}
+    .header-search form{width:100%;max-width:520px;display:flex;}
+    .header-search input[type="text"]{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:999px;background:#f3f4f6;outline:none;}
+    .header-search input[type="text"]:focus{background:#fff;border-color:#9ca3af;}
+    .header-nav{display:flex;align-items:center;gap:14px;white-space:nowrap;}
+    .header-nav a{color:#111827;text-decoration:none;font-weight:600;}
+    .header-nav a:hover{text-decoration:underline;}
+    .nav-user{display:flex;align-items:center;gap:8px;}
+    .avatar{width:22px;height:22px;border-radius:999px;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;}
+    .avatar svg{width:14px;height:14px;opacity:.75;}
+    @media (max-width: 720px){
+      .site-header .inner{flex-wrap:wrap;}
+      .header-search{order:3;width:100%;}
+      .header-search form{max-width:none;}
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="inner">
+      <a class="brand-link" href="{{ url_for('home') }}">
+        <img class="brand-logo" src="{{ url_for('static', filename='img/logo-sign-header.png') }}?v=10" alt="EnforcedSpeed">
+      </a>
+
+      <div class="header-search">
+        <form action="{{ url_for('search') }}" method="get">
+          <input type="text" id="global-search" name="q" value="{{ request.args.get('q','') }}" placeholder="Search road, state, or username" autocomplete="off">
+        </form>
+          <div id="search-suggest" class="search-suggest" style="display:none;"></div>
+      </div>
+
+      <nav class="header-nav">
+        <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('strictness') }}">Rankings</a>
+
+        {% if current_user.is_authenticated %}
+          <a class="nav-user" href="{{ url_for('profile', username=current_user.username) }}">
+            <span class="avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z" fill="currentColor"/><path d="M4 22c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            My Profile
+          </a>
+          <a href="{{ url_for('logout') }}">Log out</a>
+        {% else %}
+          <a class="nav-user" href="{{ url_for('login') }}">
+            <span class="avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z" fill="currentColor"/><path d="M4 22c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            Log In
+          </a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% block content %}{% endblock %}
+  <script>
+    (function(){
+      const input = document.getElementById('global-search');
+      const box = document.getElementById('search-suggest');
+      if(!input || !box) return;
+
+      let t = null;
+      function hide(){ box.style.display='none'; box.innerHTML=''; }
+      function show(items){
+        if(!items || items.length===0){ hide(); return; }
+        box.innerHTML = items.map(it => `<a href="${it.url}">${it.label}</a>`).join('');
+        box.style.display='block';
+      }
+
+      input.addEventListener('input', function(){
+        const q = input.value.trim();
+        if(q.length < 1){ hide(); return; }
+        if(t) clearTimeout(t);
+        t = setTimeout(async () => {
+          try{
+            const res = await fetch(`/api/search_suggest?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            show(data.slice(0,5));
+          }catch(e){ hide(); }
+        }, 120);
+      });
+
+      document.addEventListener('click', function(e){
+        if(!box.contains(e.target) && e.target !== input){ hide(); }
+      });
+      input.addEventListener('focus', function(){
+        const q = input.value.trim();
+        if(q.length >= 1){
+          input.dispatchEvent(new Event('input'));
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

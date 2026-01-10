@@ -356,7 +356,7 @@ def create_app() -> Flask:
             ticket_count=len(reports),
         )
 
-    def strictness_rows(limit: int, exclude_anonymous: bool) -> Dict[str, List[Dict]]:
+    def strictness_rows(limit: int, exclude_anonymous: bool, state_filter: str | None = None) -> Dict[str, List[Dict]]:
         """Return Most Strict and Least Strict rankings.
 
         Strictness is based on the MEDIAN overage (ticketed - posted), considering only tickets where
@@ -374,6 +374,9 @@ def create_app() -> Flask:
             .outerjoin(User, User.id == SpeedReport.user_id)
             .filter(SpeedReport.ticketed_speed > SpeedReport.posted_speed)
         )
+
+        if state_filter:
+            q = q.filter(SpeedReport.state.ilike(f"{state_filter}%"))
 
         if exclude_anonymous:
             q = q.filter(SpeedReport.user_id.isnot(None))
@@ -487,26 +490,35 @@ def create_app() -> Flask:
 
         return redirect(url_for("result", report_id=report.id))
 
-    def compute_distribution_stats(speeds: List[int], user_speed: int) -> Dict:
-        speeds_sorted = sorted(speeds)
-        n = len(speeds_sorted)
+    def compute_distribution_stats(values: List[float], user_value: float | None) -> Dict:
+        """Return distribution stats + a min-max percentile (0–100).
+
+        Percentile definition used here:
+          0%  -> lowest value in group
+          100%-> highest value in group
+        This matches the product meaning for 'strictness score' comparisons.
+        """
+        vals = [v for v in values if v is not None]
+        n = len(vals)
         if n == 0:
-            return {"n": 0, "enforced_speed": None, "percentile": None}
+            return {"n": 0, "min": None, "max": None, "median": None, "percentile": None}
 
-        le_count = sum(1 for s in speeds_sorted if s <= user_speed)
-        percentile = round((le_count / n) * 100, 1)
+        vals_sorted = sorted(vals)
+        vmin = vals_sorted[0]
+        vmax = vals_sorted[-1]
+        med = float(median(vals_sorted))
 
-        enforced = round(median(speeds_sorted), 1)
-        return {"n": n, "enforced_speed": enforced, "percentile": percentile}
-
-        med = round(median(vals), 2)
         if user_value is None:
             pct = None
         else:
-            le_count = sum(1 for v in vals if v <= user_value)
-            pct = round((le_count / n) * 100, 1)
+            if vmax == vmin:
+                pct = 100.0
+            else:
+                pct = round(((user_value - vmin) / (vmax - vmin)) * 100, 1)
+                # clamp
+                pct = max(0.0, min(100.0, pct))
 
-        return {"n": n, "median": med, "percentile": pct}
+        return {"n": n, "min": vmin, "max": vmax, "median": round(med, 1), "percentile": pct}
 
 
     @app.get("/strictness")
@@ -517,7 +529,7 @@ def create_app() -> Flask:
             flash("You must be logged in to hide anonymous posts.", "info")
 
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
-        strictness = strictness_rows(limit=20, exclude_anonymous=hide_anon)
+        strictness = strictness_rows(limit=20, exclude_anonymous=hide_anon, state_filter=(request.args.get('state') or '').strip().upper() or None)
         most_strict = strictness["most_strict"]
         least_strict = strictness["least_strict"]
 
@@ -585,6 +597,9 @@ def create_app() -> Flask:
         report = SpeedReport.query.get_or_404(report_id)
         state_group = normalize_state_group(report.state)
 
+        # Strictness score is "how many mph over posted" the ticketed speed is.
+        user_strictness = int(report.ticketed_speed) - int(report.posted_speed)
+
         rows = (
             db.session.query(
                 SpeedReport.state,
@@ -592,24 +607,24 @@ def create_app() -> Flask:
                 SpeedReport.posted_speed,
                 SpeedReport.ticketed_speed,
             )
-            .filter(SpeedReport.posted_speed == report.posted_speed)
+            .filter(SpeedReport.state.ilike(f"{state_group}%"))
             .all()
         )
 
-        speeds_state_posted: List[int] = []
-        speeds_state_road_posted: List[int] = []
+        strict_state_road: List[float] = []
+        strict_state_posted: List[float] = []
 
         for st, road_key, posted, ticketed in rows:
             if normalize_state_group(st) != state_group:
                 continue
-
-            speeds_state_posted.append(ticketed)
-
+            strictness = float(int(ticketed) - int(posted))
             if road_key == report.road_key:
-                speeds_state_road_posted.append(ticketed)
+                strict_state_road.append(strictness)
+            if int(posted) == int(report.posted_speed):
+                strict_state_posted.append(strictness)
 
-        stats_a = compute_distribution_stats(speeds_state_road_posted, report.ticketed_speed)
-        stats_b = compute_distribution_stats(speeds_state_posted, report.ticketed_speed)
+        stats_a = compute_distribution_stats(strict_state_road, float(user_strictness))
+        stats_b = compute_distribution_stats(strict_state_posted, float(user_strictness))
 
         return render_template(
             "thank_you.html",
@@ -617,6 +632,7 @@ def create_app() -> Flask:
             stats_a=stats_a,
             stats_b=stats_b,
             state_group=state_group,
+            user_strictness=user_strictness,
         )
 
     @app.get("/api/road_preview")
@@ -664,6 +680,120 @@ def create_app() -> Flask:
                 "ambiguity_options": ambiguity_options,
             }
         )
+
+    
+    @app.get("/api/search_suggest")
+    def search_suggest():
+        q = (request.args.get("q") or "").strip()
+        if not q:
+            return jsonify([])
+
+        q_clean = q[1:] if q.startswith("@") else q
+        q_like = f"%{q_clean}%"
+        q_lower = q_clean.lower()
+        q_upper = q_clean.upper()
+
+        suggestions = []
+        seen = set()
+
+        # Users (partial, case-insensitive)
+        user_rows = (
+            User.query
+            .filter(db.func.lower(User.username).like(db.func.lower(q_like)))
+            .order_by(User.username.asc())
+            .limit(5)
+            .all()
+        )
+        for u in user_rows:
+            url = url_for("profile", username=u.username)
+            key = ("user", u.username)
+            if key in seen:
+                continue
+            suggestions.append({"type": "user", "label": f"@{u.username}", "url": url})
+            seen.add(key)
+
+        # States (based on states present in DB)
+        state_rows = db.session.query(SpeedReport.state).distinct().all()
+        state_groups = sorted({normalize_state_group(r[0]) for r in state_rows if r and r[0]})
+        for st in state_groups:
+            if q_upper in st or q_lower in st.lower():
+                url = url_for("strictness", state=st)
+                key = ("state", st)
+                if key in seen:
+                    continue
+                suggestions.append({"type": "state", "label": st, "url": url})
+                seen.add(key)
+
+        # Roads (state + road bucket)
+        road_rows = (
+            db.session.query(SpeedReport.state, SpeedReport.road_key)
+            .distinct()
+            .limit(80)
+            .all()
+        )
+        for st_raw, road_key in road_rows:
+            st = normalize_state_group(st_raw)
+            label = f"{st} • {format_road_bucket(road_key)}"
+            if (q_lower not in label.lower()):
+                continue
+            url = url_for("bucket_tickets", state=st, road=road_key)
+            key = ("road", st, road_key)
+            if key in seen:
+                continue
+            suggestions.append({"type": "road", "label": label, "url": url})
+            seen.add(key)
+
+        # Keep top 5, users first, then states, then roads (current order)
+        return jsonify(suggestions[:5])
+
+    @app.get("/search")
+    def search():
+        q = (request.args.get("q") or "").strip()
+        if not q:
+            return redirect(url_for("home"))
+
+        q_clean = q[1:] if q.startswith("@") else q
+        q_like = f"%{q_clean}%"
+        q_lower = q_clean.lower()
+        q_upper = q_clean.upper()
+
+        # Users
+        users = (
+            User.query
+            .filter(db.func.lower(User.username).like(db.func.lower(q_like)))
+            .order_by(User.username.asc())
+            .limit(25)
+            .all()
+        )
+
+        # States (present in DB)
+        state_rows = db.session.query(SpeedReport.state).distinct().all()
+        all_states = sorted({normalize_state_group(r[0]) for r in state_rows if r and r[0]})
+        states = [st for st in all_states if (q_upper in st or q_lower in st.lower())][:25]
+
+        # Roads (state + road bucket)
+        road_rows = (
+            db.session.query(SpeedReport.state, SpeedReport.road_key)
+            .distinct()
+            .limit(500)
+            .all()
+        )
+        roads = []
+        seen_roads = set()
+        for st_raw, road_key in road_rows:
+            st = normalize_state_group(st_raw)
+            label = f"{st} • {format_road_bucket(road_key)}"
+            if q_lower not in label.lower():
+                continue
+            key = (st, road_key)
+            if key in seen_roads:
+                continue
+            roads.append({"state": st, "road_key": road_key, "label": label})
+            seen_roads.add(key)
+            if len(roads) >= 50:
+                break
+
+        return render_template("search_results.html", q=q, users=users, states=states, roads=roads)
 
     @app.get("/health")
     def health():

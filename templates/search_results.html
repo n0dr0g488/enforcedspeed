@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="wrap">
+  <div class="card">
+    <h1>Search results</h1>
+    <p class="muted">Query: <span class="pill">{{ q }}</span></p>
+
+    {% if users|length == 0 and states|length == 0 and roads|length == 0 %}
+      <p class="muted">No results found.</p>
+    {% endif %}
+
+    {% if users|length %}
+      <div class="split">
+        <h2>Users</h2>
+        <ul>
+          {% for u in users %}
+            <li><a href="{{ url_for('profile', username=u.username) }}">@{{ u.username }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {% if states|length %}
+      <div class="split">
+        <h2>States</h2>
+        <ul>
+          {% for st in states %}
+            <li><a href="{{ url_for('strictness', state=st) }}">{{ st }}</a></li>
+          {% endfor %}
+        </ul>
+        <p class="muted">Rankings are filtered to the selected state.</p>
+      </div>
+    {% endif %}
+
+    {% if roads|length %}
+      <div class="split">
+        <h2>Roads</h2>
+        <ul>
+          {% for r in roads %}
+            <li><a href="{{ url_for('bucket_tickets', state=r.state, road=r.road_key) }}">{{ r.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

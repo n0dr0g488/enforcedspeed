@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 
-    <div class="shell">
+    <div class="wrap">
       <div class="card">
         <div class="toprow">
           <div>
@@ -43,7 +43,7 @@
                         0 mph
                       {% endif %}
                     </td>
-                    <td>{% if r.username %}<a href="{{ url_for('profile', username=r.username) }}">{{ r.username }}</a>{% else %}Anonymous{% endif %}</td>
+                    <td>{% if r.username %}<a href="{{ url_for('profile', username=r.username) }}" style="color:inherit;text-decoration:none;">{{ r.username }}</a>{% else %}Anonymous{% endif %}</td>
                     <td class="subtle">{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else "" }}</td>
                   </tr>
                 {% endfor %}

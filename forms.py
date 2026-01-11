@@ -1,7 +1,7 @@
 # forms.py
 import re
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField
+from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField, HiddenField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError, Email, EqualTo, Regexp
 
 US_STATE_CODES = {
@@ -109,7 +109,7 @@ class RegisterForm(FlaskForm):
         validators=[
             DataRequired(),
             Length(min=3, max=20),
-            Regexp(r"^[a-z0-9_]+$", message="Username can only use a-z, 0-9, and underscores."),
+            Regexp(r"^[A-Za-z0-9_]+$", message="Username can only use letters, numbers, and underscores."),
         ],
         render_kw={"placeholder": "e.g., fastticketguy"},
     )
@@ -152,9 +152,15 @@ class LikeForm(FlaskForm):
 
 class CommentForm(FlaskForm):
     """Members-only comments on a SpeedReport (feed post)."""
+    parent_id = HiddenField()
     body = TextAreaField(
         "Comment",
         validators=[DataRequired(message="Comment can’t be empty."), Length(max=280, message="Keep comments under 280 characters.")],
         render_kw={"maxlength": 280, "rows": 2, "placeholder": "Write a comment…"},
     )
     submit = SubmitField("Post")
+
+
+class DeleteCommentForm(FlaskForm):
+    """CSRF-protected empty form for deleting a comment."""
+    submit = SubmitField("Delete")

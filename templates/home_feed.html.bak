@@ -178,10 +178,16 @@
                       {{ render_replies(rc.id, depth+1, root_id) }}
                     {% endfor %}
                   </div>
+        {% if total_comments > 2 %}
+          <div class="subtle" style="margin-top:6px;">
+            <a href="#" id="toggle-comments-{{ r.id }}" onclick="toggleComments({{ r.id }}, {{ total_comments }}); return false;">View all {{ total_comments }} comments</a>
+          </div>
+        {% endif %}
                 {% endif %}
               {%- endmacro %}
 
               {{ render_replies(c.id, 1, c.id) }}
+
               {% if current_user.is_authenticated %}
                 <div id="replybox-{{ c.id }}" style="display:none; margin-top:10px; margin-left:18px;">
                   <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}">
@@ -199,13 +205,6 @@
               {% endif %}
             </div>
           {% endfor %}
-
-        {% if total_comments > 2 %}
-          <div class="subtle" style="margin-top:6px;">
-            <a href="#" id="toggle-comments-{{ r.id }}" onclick="toggleComments({{ r.id }}, {{ total_comments }}); return false;">View all {{ total_comments }} comments</a>
-          </div>
-        {% endif %}
-
         </div>
       {% endif %}
 
@@ -322,67 +321,57 @@
 </script>
 
 
-<script>
-  (function convertLocalTimes(){
-    var nodes = document.querySelectorAll('.js-localtime[data-utc]');
-    if(!nodes || nodes.length === 0) return;
+  <script>
+    (function convertLocalTimes(){
+      var nodes = document.querySelectorAll('.js-localtime[data-utc]');
+      if(!nodes || nodes.length === 0) return;
 
-    function formatLocal(d){
-      try{
-        return new Intl.DateTimeFormat(undefined, {
-          month: 'short',
-          day: '2-digit',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }).format(d);
-      }catch(e){
-        return d.toLocaleString();
+      function formatLocal(d){
+        try{
+          return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: '2-digit',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }).format(d);
+        }catch(e){
+          return d.toLocaleString();
+        }
       }
-    }
 
-    nodes.forEach(function(el){
-      var iso = el.getAttribute('data-utc');
-      if(!iso) return;
-      var d = new Date(iso);
-      if(isNaN(d.getTime())) return;
-      el.textContent = formatLocal(d);
-    });
-  })();
-
-  function toggleComments(reportId, totalCount) {
-    const link = document.getElementById('toggle-comments-' + reportId);
-    if(!link) return;
-    const isExpanded = link.getAttribute('data-expanded') === '1';
-    const card = link.closest('.card');
-    if (!card) return;
-
-    // Use element.style.display (not string-matching the style attribute) so it works
-    // whether the browser serializes it as "display:none" or "display: none".
-    const all = card.querySelectorAll('[id^="comment-"]');
-
-    if (!isExpanded) {
-      all.forEach(el => {
-        if (el && el.style && el.style.display === 'none') {
-          el.style.display = '';
-          el.setAttribute('data-extra', '1');
-        }
+      nodes.forEach(function(el){
+        var iso = el.getAttribute('data-utc');
+        if(!iso) return;
+        var d = new Date(iso);
+        if(isNaN(d.getTime())) return;
+        el.textContent = formatLocal(d);
       });
-      link.textContent = 'Collapse comments';
-      link.setAttribute('data-expanded','1');
-    } else {
-      all.forEach(el => {
-        if (el && el.getAttribute && el.getAttribute('data-extra') === '1') {
-          el.style.display = 'none';
-          el.removeAttribute('data-extra');
-        }
-      });
-      link.textContent = 'View all ' + totalCount + ' comments';
-      link.setAttribute('data-expanded','0');
-    }
+    })();
+  
+<script>
+function toggleComments(reportId, totalCount) {
+  const link = document.getElementById('toggle-comments-' + reportId);
+  const isExpanded = link.getAttribute('data-expanded') === '1';
+  // Find all comment elements for this report beyond the first two, based on inline display:none inserted server-side.
+  // We'll toggle any element inside this report card that currently has style containing 'display:none' and an id starting with 'comment-'.
+  const card = link.closest('.card');
+  if (!card) return;
+  const hidden = card.querySelectorAll('[id^="comment-"][style*="display:none"]');
+  const shownExtra = card.querySelectorAll('[id^="comment-"][data-extra="1"]');
+  if (!isExpanded) {
+    hidden.forEach(el => { el.style.display = ''; el.setAttribute('data-extra','1'); });
+    link.textContent = 'Collapse comments';
+    link.setAttribute('data-expanded','1');
+  } else {
+    // re-hide extras we previously revealed
+    shownExtra.forEach(el => { el.style.display = 'none'; el.removeAttribute('data-extra'); });
+    link.textContent = 'View all ' + totalCount + ' comments';
+    link.setAttribute('data-expanded','0');
   }
+}
 </script>
-
+</script>
 
 {% endblock %}

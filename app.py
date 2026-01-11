@@ -25,6 +25,7 @@ from forms import (
     ResetPasswordForm,
     LikeForm,
     CommentForm,
+    DeleteCommentForm,
 )
 from models import db, SpeedReport, User, Like, Comment, normalize_road, state_code_from_value
 
@@ -139,6 +140,11 @@ def ensure_schema_patches() -> None:
         db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_count INTEGER"))
         db.session.commit()
 
+    # Add parent_id to comments for threaded replies.
+    if not column_exists("comments", "parent_id"):
+        db.session.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
+        db.session.commit()
+
 
 
 def create_app() -> Flask:
@@ -175,13 +181,14 @@ def create_app() -> Flask:
         form = RegisterForm()
         if form.validate_on_submit():
             email = form.email.data.strip().lower()
-            username = form.username.data.strip().lower()
+            # Preserve casing as-entered, but treat usernames as case-insensitive for uniqueness.
+            username = form.username.data.strip()
 
             if User.query.filter_by(email=email).first():
                 flash("That email is already registered. Please log in.", "error")
                 return redirect(url_for("login"))
 
-            if User.query.filter_by(username=username).first():
+            if User.query.filter(func.lower(User.username) == username.lower()).first():
                 flash("That username is taken. Try another.", "error")
                 return render_template("register.html", form=form)
 
@@ -202,12 +209,13 @@ def create_app() -> Flask:
 
         form = LoginForm()
         if form.validate_on_submit():
-            identifier = form.email.data.strip().lower()
+            identifier = form.email.data.strip()
+            ident_lc = identifier.lower()
 
             # Allow login via username OR email (username first, then email).
-            user = User.query.filter_by(username=identifier).first()
+            user = User.query.filter(func.lower(User.username) == ident_lc).first()
             if not user:
-                user = User.query.filter_by(email=identifier).first()
+                user = User.query.filter_by(email=ident_lc).first()
 
             if not user or not user.check_password(form.password.data):
                 flash("Invalid username/email or password.", "error")
@@ -302,11 +310,12 @@ def create_app() -> Flask:
 
         form = ForgotPasswordForm()
         if form.validate_on_submit():
-            identifier = form.identifier.data.strip().lower()
+            identifier = form.identifier.data.strip()
+            ident_lc = identifier.lower()
 
-            user = User.query.filter_by(username=identifier).first()
+            user = User.query.filter(func.lower(User.username) == ident_lc).first()
             if not user:
-                user = User.query.filter_by(email=identifier).first()
+                user = User.query.filter_by(email=ident_lc).first()
 
             # Always show the same message to avoid revealing whether an account exists.
             flash('If an account exists for that username/email, a reset link has been sent.', 'success')
@@ -350,7 +359,8 @@ def create_app() -> Flask:
 
     @app.get("/u/<username>")
     def profile(username: str):
-        u = User.query.filter_by(username=username.strip().lower()).first_or_404()
+        ident_lc = username.strip().lower()
+        u = User.query.filter(func.lower(User.username) == ident_lc).first_or_404()
 
         reports = (
             SpeedReport.query.filter(SpeedReport.user_id == u.id)
@@ -545,8 +555,10 @@ def create_app() -> Flask:
                 )
                 user_liked = {rid for (rid,) in rows}
 
-        # Comments: show newest first per report (limited for feed performance)
+        # Comments: show oldest -> newest so threads read naturally
         comments_by_report: Dict[int, List[Comment]] = {rid: [] for rid in report_ids}
+        comment_threads_by_report: Dict[int, Dict[str, object]] = {rid: {"top": [], "replies": {}} for rid in report_ids}
+
         if report_ids:
             rows = (
                 Comment.query.options(joinedload(Comment.user))
@@ -556,11 +568,19 @@ def create_app() -> Flask:
             )
             for c in rows:
                 comments_by_report.setdefault(c.report_id, []).append(c)
+                if c.parent_id:
+                    comment_threads_by_report.setdefault(c.report_id, {"top": [], "replies": {}})
+                    comment_threads_by_report[c.report_id]["replies"].setdefault(c.parent_id, []).append(c)
+                else:
+                    comment_threads_by_report.setdefault(c.report_id, {"top": [], "replies": {}})
+                    comment_threads_by_report[c.report_id]["top"].append(c)
 
         like_form = LikeForm()
         comment_form = CommentForm()
+        delete_comment_form = DeleteCommentForm()
 
         return render_template(
+
             "home_feed.html",
             reports=reports,
             pagination=pagination,
@@ -570,6 +590,8 @@ def create_app() -> Flask:
             like_counts=like_counts,
             user_liked=user_liked,
             comments_by_report=comments_by_report,
+            comment_threads_by_report=comment_threads_by_report,
+            delete_comment_form=delete_comment_form,
             like_form=like_form,
             comment_form=comment_form,
         )
@@ -639,10 +661,60 @@ def create_app() -> Flask:
             return redirect(_safe_next_url())
 
         report = SpeedReport.query.get_or_404(report_id)
-        c = Comment(report_id=report.id, user_id=current_user.id, body=body)
+
+        parent_id = None
+        raw_parent = (request.form.get("parent_id") or "").strip()
+        if raw_parent:
+            try:
+                parent_id = int(raw_parent)
+            except ValueError:
+                parent_id = None
+
+        if parent_id:
+            parent = Comment.query.get(parent_id)
+            if (not parent) or (parent.report_id != report.id):
+                flash("That comment no longer exists.", "error")
+                return redirect(_safe_next_url())
+            # Allow replying to replies (nested threads). We only validate that the parent
+            # belongs to the same report above.
+
+        c = Comment(report_id=report.id, user_id=current_user.id, body=body, parent_id=parent_id)
         db.session.add(c)
         db.session.commit()
 
+        # After posting, return to the normal home view (comment/reply boxes closed by default).
+        return redirect(_safe_next_url())
+
+
+    @app.post("/comment/<int:comment_id>/delete")
+    def delete_comment(comment_id: int):
+        # Members-only
+        if not current_user.is_authenticated:
+            flash("Members only.", "info")
+            return redirect(_safe_next_url())
+
+        c = Comment.query.get_or_404(comment_id)
+        if c.user_id != current_user.id:
+            flash("You can only delete your own comments.", "error")
+            return redirect(_safe_next_url())
+
+        # Delete descendants (supports nested replies)
+        to_delete = [c.id]
+        all_ids = []
+        while to_delete:
+            cur_id = to_delete.pop()
+            all_ids.append(cur_id)
+            child_ids = [cid for (cid,) in db.session.query(Comment.id).filter(Comment.parent_id == cur_id).all()]
+            to_delete.extend(child_ids)
+
+        # Delete children first, then the root (reverse topological order)
+        for cid in reversed(all_ids):
+            obj = Comment.query.get(cid)
+            if obj is not None:
+                db.session.delete(obj)
+        db.session.commit()
+
+        flash("Comment deleted.", "info")
         return redirect(_safe_next_url())
 
 

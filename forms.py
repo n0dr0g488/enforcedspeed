@@ -143,3 +143,18 @@ class ResetPasswordForm(FlaskForm):
     new_password = PasswordField("New Password", validators=[DataRequired(), Length(min=8, max=128)])
     confirm_new_password = PasswordField("Confirm New Password", validators=[DataRequired(), EqualTo('new_password', message='Passwords must match.')])
     submit = SubmitField("Set New Password")
+
+
+class LikeForm(FlaskForm):
+    """CSRF-protected empty form for like toggles."""
+    submit = SubmitField("Like")
+
+
+class CommentForm(FlaskForm):
+    """Members-only comments on a SpeedReport (feed post)."""
+    body = TextAreaField(
+        "Comment",
+        validators=[DataRequired(message="Comment can’t be empty."), Length(max=280, message="Keep comments under 280 characters.")],
+        render_kw={"maxlength": 280, "rows": 2, "placeholder": "Write a comment…"},
+    )
+    submit = SubmitField("Post")

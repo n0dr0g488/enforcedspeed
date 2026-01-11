@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="wrap">
+
+  <div class="card">
+    <div style="position:relative;">
+      <form action="{{ url_for('search') }}" method="get">
+        <input
+          type="text"
+          id="global-search"
+          name="q"
+          placeholder="Search road, state, or username"
+          autocomplete="off"
+          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:999px;background:#f3f4f6;outline:none;"
+        >
+      </form>
+      <div id="search-suggest" class="search-suggest" style="display:none;"></div>
+    </div>
+
+    <div class="subtle" style="margin: 10px 0 2px 0;">
+      {% if hide_anon %}
+        Viewing: <strong id="viewingMode">Members only</strong> · <a href="{{ url_for('home') }}">Show anonymous too</a>
+      {% else %}
+        Viewing: <strong id="viewingMode">All posts</strong> · {% if current_user.is_authenticated %}
+        <a href="{{ url_for('home', hide_anon=1) }}">Hide anonymous</a>
+      {% else %}
+        <a href="#" id="hideAnonLink" onclick="
+          var vm=document.getElementById('viewingMode');
+          var old=vm.innerText;
+          vm.innerText='Members only';
+          var msg=document.getElementById('loginRequiredMsg');
+          if(msg){msg.style.display='inline';}
+          setTimeout(function(){ vm.innerText=old; }, 700);
+          return false;
+        ">Hide anonymous</a>
+        <span id="loginRequiredMsg" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% for r in reports %}
+  <div class="card" style="margin-top:16px;">
+
+      <div class="row" style="justify-content:space-between;gap:12px;">
+        <div style="font-weight:800;">
+          {% if r.user %}
+            {{ r.user.username }}
+          {% else %}
+            Anonymous
+          {% endif %}
+        </div>
+        <div class="subtle">
+          {{ r.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC
+        </div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <span class="pill">{{ r.state }}</span>
+        <span class="pill">{{ format_road_bucket(r.road_name) }}</span>
+        <span class="pill">{{ r.posted_speed }} mph posted</span>
+        <span class="pill">{{ r.ticketed_speed }} mph ticketed</span>
+        <span class="pill">{{ (r.ticketed_speed - r.posted_speed) }} over</span>
+      </div>
+
+      <div style="margin-top:14px;">
+        <div class="thermo-row">
+          <div class="thermo-label">Road + State percentile</div>
+          <div class="thermo-pct">{{ pct_a[r.id] }}%</div>
+        </div>
+        <div class="thermo-bar" aria-label="Road and state percentile">
+          <div class="thermo-fill" style="width: {{ pct_a[r.id] }}%;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="thermo-row">
+          <div class="thermo-label">State + Posted Speed percentile</div>
+          <div class="thermo-pct">{{ pct_b[r.id] }}%</div>
+        </div>
+        <div class="thermo-bar" aria-label="State and posted speed percentile">
+          <div class="thermo-fill" style="width: {{ pct_b[r.id] }}%;"></div>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:14px;display:flex;justify-content:space-between;gap:12px;align-items:center;">
+        <div class="row" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-start;">
+
+          {% set lc = like_counts.get(r.id, 0) %}
+
+          {% if current_user.is_authenticated %}
+            <form method="post" action="{{ url_for('toggle_like', report_id=r.id) }}" style="margin:0;display:inline;">
+              {{ like_form.hidden_tag() }}
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button type="submit" style="background:none;border:none;padding:0;color:#2563eb;cursor:pointer;font:inherit;">
+                {% if r.id in user_liked %}Liked{% else %}Like{% endif %}
+              </button>
+            </form>
+
+            <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
+
+            <a href="#" onclick="toggleComment({{ r.id }}); return false;">Comment</a>
+
+          {% else %}
+            <a href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
+            <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
+            <a href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
+            <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
+          {% endif %}
+        </div>
+
+        <a href="{{ url_for('bucket_tickets') }}?state={{ r.state[:2] }}&road={{ r.road_key }}">View similar</a>
+        {# Report link later (v3) #}
+      </div>
+
+      {% set comments = comments_by_report.get(r.id, []) %}
+      {% if comments %}
+        <div style="margin-top:12px;">
+          {% for c in comments %}
+            <div class="subtle" style="margin-top:6px;">
+              <strong style="color:#111827;">{{ c.user.username }}</strong> {{ c.body }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if current_user.is_authenticated %}
+        <div id="commentbox-{{ r.id }}" style="display:none; margin-top:12px;">
+          <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}">
+            {{ comment_form.hidden_tag() }}
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <textarea name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a comment…"></textarea>
+            <div style="margin-top:8px;">
+              <button type="submit">Post</button>
+              <span class="subtle" style="margin-left:10px;">280 characters max.</span>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+
+    </div>
+  {% else %}
+    <div class="card">
+      <p>No posts yet. Be the first to <a href="{{ url_for('submit') }}">submit a ticket</a>.</p>
+    </div>
+  {% endfor %}
+
+  {% if pagination.pages > 1 %}
+    <div class="card">
+      <div class="row" style="justify-content:space-between;gap:12px;">
+        <div>
+          {% if pagination.has_prev %}
+            <a href="{{ url_for('home', page=pagination.prev_num, hide_anon=(1 if hide_anon else None)) }}">← Newer</a>
+          {% endif %}
+        </div>
+        <div class="subtle">Page {{ pagination.page }} of {{ pagination.pages }}</div>
+        <div>
+          {% if pagination.has_next %}
+            <a href="{{ url_for('home', page=pagination.next_num, hide_anon=(1 if hide_anon else None)) }}">Older →</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+
+<style>
+  /* Reuse the exact thank_you thermometer styling (scoped to this template). */
+  .thermo-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+  .thermo-label{font-size:13px;font-weight:700;color:#374151}
+  .thermo-pct{font-size:13px;font-weight:800;color:#111827}
+  .thermo-bar{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+  .thermo-fill{height:100%;background:#111827;border-radius:999px}
+</style>
+
+<script>
+  function membersOnly(id){
+    var el=document.getElementById('mo-'+id);
+    if(!el){return;}
+    el.style.display='inline';
+    setTimeout(function(){ el.style.display='none'; }, 900);
+  }
+  function toggleComment(id){
+    var el=document.getElementById('commentbox-'+id);
+    if(!el){return;}
+    el.style.display = (el.style.display==='none' || el.style.display==='') ? 'block' : 'none';
+  }
+</script>
+
+{% endblock %}

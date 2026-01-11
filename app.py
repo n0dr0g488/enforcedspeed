@@ -9,14 +9,24 @@ from typing import Dict, List
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
-from sqlalchemy import text, func
+from sqlalchemy import text, func, tuple_
+from sqlalchemy.orm import joinedload
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 from config import Config
-from forms import SpeedReportForm, RegisterForm, LoginForm, ChangePasswordForm, ForgotPasswordForm, ResetPasswordForm
-from models import db, SpeedReport, User, normalize_road, state_code_from_value
+from forms import (
+    SpeedReportForm,
+    RegisterForm,
+    LoginForm,
+    ChangePasswordForm,
+    ForgotPasswordForm,
+    ResetPasswordForm,
+    LikeForm,
+    CommentForm,
+)
+from models import db, SpeedReport, User, Like, Comment, normalize_road, state_code_from_value
 
 
 STATE_OPTIONS = [
@@ -436,6 +446,208 @@ def create_app() -> Flask:
 
     @app.get("/")
     def home():
+        """
+        Soft-gated public feed (newest first).
+        Anonymous posts are visible by default.
+        Logged-in users can optionally hide anonymous posts via ?hide_anon=1.
+        """
+        hide_anon_requested = (request.args.get("hide_anon") == "1")
+        if hide_anon_requested and not current_user.is_authenticated:
+            flash("You must be logged in to hide anonymous posts.", "info")
+
+        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        page = request.args.get("page", 1, type=int)
+        per_page = 20
+
+        q = SpeedReport.query.options(joinedload(SpeedReport.user)).order_by(SpeedReport.created_at.desc())
+        if hide_anon:
+            q = q.filter(SpeedReport.user_id.isnot(None))
+
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        reports = pagination.items
+
+        # Compute per-post min/max percentiles using only group min/max (fast, stable meaning).
+        keys_a = {(r.state, r.road_key) for r in reports}  # Road + State group
+        keys_b = {(r.state, r.posted_speed) for r in reports}  # State + Posted Speed group
+
+        expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
+
+        a_minmax = {}
+        if keys_a:
+            rows = (
+                db.session.query(
+                    SpeedReport.state,
+                    SpeedReport.road_key,
+                    func.min(expr).label("minv"),
+                    func.max(expr).label("maxv"),
+                )
+                .filter(tuple_(SpeedReport.state, SpeedReport.road_key).in_(list(keys_a)))
+                .group_by(SpeedReport.state, SpeedReport.road_key)
+                .all()
+            )
+            for st, rk, minv, maxv in rows:
+                a_minmax[(st, rk)] = (float(minv), float(maxv))
+
+        b_minmax = {}
+        if keys_b:
+            rows = (
+                db.session.query(
+                    SpeedReport.state,
+                    SpeedReport.posted_speed,
+                    func.min(expr).label("minv"),
+                    func.max(expr).label("maxv"),
+                )
+                .filter(tuple_(SpeedReport.state, SpeedReport.posted_speed).in_(list(keys_b)))
+                .group_by(SpeedReport.state, SpeedReport.posted_speed)
+                .all()
+            )
+            for st, ps, minv, maxv in rows:
+                b_minmax[(st, ps)] = (float(minv), float(maxv))
+
+        def _pct(minv: float | None, maxv: float | None, v: float) -> float:
+            if minv is None or maxv is None:
+                return 100.0
+            if maxv == minv:
+                return 100.0
+            pct = round(((v - minv) / (maxv - minv)) * 100.0, 1)
+            return max(0.0, min(100.0, pct))
+
+        pct_a = {}
+        pct_b = {}
+        for r in reports:
+            v = float(r.ticketed_speed - r.posted_speed)
+            minv, maxv = a_minmax.get((r.state, r.road_key), (None, None))
+            pct_a[r.id] = _pct(minv, maxv, v)
+
+            minv, maxv = b_minmax.get((r.state, r.posted_speed), (None, None))
+            pct_b[r.id] = _pct(minv, maxv, v)
+
+        report_ids = [r.id for r in reports]
+
+        # Likes: counts + whether current user liked each report
+        like_counts: Dict[int, int] = {}
+        user_liked: set[int] = set()
+        if report_ids:
+            rows = (
+                db.session.query(Like.report_id, func.count(Like.id))
+                .filter(Like.report_id.in_(report_ids))
+                .group_by(Like.report_id)
+                .all()
+            )
+            like_counts = {rid: int(c) for rid, c in rows}
+
+            if current_user.is_authenticated:
+                rows = (
+                    db.session.query(Like.report_id)
+                    .filter(Like.report_id.in_(report_ids), Like.user_id == current_user.id)
+                    .all()
+                )
+                user_liked = {rid for (rid,) in rows}
+
+        # Comments: show newest first per report (limited for feed performance)
+        comments_by_report: Dict[int, List[Comment]] = {rid: [] for rid in report_ids}
+        if report_ids:
+            rows = (
+                Comment.query.options(joinedload(Comment.user))
+                .filter(Comment.report_id.in_(report_ids))
+                .order_by(Comment.created_at.asc())
+                .all()
+            )
+            for c in rows:
+                comments_by_report.setdefault(c.report_id, []).append(c)
+
+        like_form = LikeForm()
+        comment_form = CommentForm()
+
+        return render_template(
+            "home_feed.html",
+            reports=reports,
+            pagination=pagination,
+            hide_anon=hide_anon,
+            pct_a=pct_a,
+            pct_b=pct_b,
+            like_counts=like_counts,
+            user_liked=user_liked,
+            comments_by_report=comments_by_report,
+            like_form=like_form,
+            comment_form=comment_form,
+        )
+
+
+    def _safe_next_url() -> str:
+        """Return a safe relative next url from form data."""
+        nxt = (request.form.get("next") or "").strip()
+        if nxt.startswith("/") and not nxt.startswith("//"):
+            return nxt
+        return url_for("home")
+
+
+    @app.post("/like/<int:report_id>")
+    def toggle_like(report_id: int):
+        # Members-only
+        if not current_user.is_authenticated:
+            flash("Members only.", "info")
+            return redirect(_safe_next_url())
+
+        # Validate CSRF via FlaskForm
+        form = LikeForm()
+        if not form.validate_on_submit():
+            flash("Something went wrong. Please try again.", "error")
+            return redirect(_safe_next_url())
+
+        report = SpeedReport.query.get_or_404(report_id)
+        existing = Like.query.filter_by(report_id=report.id, user_id=current_user.id).first()
+        if existing:
+            db.session.delete(existing)
+        else:
+            db.session.add(Like(report_id=report.id, user_id=current_user.id))
+
+        db.session.commit()
+        return redirect(_safe_next_url())
+
+
+    @app.post("/comment/<int:report_id>")
+    def add_comment(report_id: int):
+        # Members-only
+        if not current_user.is_authenticated:
+            flash("Members only.", "info")
+            return redirect(_safe_next_url())
+
+        form = CommentForm()
+        if not form.validate_on_submit():
+            # Show the first validation error if present
+            err = None
+            if form.body.errors:
+                err = form.body.errors[0]
+            flash(err or "Please enter a valid comment.", "error")
+            return redirect(_safe_next_url())
+
+        body = (form.body.data or "").strip()
+        if not body:
+            flash("Comment can’t be empty.", "error")
+            return redirect(_safe_next_url())
+
+        # Lightweight anti-abuse: max 5 comments per 60 seconds per user
+        window_start = datetime.utcnow() - timedelta(seconds=60)
+        recent_count = (
+            Comment.query.filter(Comment.user_id == current_user.id, Comment.created_at >= window_start)
+            .count()
+        )
+        if recent_count >= 5:
+            flash("Please slow down for a moment.", "info")
+            return redirect(_safe_next_url())
+
+        report = SpeedReport.query.get_or_404(report_id)
+        c = Comment(report_id=report.id, user_id=current_user.id, body=body)
+        db.session.add(c)
+        db.session.commit()
+
+        return redirect(_safe_next_url())
+
+
+    @app.get("/submit")
+    def submit():
         form = SpeedReportForm()
         ticket_count = SpeedReport.query.count()
 
@@ -460,7 +672,8 @@ def create_app() -> Flask:
             state_options=STATE_OPTIONS,
         )
 
-    @app.post("/")
+
+    @app.post("/submit")
     def submit_ticket():
         form = SpeedReportForm()
 

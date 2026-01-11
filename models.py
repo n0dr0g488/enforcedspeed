@@ -173,3 +173,33 @@ class SpeedReport(db.Model):
             f"<SpeedReport id={self.id} state={self.state!r} road_name={self.road_name!r} "
             f"road_key={self.road_key!r} posted={self.posted_speed} ticketed={self.ticketed_speed} "
         )
+
+
+class Like(db.Model):
+    __tablename__ = "likes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    report_id = db.Column(db.Integer, db.ForeignKey("speed_reports.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("report_id", "user_id", name="uq_likes_report_user"),
+    )
+
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    report_id = db.Column(db.Integer, db.ForeignKey("speed_reports.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    body = db.Column(db.String(280), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    # Reserved for threaded replies (v3)
+    parent_id = db.Column(db.Integer, db.ForeignKey("comments.id"), nullable=True, index=True)
+
+    user = db.relationship("User", lazy=True)
+

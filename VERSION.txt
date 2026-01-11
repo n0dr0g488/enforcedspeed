@@ -1,3 +1,9 @@
-EnforcedSpeed_v13_2026-01-10_2335
-Local runner: run_local.ps1 (sets local Postgres DATABASE_URL if unset)
-Local runner comments cleaned (v14).
+EnforcedSpeed v17 — Home feed v1.2 (fix header alignment, restore home search styling, remove label text)
+
+
+v18: Header nav pushed right (margin-left:auto on .header-nav).
+
+v19: Home feed uses same Viewing/Hide Anonymous control as Rankings; fixed Rankings template escaping.
+
+v20: Feed interactions v1 — Likes + Comments (members-only), 280-char limit, lightweight anti-abuse (5/min).
+- v22: Fix feed action row flex so 'View similar' aligns right; no CSS/global changes.

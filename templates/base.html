@@ -23,11 +23,12 @@
     .site-header .inner{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:10px 16px;}
     .brand-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;}
     .brand-logo{height:42px;width:auto;display:block;}
-    .header-search{flex:1;display:flex;justify-content:center;}
+        .brand-text{font-weight:900;font-size:18px;letter-spacing:.2px;color:#111;}
+.header-search{flex:1;display:flex;justify-content:center;}
     .header-search form{width:100%;max-width:520px;display:flex;}
     .header-search input[type="text"]{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:999px;background:#f3f4f6;outline:none;}
     .header-search input[type="text"]:focus{background:#fff;border-color:#9ca3af;}
-    .header-nav{display:flex;align-items:center;gap:14px;white-space:nowrap;}
+    .header-nav{display:flex;align-items:center;gap:14px;white-space:nowrap;margin-left:auto;}
     .header-nav a{color:#111827;text-decoration:none;font-weight:600;}
     .header-nav a:hover{text-decoration:underline;}
     .nav-user{display:flex;align-items:center;gap:8px;}
@@ -45,17 +46,12 @@
     <div class="inner">
       <a class="brand-link" href="{{ url_for('home') }}">
         <img class="brand-logo" src="{{ url_for('static', filename='img/logo-sign-header.png') }}?v=10" alt="EnforcedSpeed">
+        <span class="brand-text">EnforcedSpeed</span>
       </a>
-
-      <div class="header-search">
-        <form action="{{ url_for('search') }}" method="get">
-          <input type="text" id="global-search" name="q" value="{{ request.args.get('q','') }}" placeholder="Search road, state, or username" autocomplete="off">
-        </form>
-          <div id="search-suggest" class="search-suggest" style="display:none;"></div>
-      </div>
 
       <nav class="header-nav">
         <a href="{{ url_for('home') }}">Home</a>
+        <a href="{{ url_for('submit') }}">Submit a Ticket</a>
         <a href="{{ url_for('strictness') }}">Rankings</a>
 
         {% if current_user.is_authenticated %}

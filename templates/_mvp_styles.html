@@ -67,4 +67,91 @@
         .blocks { grid-template-columns: 1fr; }
       }
     
+
+      /* v34 — modern, non-hyperlink action controls */
+      .action-link,
+      .action-link:visited{
+        color: inherit;
+        text-decoration: none;
+        font-weight: inherit;
+        cursor: pointer;
+      }
+      .action-link:hover{ text-decoration: underline; }
+
+      /* Buttons that should look like text (not a blue link) */
+      .action-btn{
+        appearance: none;
+        background: none;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        color: inherit;
+        font: inherit;
+        font-weight: inherit;
+        cursor: pointer;
+      }
+      .action-btn:hover{ text-decoration: underline; }
+
+      /* Toggle chip (used for Hide anonymous) */
+      .toggle-chip{
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        border: 1px solid #e5e7eb;
+        background: #f9fafb;
+        color: #111827;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .toggle-chip:hover{ background:#f3f4f6; }
+      .toggle-chip.is-on{
+        background: #111827;
+        border-color: #111827;
+        color: #fff;
+      }
+
+      /* Header active page indicator */
+      .header-nav a.active{
+        text-decoration: none;
+        box-shadow: inset 0 -2px 0 currentColor;
+      }
+
+
+
+/* --- Ticket card v4 accents --- */
+.pill-link { text-decoration: none; }
+.pill-link .pill { cursor: pointer; }
+.pill-link:hover .pill { filter: brightness(0.97); }
+
+.es-context-line { font-weight: 400; color: #374151; font-size: 14px; line-height: 1.25; }
+.es-bold { font-weight: 700; color: #111827; }
+.es-delta {
+  margin-top: 24px;
+  margin-bottom: 24px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: .02em;
+  text-align: center;
+}
+.es-delta-pos { color: #dc2626; } /* above enforcement */
+.es-delta-neg { color: #2563eb; } /* below enforcement */
+.es-delta-zero { color: #111827; }
+
+.pill-ocr { margin-left: 6px; }
+.pill-ocr-unverified { background: #eef2f7; color: #374151; }
+.pill-ocr-pending { background: #fff7ed; color: #9a3412; }
+.pill-ocr-verified { background: #dcfce7; color: #166534; }
+
+.ticket-ocr { display:flex; justify-content:flex-end; }
+.ticket-actions{ font-size: 14px; font-weight: 600; color: #111827; }
+.ticket-actions .action-link,
+.ticket-actions .action-btn,
+.ticket-actions .ticket-total-link{ font-size: 14px !important; font-weight: 600 !important; line-height: 1 !important; color: inherit !important; }
+.ticket-total-link { text-decoration: none; display: inline; padding: 0; margin: 0; }
+.ticket-total-link:hover{ text-decoration: underline; }
+.ticket-actions .ticket-total{ margin-left:auto; text-align:right; flex: 1; }
+.ticket-actions .ticket-total a{ display:inline-block; }
+
 </style>

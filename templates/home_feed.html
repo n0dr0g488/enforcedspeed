@@ -3,7 +3,7 @@
 
 <div class="wrap">
 
-  <div class="card">
+  <div class="card ticket-card">
     <div style="position:relative;">
       <form action="{{ url_for('search') }}" method="get">
         <input
@@ -19,13 +19,11 @@
     </div>
 
     <div class="subtle" style="margin: 10px 0 2px 0;">
-      {% if hide_anon %}
-        Viewing: <strong id="viewingMode">Members only</strong> · <a href="{{ url_for('home') }}">Show anonymous too</a>
+      <span>Viewing: <strong id="viewingMode">{% if hide_anon %}Members only{% else %}All posts{% endif %}</strong></span> ·
+      {% if current_user.is_authenticated %}
+        <a class="toggle-chip {% if hide_anon %}is-on{% endif %}" href="{% if hide_anon %}{{ url_for('home') }}{% else %}{{ url_for('home', hide_anon=1) }}{% endif %}">Hide anonymous</a>
       {% else %}
-        Viewing: <strong id="viewingMode">All posts</strong> · {% if current_user.is_authenticated %}
-        <a href="{{ url_for('home', hide_anon=1) }}">Hide anonymous</a>
-      {% else %}
-        <a href="#" id="hideAnonLink" onclick="
+        <a href="#" class="toggle-chip" id="hideAnonLink" onclick="
           var vm=document.getElementById('viewingMode');
           var old=vm.innerText;
           vm.innerText='Members only';
@@ -36,56 +34,75 @@
         ">Hide anonymous</a>
         <span id="loginRequiredMsg" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
       {% endif %}
+    </div>
+  
+    {# Definition text removed (now shown per-ticket in each card). #}
+  </div>
+
+    {% for r in reports %}
+  {% set state_code = (r.state.split(' - ')[0] if ' - ' in r.state else r.state) %}
+  {% set state_name = (r.state.split(' - ')[-1] if ' - ' in r.state else r.state) %}
+  <div class="card ticket-card" style="margin-top:16px;">
+
+      
+{# --- Header: Username (X) + time, OCR pill on right --- #}
+<div class="ticket-headwrap">
+  <div class="ticket-headrow">
+    <div class="ticket-user">
+      {% if r.user %}
+        {% set user_count = user_ticket_counts.get(r.user_id, 0) %}
+        <div class="ticket-userline">
+          <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
+          <span class="ticket-usercount">({{ user_count }})</span>
+        </div>
+      {% else %}
+        <div class="ticket-userline">Anonymous</div>
       {% endif %}
+    </div>
+
+    <div class="ticket-ocr">
+    {% if r.verification_status == "verified" %}
+      <span class="pill pill-ocr pill-ocr-verified">Photo OCR Verified ✓</span>
+    {% elif r.verification_status == "pending" %}
+      <span class="pill pill-ocr pill-ocr-pending">Photo OCR Pending</span>
+    {% else %}
+      <span class="pill pill-ocr pill-ocr-unverified">Photo OCR Unverified</span>
+    {% endif %}
     </div>
   </div>
 
-  {% for r in reports %}
-  <div class="card" style="margin-top:16px;">
+  <div class="subtle ticket-date" style="margin-top:4px;">
+    <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
+  </div>
+</div>
 
-      <div class="row" style="justify-content:space-between;gap:12px;">
-        <div style="font-weight:800;">
-          {% if r.user %}
-            <a href="{{ url_for('profile', username=r.user.username) }}" style="text-decoration:none; color:inherit;">{{ r.user.username }}</a>
-          {% else %}
-            Anonymous
-          {% endif %}
-        </div>
-        <div class="subtle">
-          <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
-        </div>
-      </div>
+{# --- Center: Road + State, speed/limit, ticket overage --- #}
+{% set ticket_over = (r.ticketed_speed - r.posted_speed)|round|int %}
+{% set enforced_over = enforced_a.get(r.id, (r.ticketed_speed - r.posted_speed)) %}
+{% set enforced_speed_mph = (r.posted_speed + enforced_over)|round|int %}
 
-      <div style="margin-top:10px;">
-        <span class="pill">{{ r.state }}</span>
-        <span class="pill">{{ format_road_bucket(r.road_name) }}</span>
-        <span class="pill">{{ r.posted_speed }} mph posted</span>
-        <span class="pill">{{ r.ticketed_speed }} mph ticketed</span>
-        <span class="pill">{{ (r.ticketed_speed - r.posted_speed) }} over</span>
-      </div>
+<div class="ticket-center">
+  <div class="ticket-roadstate">{{ format_road_bucket(r.road_name) }} in {{ state_name }}</div>
 
-      <div style="margin-top:14px;">
-        <div class="thermo-row">
-          <div class="thermo-label">Road + State percentile</div>
-          <div class="thermo-pct">{{ pct_a[r.id] }}%</div>
-        </div>
-        <div class="thermo-bar" aria-label="Road and state percentile">
-          <div class="thermo-fill" style="width: {{ pct_a[r.id] }}%;"></div>
-        </div>
-      </div>
+  <div class="ticket-overageblue ticket-overagefloat">
+    {% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph
+  </div>
 
-      <div style="margin-top:16px;">
-        <div class="thermo-row">
-          <div class="thermo-label">State + Posted Speed percentile</div>
-          <div class="thermo-pct">{{ pct_b[r.id] }}%</div>
-        </div>
-        <div class="thermo-bar" aria-label="State and posted speed percentile">
-          <div class="thermo-fill" style="width: {{ pct_b[r.id] }}%;"></div>
-        </div>
-      </div>
+  <div class="ticket-speedrow">
+    <div class="ticket-speedtext">
+      <span class="ticket-speednum">{{ r.ticketed_speed }}</span>
+      <span class="ticket-speedin">in a</span>
+      <span class="ticket-speedlimit">{{ r.posted_speed }}</span>
+    </div>
+  </div>
 
-      <div class="row" style="margin-top:14px;display:flex;justify-content:space-between;gap:12px;align-items:center;">
-        <div class="row" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:flex-start;">
+  <div class="ticket-enforcedline">
+    The EnforcedSpeed on <span class="es-bold">{{ format_road_bucket(r.road_name) }} in {{ state_name }}</span> is <span class="es-bold">{{ enforced_speed_mph }} mph</span>. 90% of all submitted tickets occurred at or above this speed.
+  </div>
+</div>
+
+<div class="row ticket-actions" style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;">
+        <div class="row" style="display:flex;gap:14px;align-items:center;flex-wrap:nowrap;justify-content:flex-start;">
 
           {% set lc = like_counts.get(r.id, 0) %}
 
@@ -93,39 +110,41 @@
             <form method="post" action="{{ url_for('toggle_like', report_id=r.id) }}" style="margin:0;display:inline;">
               {{ like_form.hidden_tag() }}
               <input type="hidden" name="next" value="{{ request.full_path }}">
-              <button type="submit" style="background:none;border:none;padding:0;color:#2563eb;cursor:pointer;font:inherit;">
+              <button type="submit" class="action-btn">
                 {% if r.id in user_liked %}Liked{% else %}Like{% endif %}
               </button>
             </form>
 
             <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
 
-            <a href="#" onclick="toggleComment({{ r.id }}); return false;">Comment</a>
+            <a class="action-link" href="#" onclick="toggleComment({{ r.id }}); return false;">Comment</a>
 
           {% else %}
-            <a href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
+            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
             <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
-            <a href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
+            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
             <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
           {% endif %}
         </div>
 
-        <a href="{{ url_for('bucket_tickets') }}?state={{ r.state[:2] }}&road={{ r.road_key }}">View similar</a>
+        {% set bucket_total = a_counts.get((r.state, r.road_key), 0) %}
+        <div class="ticket-total" style="margin-left:auto;text-align:right;">
+        <a class="action-link ticket-total-link" href="{{ url_for('bucket_tickets', state=state_code, road=r.road_key) }}" style="font-size:14px;font-weight:600;line-height:1;color:inherit;text-decoration:none;">View all {{ bucket_total }} tickets for this state and road</a>
+        </div>
         {# Report link later (v3) #}
-      </div>
+      
+</div>
 
       {% set thread = comment_threads_by_report.get(r.id, {"top": [], "replies": {}}) %}
       {% set top_comments = thread["top"] %}
       {% set replies_map = thread["replies"] %}
       {% set total_comments = comments_by_report.get(r.id, [])|length %}
-      {% set ns = namespace(shown=0) %}
 
+      {# Comments are fully collapsed by default (no comments shown until user expands). #}
       {% if top_comments %}
         <div style="margin-top:12px;">
           {% for c in top_comments %}
-            {% set ns.shown = ns.shown + 1 %}
-            {% set hide = ns.shown > 2 %}
-            <div id="comment-{{ c.id }}" class="subtle" style="margin-top:6px;{{ ' display:none;' if hide else '' }}">
+            <div id="comment-{{ c.id }}" class="subtle" style="margin-top:6px; display:none;">
               <strong style="color:#111827;">
                 <a href="{{ url_for('profile', username=c.user.username) }}" style="color:inherit;text-decoration:none;">{{ c.user.username }}</a>
               </strong>
@@ -136,7 +155,7 @@
 
               <div class="subtle" style="margin-top:4px;">
                 {% if current_user.is_authenticated %}
-                  <a href="#" onclick="openReplyWithMention({{ c.id }}, {{ c.id }}, '{{ c.user.username|e }}'); return false;">Reply</a>
+                  <a class="action-link" href="#" onclick="openReplyWithMention({{ c.id }}, {{ c.id }}, '{{ c.user.username|e }}'); return false;">Reply</a>
                   {% if current_user.id == c.user_id %}
                     <form method="post" action="{{ url_for('delete_comment', comment_id=c.id) }}" style="display:inline; margin-left:10px;">
                       {{ delete_comment_form.hidden_tag() }}
@@ -148,16 +167,17 @@
               </div>
 
               {# Nested replies renderer (supports replying to replies). #}
-              {# Nested replies renderer with capped visual indentation and feed-collapse (first 2 items visible). #}
-              {% macro render_replies(parent_id, depth, root_id) -%}
+              {# Nested replies renderer with capped visual indentation and feed-collapse (fully collapsed by default). #}
+              {% macro render_replies(parent_id, depth, root_id, seen) -%}
+                {# Safety guard: prevent cycles/runaway nesting from hanging the page. #}
+                {% if parent_id in seen or depth > 20 %}
+                {% else %}
                 {% set kids = replies_map.get(parent_id, []) %}
                 {% if kids %}
                   <div style="margin-top:6px;">
                     {% for rc in kids %}
-                      {% set ns.shown = ns.shown + 1 %}
-                      {% set hide = ns.shown > 2 %}
                       {% set d = depth if depth < 2 else 2 %}
-                      <div id="comment-{{ rc.id }}" class="subtle" style="margin-top:6px; margin-left:{{ 18 * d }}px;{{ ' display:none;' if hide else '' }}">
+                      <div id="comment-{{ rc.id }}" class="subtle" style="margin-top:6px; margin-left:{{ 18 * d }}px; display:none;">
                         <strong style="color:#111827;">
                           <a href="{{ url_for('profile', username=rc.user.username) }}" style="color:inherit;text-decoration:none;">{{ rc.user.username }}</a>
                         </strong>
@@ -165,7 +185,7 @@
                         <div style="margin-top:2px;">{{ rc.body }}</div>
                         {% if current_user.is_authenticated %}
                           <div class="subtle" style="margin-top:4px;">
-                            <a href="#" onclick="openReplyWithMention({{ root_id }}, {{ rc.id }}, '{{ rc.user.username|e }}'); return false;">Reply</a>
+                            <a class="action-link" href="#" onclick="openReplyWithMention({{ root_id }}, {{ rc.id }}, '{{ rc.user.username|e }}'); return false;">Reply</a>
                             {% if current_user.id == rc.user_id %}
                               <form method="post" action="{{ url_for('delete_comment', comment_id=rc.id) }}" style="display:inline; margin-left:10px;">
                                 {{ delete_comment_form.hidden_tag() }}
@@ -175,13 +195,14 @@
                           </div>
                         {% endif %}
                       </div>
-                      {{ render_replies(rc.id, depth+1, root_id) }}
+                      {{ render_replies(rc.id, depth+1, root_id, seen + [parent_id]) }}
                     {% endfor %}
                   </div>
                 {% endif %}
+              {% endif %}
               {%- endmacro %}
 
-              {{ render_replies(c.id, 1, c.id) }}
+              {{ render_replies(c.id, 1, c.id, []) }}
               {% if current_user.is_authenticated %}
                 <div id="replybox-{{ c.id }}" style="display:none; margin-top:10px; margin-left:18px;">
                   <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}">
@@ -200,11 +221,9 @@
             </div>
           {% endfor %}
 
-        {% if total_comments > 2 %}
           <div class="subtle" style="margin-top:6px;">
-            <a href="#" id="toggle-comments-{{ r.id }}" onclick="toggleComments({{ r.id }}, {{ total_comments }}); return false;">View all {{ total_comments }} comments</a>
+            <a class="action-link" href="javascript:void(0)" id="toggle-comments-{{ r.id }}" onclick="return toggleComments({{ r.id }}, {{ total_comments }});" data-expanded="0" data-label="View all {{ total_comments }} comment{% if total_comments != 1 %}s{% endif %}">View all {{ total_comments }} comment{% if total_comments != 1 %}s{% endif %}</a>
           </div>
-        {% endif %}
 
         </div>
       {% endif %}
@@ -227,13 +246,13 @@
 
     </div>
   {% else %}
-    <div class="card">
+    <div class="card ticket-card">
       <p>No posts yet. Be the first to <a href="{{ url_for('submit') }}">submit a ticket</a>.</p>
     </div>
   {% endfor %}
 
   {% if pagination.pages > 1 %}
-    <div class="card">
+    <div class="card ticket-card">
       <div class="row" style="justify-content:space-between;gap:12px;">
         <div>
           {% if pagination.has_prev %}
@@ -253,12 +272,57 @@
 </div>
 
 <style>
+
   /* Reuse the exact thank_you thermometer styling (scoped to this template). */
-  .thermo-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+  .ticket-card{padding-top:18px;padding-bottom:18px}
+
   .thermo-label{font-size:13px;font-weight:700;color:#374151}
-  .thermo-pct{font-size:13px;font-weight:800;color:#111827}
-  .thermo-bar{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden}
-  .thermo-fill{height:100%;background:#111827;border-radius:999px}
+  .thermo-line{display:flex;align-items:center;gap:10px}
+  .thermo-bar{flex:1;height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;position:relative}
+  .thermo-fill{height:100%;background:#cbd5e1;border-radius:999px}
+  .thermo-tick{position:absolute;top:0;bottom:0;width:2px;background:#9ca3af;opacity:.85;transform:translateX(-1px)}
+  .thermo-tick.tick-90{left:90%;background:#111827;opacity:1}
+  .thermo-value{min-width:54px;text-align:right;font-size:12px;font-weight:800;color:#111827}
+  .thermo-p90{position:absolute;left:90%;top:-32px;transform:translateX(-50%);font-size:11px;font-weight:700;color:#111827;white-space:nowrap}
+
+  .ticket-top{margin-top:-10px}
+  .ticket-user{font-weight:400}
+  .ticket-user .user-link{font-weight:800}
+  .ticket-date{font-weight:400}
+  /* Header layout: username on the left, OCR pill top-right aligned to username line. */
+  .ticket-headwrap{display:block}
+  .ticket-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .ticket-userline{display:flex;align-items:baseline;gap:6px}
+  .ticket-usercount{font-size:13px;font-weight:600;color:#6b7280}
+  .ticket-ocr{align-self:flex-start;margin-top:0}
+  .user-link{text-decoration:none;color:inherit}
+  .user-link:hover{text-decoration:underline}
+
+  /* Ticket card center (Version 5). */
+  .ticket-center{margin-top:12px;text-align:center;position:relative}
+  .ticket-roadstate{font-size:20px;font-weight:800;color:#111827;letter-spacing:.01em}
+  /* Speed line: keep the "90 in a 65" centered, and place "+25 mph" in the center of the right-hand side. */
+  .ticket-speedrow{margin-top:10px;display:flex;justify-content:center;align-items:baseline}
+    .ticket-speedtext{font-size:18px;font-weight:700;color:#111827;display:flex;align-items:baseline;gap:10px}
+  .ticket-speedin{font-weight:600;color:#111827}
+  .ticket-overageblue{font-size:18px;font-weight:800;color:#2563eb;white-space:nowrap}
+  /* Float the +mph BETWEEN road/state and speed line (center-right). */
+  .ticket-overagefloat{position:absolute;top:36px;left:70%;transform:translate(-50%,-50%);}
+  /* Add a touch more whitespace above/below the EnforcedSpeed sentence. */
+  .ticket-enforcedline{margin-top:30px;margin-bottom:30px;font-size:13.5px;font-weight:400;color:#374151;line-height:1.35}
+
+  .ticket-actions{margin-top:0px;padding-top:0;border-top:0}
+  /* Force "View all…" to match Like/Comment exactly (no local overrides). */
+  .ticket-total .action-link{font-size:inherit;line-height:inherit;font-weight:inherit;text-align:right;display:inline}
+  .ticket-total{flex:1;min-width:160px}
+
+  /* v58 refinements */
+  .ticket-card{padding-top:18px;padding-bottom:18px}
+  .ticket-top{margin-top:-10px}
+  .thermo-line{display:flex;align-items:center;gap:10px}
+  .thermo-bar{flex:1}
+  .thermo-value{position:static;font-size:12px;font-weight:800;color:#111827;min-width:52px;text-align:right}
+
 </style>
 
 <script>
@@ -323,7 +387,7 @@
 
 
 <script>
-  (function convertLocalTimes(){
+  function convertLocalTimes(){
     var nodes = document.querySelectorAll('.js-localtime[data-utc]');
     if(!nodes || nodes.length === 0) return;
 
@@ -349,39 +413,35 @@
       if(isNaN(d.getTime())) return;
       el.textContent = formatLocal(d);
     });
-  })();
+  }
 
-  function toggleComments(reportId, totalCount) {
-    const link = document.getElementById('toggle-comments-' + reportId);
-    if(!link) return;
-    const isExpanded = link.getAttribute('data-expanded') === '1';
-    const card = link.closest('.card');
-    if (!card) return;
+  function toggleComments(reportId, totalCount){
+    var link = document.getElementById('toggle-comments-' + reportId);
+    if(!link) return false;
+    var isExpanded = link.getAttribute('data-expanded') === '1';
 
-    // Use element.style.display (not string-matching the style attribute) so it works
-    // whether the browser serializes it as "display:none" or "display: none".
-    const all = card.querySelectorAll('[id^="comment-"]');
+    var card = link.closest('.card');
+    if(!card) return false;
 
-    if (!isExpanded) {
-      all.forEach(el => {
-        if (el && el.style && el.style.display === 'none') {
-          el.style.display = '';
-          el.setAttribute('data-extra', '1');
-        }
-      });
+    var items = card.querySelectorAll('[id^="comment-"]');
+
+    if(!isExpanded){
+      items.forEach(function(el){ el.style.display = ''; });
       link.textContent = 'Collapse comments';
       link.setAttribute('data-expanded','1');
-    } else {
-      all.forEach(el => {
-        if (el && el.getAttribute && el.getAttribute('data-extra') === '1') {
-          el.style.display = 'none';
-          el.removeAttribute('data-extra');
-        }
-      });
-      link.textContent = 'View all ' + totalCount + ' comments';
+      try{ convertLocalTimes(); }catch(e){}
+    }else{
+      items.forEach(function(el){ el.style.display = 'none'; });
+      var lbl = link.getAttribute('data-label');
+      link.textContent = lbl ? lbl : ('View all ' + totalCount + ' comments');
       link.setAttribute('data-expanded','0');
     }
+    return false;
   }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    try{ convertLocalTimes(); }catch(e){}
+  });
 </script>
 
 

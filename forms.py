@@ -1,6 +1,7 @@
 # forms.py
 import re
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField
 from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField, HiddenField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError, Email, EqualTo, Regexp
 
@@ -77,6 +78,14 @@ class SpeedReportForm(FlaskForm):
             NumberRange(min=0, max=150, message="Enter a reasonable speed (0–150)."),
         ],
         render_kw={"placeholder": "e.g., 79"},
+    )
+
+    photo = FileField(
+        "Photo (optional)",
+        validators=[
+            Optional(),
+            FileAllowed(["jpg", "jpeg", "png", "webp"], "Upload a JPG, PNG, or WebP image."),
+        ],
     )
 
     notes = TextAreaField(

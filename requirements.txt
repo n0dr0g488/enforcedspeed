@@ -3,6 +3,12 @@ Flask-SQLAlchemy>=3.1
 Flask-WTF>=1.2
 Flask-Login>=0.6
 gunicorn>=21.2
-psycopg[binary]>=3.2
+pg8000>=1.30
 email-validator==2.3.0
 sendgrid>=6.11
+rq>=2.0
+redis>=5.0
+boto3>=1.34
+Pillow>=10.0
+google-cloud-vision>=3.7
+google-auth>=2.28

@@ -12,13 +12,11 @@
         </p>
 
         <div class="subtle" style="margin: 6px 0 10px 0;">
-          {% if hide_anon %}
-            Viewing: <strong id="viewingMode">Members only</strong> · <a href="{{ url_for('strictness') }}">Show anonymous too</a>
+          <span>Viewing: <strong id="viewingMode">{% if hide_anon %}Members only{% else %}All posts{% endif %}</strong></span> ·
+          {% if current_user.is_authenticated %}
+            <a class="toggle-chip {% if hide_anon %}is-on{% endif %}" href="{% if hide_anon %}{{ url_for('strictness') }}{% else %}{{ url_for('strictness', hide_anon=1) }}{% endif %}">Hide anonymous</a>
           {% else %}
-            Viewing: <strong id="viewingMode">All posts</strong> · {% if current_user.is_authenticated %}
-            <a href="{{ url_for('strictness', hide_anon=1) }}">Hide anonymous</a>
-          {% else %}
-            <a href="#" id="hideAnonLink" onclick="
+            <a href="#" class="toggle-chip" id="hideAnonLink" onclick="
               var vm=document.getElementById('viewingMode');
               var old=vm.innerText;
               vm.innerText='Members only';
@@ -28,7 +26,6 @@
               return false;
             ">Hide anonymous</a>
             <span id="loginRequiredMsg" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
-          {% endif %}
           {% endif %}
         </div>
 <div class="blocks">
@@ -42,7 +39,7 @@
                     <span class="pill">{{ r.state }}</span>
                     <span class="pill">{{ format_road_bucket(r.road) }}</span>
 	                    <br>
-                    +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
+                    +{{ '%.1f'|format(r.median_overage) }} mph <a class="action-link" href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
                   </li>
                 {% else %}
                   <li class="subtle">Waiting for more data…</li>
@@ -61,7 +58,7 @@
                     <span class="pill">{{ r.state }}</span>
                     <span class="pill">{{ format_road_bucket(r.road) }}</span>
 	                    <br>
-                    +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
+                    +{{ '%.1f'|format(r.median_overage) }} mph <a class="action-link" href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
                   </li>
                 {% else %}
                   <li class="subtle">Waiting for more data…</li>
@@ -70,10 +67,6 @@
             </ol>
           </div>
         </div>
-      </div>
-
-      <div class="footer">
-        © 2025 EnforcedSpeed · Developed by Conor Gordon · Gordon Capital Holdings LLC
       </div>
     </div>
 {% endblock %}

@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import os
+import io
+import uuid
 import re
+import math
 from datetime import datetime, timedelta
 from statistics import median
+from bisect import bisect_right
 from typing import Dict, List
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
@@ -14,6 +18,8 @@ from sqlalchemy.orm import joinedload
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+
+from PIL import Image
 
 from config import Config
 from forms import (
@@ -28,6 +34,9 @@ from forms import (
     DeleteCommentForm,
 )
 from models import db, SpeedReport, User, Like, Comment, normalize_road, state_code_from_value
+
+from queue_utils import get_queue
+from r2_utils import put_bytes
 
 
 STATE_OPTIONS = [
@@ -131,6 +140,35 @@ def ensure_schema_patches() -> None:
         db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN user_id INTEGER"))
         db.session.commit()
 
+    # Add OCR verification fields to speed_reports for existing databases.
+    if not column_exists("speed_reports", "verification_status"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verification_status VARCHAR(20) NOT NULL DEFAULT 'unverified'"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "verified_at"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verified_at TIMESTAMP"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "ocr_posted_speed"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_posted_speed INTEGER"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "ocr_ticketed_speed"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_ticketed_speed INTEGER"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "ocr_confidence"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_confidence DOUBLE PRECISION"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "verify_attempts"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verify_attempts INTEGER NOT NULL DEFAULT 0"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "verify_reason"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verify_reason VARCHAR(50)"))
+        db.session.commit()
+
     # Add password reset rate limit columns to users for existing databases.
     if not column_exists("users", "reset_req_window_start"):
         db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_window_start TIMESTAMP"))
@@ -164,14 +202,15 @@ def create_app() -> Flask:
     def inject_helpers():
         return {"format_road_bucket": format_road_bucket}
 
-    @app.before_request
-    def ensure_tables_exist():
+    with app.app_context():
         try:
-            db.session.execute(text("SELECT 1"))
             db.create_all()
             ensure_schema_patches()
-        except Exception:
+        except Exception as e:
+            # Don't start a server that can't reach the database; fail fast with a clear error.
+            print(f"[DB INIT ERROR] {e}")
             db.session.rollback()
+            raise
 
     @app.route("/register", methods=["GET", "POST"])
     def register():
@@ -483,55 +522,102 @@ def create_app() -> Flask:
 
         expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
 
-        a_minmax = {}
+        # Road + State: true percentile rank within the (state, road_key) distribution.
+        # Percent = % of tickets in the same group with overage <= this ticket's overage.
+        a_dist: Dict[tuple[str, str], List[float]] = {}
         if keys_a:
             rows = (
                 db.session.query(
                     SpeedReport.state,
                     SpeedReport.road_key,
-                    func.min(expr).label("minv"),
-                    func.max(expr).label("maxv"),
+                    expr.label("overage"),
                 )
                 .filter(tuple_(SpeedReport.state, SpeedReport.road_key).in_(list(keys_a)))
-                .group_by(SpeedReport.state, SpeedReport.road_key)
                 .all()
             )
-            for st, rk, minv, maxv in rows:
-                a_minmax[(st, rk)] = (float(minv), float(maxv))
+            for st, rk, overage in rows:
+                a_dist.setdefault((st, rk), []).append(float(overage))
+            for k, vals in a_dist.items():
+                vals.sort()
 
-        b_minmax = {}
+
+        
+                b_dist = {}
         if keys_b:
             rows = (
                 db.session.query(
                     SpeedReport.state,
                     SpeedReport.posted_speed,
-                    func.min(expr).label("minv"),
-                    func.max(expr).label("maxv"),
+                    expr.label("overage"),
                 )
                 .filter(tuple_(SpeedReport.state, SpeedReport.posted_speed).in_(list(keys_b)))
-                .group_by(SpeedReport.state, SpeedReport.posted_speed)
                 .all()
             )
-            for st, ps, minv, maxv in rows:
-                b_minmax[(st, ps)] = (float(minv), float(maxv))
+            for st, ps, overage in rows:
+                b_dist.setdefault((st, ps), []).append(float(overage))
+            for k, vals in b_dist.items():
+                vals.sort()
 
-        def _pct(minv: float | None, maxv: float | None, v: float) -> float:
-            if minv is None or maxv is None:
-                return 100.0
-            if maxv == minv:
-                return 100.0
-            pct = round(((v - minv) / (maxv - minv)) * 100.0, 1)
-            return max(0.0, min(100.0, pct))
+        def _pctl(sorted_vals, p):
+            """EnforcedSpeed threshold helper.
+
+            Returns the smallest value v such that at least p (e.g., 0.90)
+            of the distribution is at or above v.
+
+            Implementation (Option B): pick index k = floor((1-p)*n) + 1
+            from the ascending-sorted list.
+            """
+            if not sorted_vals:
+                return 0.0
+            n = len(sorted_vals)
+            # k is 1-indexed into ascending list
+            k = int(math.floor((1.0 - p) * n)) + 1
+            if k < 1:
+                k = 1
+            if k > n:
+                k = n
+            return float(sorted_vals[k - 1])
+
+        a_p90 = {k: _pctl(vals, 0.90) for k, vals in a_dist.items()}
+        b_p90 = {k: _pctl(vals, 0.90) for k, vals in b_dist.items()}
 
         pct_a = {}
         pct_b = {}
+        enforced_a = {}
+        enforced_b = {}
         for r in reports:
             v = float(r.ticketed_speed - r.posted_speed)
-            minv, maxv = a_minmax.get((r.state, r.road_key), (None, None))
-            pct_a[r.id] = _pct(minv, maxv, v)
 
-            minv, maxv = b_minmax.get((r.state, r.posted_speed), (None, None))
-            pct_b[r.id] = _pct(minv, maxv, v)
+            vals = a_dist.get((r.state, r.road_key))
+            if not vals:
+                pct_a[r.id] = 100.0
+            else:
+                # bisect_right gives count of values <= v
+                pct_a[r.id] = round((bisect_right(vals, v) / len(vals)) * 100.0, 1)
+
+            vals_b = b_dist.get((r.state, r.posted_speed))
+            if not vals_b:
+                pct_b[r.id] = 100.0
+            else:
+                pct_b[r.id] = round((bisect_right(vals_b, v) / len(vals_b)) * 100.0, 1)
+
+            enforced_a[r.id] = a_p90.get((r.state, r.road_key), v)
+            enforced_b[r.id] = b_p90.get((r.state, r.posted_speed), v)
+
+        a_counts = {k: len(vals) for k, vals in a_dist.items()}
+
+        # Per-user ticket counts (for feed display: Username (X))
+        user_ticket_counts: Dict[int, int] = {}
+        user_ids = {r.user_id for r in reports if r.user_id}
+        if user_ids:
+            rows = (
+                db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
+                .filter(SpeedReport.user_id.in_(list(user_ids)))
+                .group_by(SpeedReport.user_id)
+                .all()
+            )
+            user_ticket_counts = {uid: int(c) for uid, c in rows if uid is not None}
+
 
         report_ids = [r.id for r in reports]
 
@@ -555,7 +641,10 @@ def create_app() -> Flask:
                 )
                 user_liked = {rid for (rid,) in rows}
 
-        # Comments: show oldest -> newest so threads read naturally
+        # Comments: show oldest -> newest so threads read naturally.
+        # IMPORTANT: legacy data may contain invalid/cyclic parent pointers from before true nesting.
+        # If we build threads naively, a cycle can hang template rendering (browser spins forever).
+        # We therefore sanitize parent pointers per-report before building the thread maps.
         comments_by_report: Dict[int, List[Comment]] = {rid: [] for rid in report_ids}
         comment_threads_by_report: Dict[int, Dict[str, object]] = {rid: {"top": [], "replies": {}} for rid in report_ids}
 
@@ -566,14 +655,51 @@ def create_app() -> Flask:
                 .order_by(Comment.created_at.asc())
                 .all()
             )
+
+            # Group by report so we can sanitize parent pointers within each report.
+            by_report: Dict[int, List[Comment]] = {}
             for c in rows:
-                comments_by_report.setdefault(c.report_id, []).append(c)
-                if c.parent_id:
-                    comment_threads_by_report.setdefault(c.report_id, {"top": [], "replies": {}})
-                    comment_threads_by_report[c.report_id]["replies"].setdefault(c.parent_id, []).append(c)
-                else:
-                    comment_threads_by_report.setdefault(c.report_id, {"top": [], "replies": {}})
-                    comment_threads_by_report[c.report_id]["top"].append(c)
+                by_report.setdefault(c.report_id, []).append(c)
+
+            def _safe_parent_id(comment: Comment, id_map: Dict[int, Comment]) -> int | None:
+                """Return a safe parent_id (or None) by rejecting self-loops, missing parents, and cycles."""
+                pid = comment.parent_id
+                if not pid:
+                    return None
+                if pid == comment.id:
+                    return None
+
+                # Walk upward to detect cycles / broken pointers.
+                seen: set[int] = {comment.id}
+                cur = pid
+                steps = 0
+                while cur:
+                    steps += 1
+                    if steps > 50:
+                        # Hard safety cap; treat as top-level if chain is suspiciously deep.
+                        return None
+                    if cur in seen:
+                        return None
+                    seen.add(cur)
+                    parent = id_map.get(cur)
+                    if parent is None:
+                        return None
+                    if parent.parent_id == parent.id:
+                        return None
+                    cur = parent.parent_id
+                return pid
+
+            for rid, comments in by_report.items():
+                id_map = {c.id: c for c in comments}
+                for c in comments:
+                    comments_by_report.setdefault(rid, []).append(c)
+                    safe_pid = _safe_parent_id(c, id_map)
+                    if safe_pid:
+                        comment_threads_by_report.setdefault(rid, {"top": [], "replies": {}})
+                        comment_threads_by_report[rid]["replies"].setdefault(safe_pid, []).append(c)
+                    else:
+                        comment_threads_by_report.setdefault(rid, {"top": [], "replies": {}})
+                        comment_threads_by_report[rid]["top"].append(c)
 
         like_form = LikeForm()
         comment_form = CommentForm()
@@ -587,6 +713,10 @@ def create_app() -> Flask:
             hide_anon=hide_anon,
             pct_a=pct_a,
             pct_b=pct_b,
+            enforced_a=enforced_a,
+            enforced_b=enforced_b,
+            a_counts=a_counts,
+            user_ticket_counts=user_ticket_counts,
             like_counts=like_counts,
             user_liked=user_liked,
             comments_by_report=comments_by_report,
@@ -772,6 +902,50 @@ def create_app() -> Flask:
 
         db.session.add(report)
         db.session.commit()
+
+        # Optional photo upload -> quarantine in R2 + async OCR verification (fail closed).
+        photo_fs = getattr(form, "photo", None)
+        file_obj = photo_fs.data if photo_fs is not None else None
+        if file_obj and getattr(file_obj, "filename", ""):
+            try:
+                # Mark pending first so the feed can show status immediately.
+                report.verification_status = "pending"
+                report.verify_reason = None
+                db.session.commit()
+
+                # Load + normalize + strip metadata by re-encoding.
+                raw = file_obj.read()
+                im = Image.open(io.BytesIO(raw))
+                im = im.convert("RGB")
+                im.thumbnail((1600, 1600))
+                out = io.BytesIO()
+                im.save(out, format="JPEG", quality=80, optimize=True)
+                jpg_bytes = out.getvalue()
+
+                bucket = os.environ.get("R2_QUARANTINE_BUCKET", "enforcedspeed-ticket-quarantine").strip() or "enforcedspeed-ticket-quarantine"
+                prefix = os.environ.get("R2_PREFIX", "tickets/").strip()
+                if prefix and not prefix.endswith("/"):
+                    prefix = prefix + "/"
+                key = f"{prefix}{report.id}/{uuid.uuid4().hex}.jpg"
+
+                ok = put_bytes(bucket=bucket, key=key, data=jpg_bytes, content_type="image/jpeg")
+                if not ok:
+                    report.verification_status = "unverified"
+                    report.verify_reason = "upload_failed"
+                    db.session.commit()
+                else:
+                    q = get_queue()
+                    q.enqueue(
+                        "ocr_verify.verify_ticket_from_r2",
+                        report.id,
+                        bucket,
+                        key,
+                        job_timeout=120,
+                    )
+            except Exception:
+                report.verification_status = "unverified"
+                report.verify_reason = "exception"
+                db.session.commit()
 
         return redirect(url_for("result", report_id=report.id))
 

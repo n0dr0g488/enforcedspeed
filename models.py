@@ -160,6 +160,21 @@ class SpeedReport(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
+    # OCR verification (async)
+    # pending -> show 'Pending verification'
+    # verified -> show 'Verified by OCR' (green check)
+    # unverified -> show nothing
+    verification_status = db.Column(db.String(20), nullable=False, default="unverified", index=True)
+    verified_at = db.Column(db.DateTime, nullable=True)
+
+    # Stored for internal tuning/debug only (never shown publicly)
+    ocr_posted_speed = db.Column(db.Integer, nullable=True)
+    ocr_ticketed_speed = db.Column(db.Integer, nullable=True)
+    ocr_confidence = db.Column(db.Float, nullable=True)
+    verify_attempts = db.Column(db.Integer, nullable=False, default=0)
+    verify_reason = db.Column(db.String(50), nullable=True)
+
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Ensure road_key stays consistent with latest normalization rules

@@ -5,6 +5,23 @@
 
   <div class="card ticket-card">
     <div style="position:relative;">
+
+      {# Homepage intro card (Option A typography): title slightly emphasized, body normal, disclaimer visible but quiet. #}
+      <div class="home-intro" style="margin: 0 0 10px 0;">
+        <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
+
+        <div class="home-intro-body">
+          EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers to identify the speeds at which enforcement most commonly occurs. Rather than relying on posted limits alone, this data helps reveal how speeding laws are actually enforced across different roads and states.
+        </div>
+
+        <div class="home-intro-body" style="margin-top:8px;">
+          By analyzing thousands of tickets, EnforcedSpeed highlights the speed at which the vast majority of drivers are cited, providing a clearer picture of real-world enforcement patterns.
+        </div>
+
+        <div class="home-intro-disclaimer">
+          <span class="home-intro-disclaimer-lead">Important:</span> EnforcedSpeed is an informational data platform only. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
+        </div>
+      </div>
       <form action="{{ url_for('search') }}" method="get">
         <input
           type="text"
@@ -61,6 +78,14 @@
     </div>
 
     <div class="ticket-ocr">
+    {# Photo submitted pill: green if a photo was provided, regardless of OCR outcome. #}
+    {% set photo_submitted = (r.verification_status != 'unverified') or (r.verify_reason is not none) %}
+    {% if photo_submitted %}
+      <span class="pill pill-photo pill-photo-submitted">Photo Submitted</span>
+    {% else %}
+      <span class="pill pill-photo pill-photo-unsubmitted">Photo Unsubmitted</span>
+    {% endif %}
+
     {% if r.verification_status == "verified" %}
       <span class="pill pill-ocr pill-ocr-verified">Photo OCR Verified ✓</span>
     {% elif r.verification_status == "pending" %}
@@ -307,7 +332,7 @@
   .ticket-speedin{font-weight:600;color:#111827}
   .ticket-overageblue{font-size:18px;font-weight:800;color:#2563eb;white-space:nowrap}
   /* Float the +mph BETWEEN road/state and speed line (center-right). */
-  .ticket-overagefloat{position:absolute;top:36px;left:70%;transform:translate(-50%,-50%);}
+  .ticket-overagefloat{position:absolute;top:36px;left: calc(70% + 14px);transform:translate(-50%,-50%);}
   /* Add a touch more whitespace above/below the EnforcedSpeed sentence. */
   .ticket-enforcedline{margin-top:30px;margin-bottom:30px;font-size:13.5px;font-weight:400;color:#374151;line-height:1.35}
 

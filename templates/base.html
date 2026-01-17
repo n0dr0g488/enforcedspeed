@@ -50,7 +50,9 @@
       </a>
 
       <nav class="header-nav">
+        {% if request.endpoint != 'home' %}
         <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">Home</a>
+        {% endif %}
         <a href="{{ url_for('submit') }}" class="{{ 'active' if request.endpoint=='submit' else '' }}">Submit a Ticket</a>
         <a href="{{ url_for('strictness') }}" class="{{ 'active' if request.endpoint=='strictness' else '' }}">Rankings</a>
 

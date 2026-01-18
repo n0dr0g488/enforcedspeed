@@ -78,20 +78,34 @@
     </div>
 
     <div class="ticket-ocr">
-    {# Photo submitted pill: green if a photo was provided, regardless of OCR outcome. #}
-    {% set photo_submitted = (r.verification_status != 'unverified') or (r.verify_reason is not none) %}
+    {# Photo submitted pill: only true if we actually stored an R2 key. #}
+    {% set photo_submitted = (r.photo_key is not none) %}
     {% if photo_submitted %}
       <span class="pill pill-photo pill-photo-submitted">Photo Submitted</span>
     {% else %}
       <span class="pill pill-photo pill-photo-unsubmitted">Photo Unsubmitted</span>
     {% endif %}
 
-    {% if r.verification_status == "verified" %}
-      <span class="pill pill-ocr pill-ocr-verified">Photo OCR Verified ✓</span>
-    {% elif r.verification_status == "pending" %}
-      <span class="pill pill-ocr pill-ocr-pending">Photo OCR Pending</span>
-    {% else %}
-      <span class="pill pill-ocr pill-ocr-unverified">Photo OCR Unverified</span>
+    {# OCR status pill: only show when a photo exists. #}
+    {% if photo_submitted %}
+      {% if r.ocr_status == 'processing' or r.ocr_status == 'pending' or r.verification_status == 'pending' %}
+        <span class="pill pill-ocr pill-ocr-pending">Photo OCR Processing</span>
+        <span class="pill-info" title="OCR is processing this photo now.">i</span>
+      {% elif r.ocr_status == 'verified' or r.verification_status == 'verified' %}
+        <span class="pill pill-ocr pill-ocr-verified">Verified (Automated) ✓</span>
+        <span class="pill-info" title="OCR completed and key fields were validated automatically.">i</span>
+      {% else %}
+        <span class="pill pill-ocr pill-ocr-unverified">Not Verified</span>
+        {# Subtle reassurance: OCR did run. Tooltip text varies based on what we observed internally. #}
+        {% set _vr = (r.verify_reason or '') %}
+        {% set _err = (r.ocr_error or '') %}
+        {% if _vr in ['no_text','missing_candidates','no_image','no_speeds','ocr_exception','ocr_error'] or _err in ['no_image','no_speeds'] %}
+          {% set _tip = "OCR completed, but we couldn't read the key speed details clearly enough to verify." %}
+        {% else %}
+          {% set _tip = "OCR completed, but the extracted speeds didn't match closely enough to verify." %}
+        {% endif %}
+        <span class="pill-info" title="{{ _tip }}">i</span>
+      {% endif %}
     {% endif %}
     </div>
   </div>

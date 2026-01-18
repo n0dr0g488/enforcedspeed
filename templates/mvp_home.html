@@ -51,8 +51,18 @@
           {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
 
           <label for="photo">Photo (optional for OCR ticket verification)</label>
-          {{ form.photo(id="photo", accept="image/*") }}
-<div class="blocks">
+          <div class="photo-field">
+            {{ form.photo(id="photo", accept="image/jpeg,image/png") }}
+            <div class="subtle" id="photoHint" style="margin-top:6px;">
+              JPG/JPEG or PNG only for now. iPhone HEIC is not supported yet.
+            </div>
+            <div class="subtle" style="margin-top:4px;">
+              Photo privacy: Uploaded photos are used only to attempt OCR verification and are automatically deleted shortly after processing (and always within 24 hours).
+            </div>
+            <div class="subtle" id="photoSelected" style="margin-top:4px;"></div>
+          </div>
+
+          <div class="blocks">
             <div class="block">
               <strong>Most Strict</strong>
               <ol>
@@ -117,6 +127,10 @@
       const postedEl = document.getElementById("posted_speed");
       const ticketedEl = document.getElementById("ticketed_speed");
       const formEl = document.getElementById("ticketForm");
+
+      const photoEl = document.getElementById("photo");
+      const photoSelectedEl = document.getElementById("photoSelected");
+      const allowedPhotoExts = ["jpg", "jpeg", "png"];
 
       let t = null;
 
@@ -202,10 +216,34 @@
       });
 
       // Before submit: strip formatting so Flask validators receive clean numbers
-      formEl.addEventListener("submit", () => {
+      formEl.addEventListener("submit", (e) => {
         stripField(postedEl);
         stripField(ticketedEl);
+
+        // Client-side guard to prevent confusing "grey/no photo" results.
+        // Server still validates, this just gives immediate feedback.
+        if (photoEl && photoEl.files && photoEl.files.length) {
+          const name = (photoEl.files[0].name || "").toLowerCase();
+          const ext = name.includes(".") ? name.split(".").pop() : "";
+          if (!allowedPhotoExts.includes(ext)) {
+            e.preventDefault();
+            alert(`Unsupported photo format: .${ext || "?"}. Please upload JPG/JPEG or PNG (iPhone HEIC not supported yet).`);
+          }
+        }
       });
+
+      if (photoEl) {
+        photoEl.addEventListener("change", () => {
+          if (!photoSelectedEl) return;
+          if (!photoEl.files || !photoEl.files.length) {
+            photoSelectedEl.textContent = "";
+            return;
+          }
+          const f = photoEl.files[0];
+          const name = f.name || "(selected)";
+          photoSelectedEl.textContent = `Selected: ${name}`;
+        });
+      }
 
       stateEl.addEventListener("input", schedulePreview);
       roadEl.addEventListener("input", schedulePreview);

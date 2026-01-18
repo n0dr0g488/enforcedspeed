@@ -32,6 +32,43 @@
       </div>
     </div>
 
+    {% if report.photo_key %}
+      <div style="margin-top:22px;border-top:1px solid rgba(0,0,0,.08);padding-top:18px;">
+        <div style="font-weight:700;font-size:16px;">Photo OCR verification</div>
+        <div class="muted" style="margin-top:6px;">
+          You’ll see two photo pills on your ticket while we verify your upload.
+        </div>
+
+        <ul class="muted" style="margin:10px 0 0 0;padding-left:18px;line-height:1.35;">
+          <li style="margin:6px 0;">
+            <span class="pill pill-photo pill-photo-submitted">Photo Submitted</span>
+            We received your photo and queued it for OCR.
+          </li>
+          <li style="margin:6px 0;">
+            <span class="pill pill-ocr pill-ocr-pending">Photo OCR Processing</span>
+            Our system is reading the image now (usually a minute or two).
+          </li>
+          <li style="margin:6px 0;">
+            <span class="pill pill-ocr pill-ocr-verified">Verified (Automated) ✓</span>
+            We extracted and validated key fields automatically.
+          </li>
+          <li style="margin:6px 0;">
+            <span class="pill pill-ocr pill-ocr-unverified">Not Verified</span>
+            We couldn’t confidently validate this photo. Your ticket still posts.
+          </li>
+        </ul>
+
+        <div class="muted" style="margin-top:10px;">
+          Tip: For best results, upload a clear, straight-on photo with the speed + posted limit visible.
+        </div>
+
+        <hr class="light-divider" style="margin:14px 0;border:none;border-top:1px solid rgba(0,0,0,.08);">
+        <div class="muted" style="font-size:0.92rem; line-height:1.35; padding:10px 12px; background:rgba(0,0,0,.03); border:1px solid rgba(0,0,0,.06); border-radius:10px;">
+          <strong>Photo privacy:</strong> Uploaded photos are used only to attempt OCR verification and are automatically deleted shortly after processing (and always within 24 hours).
+        </div>
+      </div>
+    {% endif %}
+
   </div>
 
 </div>

@@ -150,6 +150,24 @@
 .pill-ocr-pending { background: #fff7ed; color: #9a3412; }
 .pill-ocr-verified { background: #dcfce7; color: #166534; }
 
+/* Subtle info icon for OCR status (tooltip via title attribute) */
+.pill-info{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:16px;
+  height:16px;
+  border-radius:999px;
+  border:1px solid rgba(0,0,0,.12);
+  color:#6b7280;
+  font-size:12px;
+  line-height:1;
+  margin-left:6px;
+  cursor:help;
+  background:rgba(255,255,255,.65);
+}
+.pill-info:hover{filter:brightness(0.97);}
+
 /* Photo submitted pill (independent from OCR status) */
 .pill-photo { margin-left: 6px; }
 .pill-photo-unsubmitted { background: #eef2f7; color: #374151; }

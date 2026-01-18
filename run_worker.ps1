@@ -1,9 +1,9 @@
-# EnforcedSpeed local runner (Windows PowerShell)
+# EnforcedSpeed RQ worker runner (Windows PowerShell)
 # - Pins DATABASE_URL + REDIS_URL for local Docker Postgres/Redis (unless already set)
 # - Clears stale R2_* env vars so .env is authoritative for R2 locally
-# - Creates venv if missing, installs deps, launches app
+# - Creates venv if missing, installs deps, launches worker
 
-Write-Host "Starting EnforcedSpeed (local)..." -ForegroundColor Cyan
+Write-Host "Starting EnforcedSpeed RQ worker (local)..." -ForegroundColor Cyan
 
 # Ensure we are running from the folder that contains this script (ZIP root)
 Set-Location -Path $PSScriptRoot
@@ -67,6 +67,6 @@ if ($currentHash -ne $previousHash) {
     Write-Host "Requirements unchanged. Skipping pip install." -ForegroundColor DarkGray
 }
 
-# ---- Launch app ----
-Write-Host "Launching app..." -ForegroundColor Green
-.\\venv\\Scripts\\python.exe app.py
+# ---- Launch worker ----
+Write-Host "Launching worker..." -ForegroundColor Green
+.\\venv\\Scripts\\python.exe worker.py

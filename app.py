@@ -2,6 +2,16 @@
 from __future__ import annotations
 
 import os
+
+# Load local environment variables from .env (if present).
+# This avoids having to re-type secrets each run during local dev.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(override=True)
+except Exception:
+    pass
+
 import io
 import uuid
 import re
@@ -176,6 +186,28 @@ def ensure_schema_patches() -> None:
 
     if not column_exists("users", "reset_req_count"):
         db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_count INTEGER"))
+        db.session.commit()
+
+
+    # Photo + OCR job tracking columns for speed_reports.
+    if not column_exists("speed_reports", "photo_key"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN photo_key TEXT"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "photo_uploaded_at"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN photo_uploaded_at TIMESTAMP"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "ocr_status"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_status VARCHAR(20)"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "ocr_job_id"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_job_id VARCHAR(64)"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "ocr_error"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_error TEXT"))
         db.session.commit()
 
     # Add parent_id to comments for threaded replies.
@@ -880,6 +912,8 @@ def create_app() -> Flask:
         form = SpeedReportForm()
 
         if not form.validate_on_submit():
+            # Make failure obvious (common case: photo format rejected by WTForms).
+            flash("Ticket not submitted. Please fix the highlighted errors below.", "warning")
             return render_template(
                 "mvp_home.html",
                 form=form,
@@ -908,8 +942,21 @@ def create_app() -> Flask:
         file_obj = photo_fs.data if photo_fs is not None else None
         if file_obj and getattr(file_obj, "filename", ""):
             try:
+                # Reject unsupported formats early (common: iPhone .HEIC).
+                fname = (getattr(file_obj, "filename", "") or "").lower()
+                if fname and not any(fname.endswith(ext) for ext in (".jpg", ".jpeg", ".png")):
+                    report.verification_status = "unverified"
+                    report.ocr_status = "not_verified"
+                    report.ocr_error = "unsupported_format"
+                    report.verify_reason = "unsupported_format"
+                    db.session.commit()
+                    flash("Photo upload failed: only JPG/JPEG/PNG are supported right now (iPhone HEIC not yet).", "warning")
+                    return redirect(url_for("result", report_id=report.id))
+
                 # Mark pending first so the feed can show status immediately.
                 report.verification_status = "pending"
+                report.ocr_status = "pending"
+                report.ocr_error = None
                 report.verify_reason = None
                 db.session.commit()
 
@@ -922,6 +969,18 @@ def create_app() -> Flask:
                 im.save(out, format="JPEG", quality=80, optimize=True)
                 jpg_bytes = out.getvalue()
 
+
+                # Ensure required R2 env vars exist (local dev often forgets these).
+                missing = [k for k in ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY") if not (os.environ.get(k) or "").strip()]
+                if missing:
+                    report.verification_status = "unverified"
+                    report.ocr_status = "not_verified"
+                    report.ocr_error = "missing_r2_env: " + ",".join(missing)
+                    report.verify_reason = "upload_failed"
+                    db.session.commit()
+                    flash("Photo upload failed: missing local R2 settings: " + ", ".join(missing), "warning")
+                    return redirect(url_for("result", report_id=report.id))
+
                 bucket = os.environ.get("R2_QUARANTINE_BUCKET", "enforcedspeed-ticket-quarantine").strip() or "enforcedspeed-ticket-quarantine"
                 prefix = os.environ.get("R2_PREFIX", "tickets/").strip()
                 if prefix and not prefix.endswith("/"):
@@ -931,19 +990,35 @@ def create_app() -> Flask:
                 ok = put_bytes(bucket=bucket, key=key, data=jpg_bytes, content_type="image/jpeg")
                 if not ok:
                     report.verification_status = "unverified"
+                    report.ocr_status = "not_verified"
+                    report.ocr_error = "upload_failed"
                     report.verify_reason = "upload_failed"
                     db.session.commit()
                 else:
+                    # Persist where the photo lives so the worker (and UI) can find it later.
+                    report.photo_key = key
+                    report.photo_uploaded_at = datetime.utcnow()
+
                     q = get_queue()
-                    q.enqueue(
+                    job = q.enqueue(
                         "ocr_verify.verify_ticket_from_r2",
                         report.id,
                         bucket,
                         key,
                         job_timeout=120,
                     )
-            except Exception:
+                    report.ocr_job_id = job.id
+                    db.session.commit()
+            except Exception as e:
+                # Store a debuggable error string (truncated) instead of a generic placeholder.
+                try:
+                    app.logger.exception("Photo upload/OCR enqueue failed for report_id=%s", report.id)
+                except Exception:
+                    pass
                 report.verification_status = "unverified"
+                report.ocr_status = "not_verified"
+                err = f"{type(e).__name__}: {e}"
+                report.ocr_error = (err[:500] if err else "exception")
                 report.verify_reason = "exception"
                 db.session.commit()
 

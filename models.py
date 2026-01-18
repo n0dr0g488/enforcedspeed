@@ -174,6 +174,13 @@ class SpeedReport(db.Model):
     verify_attempts = db.Column(db.Integer, nullable=False, default=0)
     verify_reason = db.Column(db.String(50), nullable=True)
 
+    # Photo + OCR job tracking (R2 quarantine + RQ)
+    photo_key = db.Column(db.Text, nullable=True)
+    photo_uploaded_at = db.Column(db.DateTime, nullable=True)
+    ocr_status = db.Column(db.String(20), nullable=True)  # pending|processing|verified|unverified|failed
+    ocr_job_id = db.Column(db.String(64), nullable=True)
+    ocr_error = db.Column(db.Text, nullable=True)
+
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

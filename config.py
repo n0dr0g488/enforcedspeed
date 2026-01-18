@@ -9,21 +9,25 @@ def _normalize_database_url(url: str) -> str:
       postgres://...
       postgresql://...
 
-    We are using psycopg v3, so SQLAlchemy must use:
-      postgresql+psycopg://...
+    We use a pure-Python Postgres driver (pg8000) for maximum compatibility, so SQLAlchemy must use:
+      postgresql+pg8000://...
 
-    This prevents SQLAlchemy from trying to import psycopg2.
+    This avoids native libpq DLL issues on some Windows environments.
     """
     if not url:
         return url
 
     url = url.strip()
 
+    # Normalize old local runner scheme
+    if url.startswith("postgresql+psycopg://"):
+        return "postgresql+pg8000://" + url[len("postgresql+psycopg://"):]
+
     if url.startswith("postgres://"):
-        return "postgresql+psycopg://" + url[len("postgres://") :]
+        return "postgresql+pg8000://" + url[len("postgres://") :]
 
     if url.startswith("postgresql://"):
-        return "postgresql+psycopg://" + url[len("postgresql://") :]
+        return "postgresql+pg8000://" + url[len("postgresql://") :]
 
     return url
 
@@ -45,6 +49,14 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Photo uploads (quarantine + async OCR). Keep this tight to control costs.
+    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", str(6 * 1024 * 1024)))
+
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
     }
+
+    # Fail fast if Postgres is unreachable (prevents "browser spins forever")
+    if SQLALCHEMY_DATABASE_URI.startswith("postgresql+pg8000://"):
+        # pg8000 uses a pure-Python connection; keep a short timeout to avoid hanging.
+        SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {"timeout": 3}

@@ -47,6 +47,12 @@ if (!(Test-Path ".\\venv")) {
     python -m venv venv
 }
 
+# If the venv exists but pip/python inside it are missing or broken (common after WinError 32
+# interruptions), force a reinstall on this run.
+$venvPy  = Join-Path $PSScriptRoot "venv\\Scripts\\python.exe"
+$venvPip = Join-Path $PSScriptRoot "venv\\Scripts\\pip.exe"
+$venvHealthy = (Test-Path $venvPy) -and (Test-Path $venvPip)
+
 # ---- Install/update dependencies (only when requirements.txt changes) ----
 $reqFile = Join-Path $PSScriptRoot "requirements.txt"
 $hashFile = Join-Path $PSScriptRoot "venv\\.requirements.sha256"
@@ -54,9 +60,15 @@ $currentHash = (Get-FileHash $reqFile -Algorithm SHA256).Hash
 $previousHash = ""
 if (Test-Path $hashFile) { $previousHash = (Get-Content $hashFile -ErrorAction SilentlyContinue) }
 
+if (-not $venvHealthy) {
+    Write-Host "venv exists but pip/python are missing. Forcing dependency install..." -ForegroundColor Yellow
+    $previousHash = ""
+}
+
 if ($currentHash -ne $previousHash) {
     Write-Host "Installing requirements (requirements.txt changed)..." -ForegroundColor Cyan
     try {
+        .\\venv\\Scripts\\python.exe -m ensurepip --upgrade | Out-Null
         .\\venv\\Scripts\\python.exe -m pip install -r requirements.txt
         Set-Content -Path $hashFile -Value $currentHash
     } catch {

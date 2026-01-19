@@ -1,62 +1,263 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="wrap">
+<div class="home-shell">
 
-  <div class="card ticket-card">
-    <div style="position:relative;">
+    {# Left sidebar: sticky filters (desktop). Collapses behind button on mobile. #}
+    <aside class="home-left" id="homeFiltersSidebar">
+      <div class="card ticket-card">
+        <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
+          <div class="filterbox">
+            <div class="filterbox-title">Filter speeding tickets</div>
 
-      {# Homepage intro card (Option A typography): title slightly emphasized, body normal, disclaimer visible but quiet. #}
-      <div class="home-intro" style="margin: 0 0 10px 0;">
-        <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
+            <div class="filterbox-section">Location</div>
 
-        <div class="home-intro-body">
-          EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers to identify the speeds at which enforcement most commonly occurs. Rather than relying on posted limits alone, this data helps reveal how speeding laws are actually enforced across different roads and states.
-        </div>
+            <div class="filterbar-row filterbar-row--stack">
 
-        <div class="home-intro-body" style="margin-top:8px;">
-          By analyzing thousands of tickets, EnforcedSpeed highlights the speed at which the vast majority of drivers are cited, providing a clearer picture of real-world enforcement patterns.
-        </div>
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-state">State</label>
+                <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
+                  <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
+                  {% for opt in state_filter_options %}
+                    <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
+                  {% endfor %}
+                </select>
+              </div>
 
-        <div class="home-intro-disclaimer">
-          <span class="home-intro-disclaimer-lead">Important:</span> EnforcedSpeed is an informational data platform only. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
-        </div>
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-road">Road</label>
+                <input id="filter-road" name="road" class="filterbar-input" type="text" value="{{ filter_road or '' }}" placeholder="I-95, US-1, SR-520" autocomplete="off" list="road_suggestions">
+                <datalist id="road_suggestions">
+                  {% for s in road_suggestions %}
+                    <option value="{{ s }}"></option>
+                  {% endfor %}
+                </datalist>
+              </div>
+
+              <div class="filterbox-section">Enforcement</div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
+                {% set ssel = [] %}
+                {% for b in speed_limit_buckets %}
+                  {% if b.value in filter_speed_limit_list and b.value != 'any' %}
+                    {% set _ = ssel.append(b.label) %}
+                  {% endif %}
+                {% endfor %}
+
+                <details class="multi" data-multi>
+                  <summary class="multi-summary">
+                    {% if ssel|length == 0 %}Any{% else %}{{ ssel|join(', ') }}{% endif %}
+                  </summary>
+                  <div class="multi-panel">
+                    {% for b in speed_limit_buckets %}
+                      {% if b.value != 'any' %}
+                        {% set _id = 'sl-' ~ b.value %}
+                        <label class="multi-opt">
+                          <input type="checkbox" id="{{ _id }}" name="speed_limit" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_speed_limit_list %}checked{% endif %}>
+                          <span>{{ b.label }}</span>
+                        </label>
+                      {% endif %}
+                    {% endfor %}
+                    <button type="button" class="multi-done" data-multi-done>Done</button>
+                  </div>
+                </details>
+              </div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label">Overage (mph over)</label>
+                {# Compact multi-select dropdown (no big chip grid). #}
+                {% set sel = [] %}
+                {% for b in over_buckets %}
+                  {% if b.value in filter_over_list %}
+                    {% set _ = sel.append(b.label) %}
+                  {% endif %}
+                {% endfor %}
+
+                <details class="multi" data-multi>
+                  <summary class="multi-summary">
+                    {% if sel|length == 0 %}Any{% else %}{{ sel|join(', ') }}{% endif %}
+                  </summary>
+                  <div class="multi-panel">
+                    {% for b in over_buckets %}
+                      {% if b.value != 'all' %}
+                        {% set _id = 'ov-' ~ b.value %}
+                        <label class="multi-opt">
+                          <input type="checkbox" id="{{ _id }}" name="overage" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_over_list %}checked{% endif %}>
+                          <span>{{ b.label }}</span>
+                        </label>
+                      {% endif %}
+                    {% endfor %}
+                    <button type="button" class="multi-done" data-multi-done>Done</button>
+                  </div>
+                </details>
+              </div>
+
+              <div class="filterbox-section">Evidence</div>
+
+              <div class="filterbar-item filterbar-item--tight">
+                <div class="filterbar-rowline filterbar-rowline--tight">
+                  <label class="filterbar-label" for="filter-photo-only" style="margin:0;">Photo submitted</label>
+                  <label class="switch">
+                    <input type="checkbox" id="filter-photo-only" name="photo_only" value="1" {% if filter_photo_only %}checked{% endif %} onchange="this.form.submit()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo verified</label>
+                  <label class="switch">
+                    <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="filterbox-section">Visibility</div>
+
+              <div class="filterbar-item filterbar-item--tight">
+                <div class="filterbar-rowline filterbar-rowline--tight">
+                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous</label>
+                  <label class="switch">
+                    <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                {% if not current_user.is_authenticated %}
+                  <div class="subtle filter-helper-tight">(Must be logged in)</div>
+                {% endif %}
+              </div>
+
+              <div class="filterbox-section">Date</div>
+
+              <div class="filterbar-item">
+                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
+                  {% for o in date_options %}
+                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="filterbox-section">Order</div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-sort">Sort by</label>
+                <select id="filter-sort" name="sort" class="filterbar-select" onchange="this.form.submit()">
+                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
+                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
+                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
+                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Most strict</option>
+                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Least strict</option>
+                </select>
+              </div>
+
+              <div class="filterbox-footer">
+                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('home') }}">Clear</a>
+              </div>
+
+            </div>
+          </div>
+</form>
       </div>
-      <form action="{{ url_for('search') }}" method="get">
-        <input
-          type="text"
-          id="global-search"
-          name="q"
-          placeholder="Search road, state, or username"
-          autocomplete="off"
-          style="width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:999px;background:#f3f4f6;outline:none;"
-        >
-      </form>
-      <div id="search-suggest" class="search-suggest" style="display:none;"></div>
-    </div>
+    </aside>
 
-    <div class="subtle" style="margin: 10px 0 2px 0;">
-      <span>Viewing: <strong id="viewingMode">{% if hide_anon %}Members only{% else %}All posts{% endif %}</strong></span> ·
-      {% if current_user.is_authenticated %}
-        <a class="toggle-chip {% if hide_anon %}is-on{% endif %}" href="{% if hide_anon %}{{ url_for('home') }}{% else %}{{ url_for('home', hide_anon=1) }}{% endif %}">Hide anonymous</a>
-      {% else %}
-        <a href="#" class="toggle-chip" id="hideAnonLink" onclick="
-          var vm=document.getElementById('viewingMode');
-          var old=vm.innerText;
-          vm.innerText='Members only';
-          var msg=document.getElementById('loginRequiredMsg');
-          if(msg){msg.style.display='inline';}
-          setTimeout(function(){ vm.innerText=old; }, 700);
-          return false;
-        ">Hide anonymous</a>
-        <span id="loginRequiredMsg" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
-      {% endif %}
+    <script>
+      // Multi-select dropdown behavior (speed limit + overage):
+      // - Do NOT submit on each checkbox click (allows multi-select)
+      // - Close on outside click or Done, keeping selections
+      // - Submit when the dropdown closes if selections changed
+      (function(){
+        var form = document.getElementById("feedFilters");
+        if(!form) return;
+
+        function textOf(cb){
+          return cb.getAttribute("data-label") || "";
+        }
+
+        function updateSummary(d){
+          var summary = d.querySelector(".multi-summary");
+          if(!summary) return;
+          var checks = Array.prototype.slice.call(d.querySelectorAll("input[type=checkbox]"));
+          var selected = checks.filter(function(c){ return c.checked; }).map(textOf).filter(Boolean);
+          summary.textContent = selected.length ? selected.join(", ") : "Any";
+        }
+
+        function submitIfDirty(d){
+          if(!d || !d._dirty) return;
+          if(d._submitting) return;
+          d._submitting = true;
+          d._dirty = false;
+          form.submit();
+        }
+
+        var multis = Array.prototype.slice.call(document.querySelectorAll("details[data-multi]"));
+        multis.forEach(function(d){
+          d._dirty = false;
+          d._submitting = false;
+          updateSummary(d);
+
+          d.addEventListener("change", function(e){
+            if(e.target && e.target.matches && e.target.matches("input[type=checkbox]")){
+              d._dirty = true;
+              updateSummary(d);
+            }
+          });
+
+          var done = d.querySelector("[data-multi-done]");
+          if(done){
+            done.addEventListener("click", function(ev){
+              ev.preventDefault();
+              d.open = false;
+              submitIfDirty(d);
+            });
+          }
+
+          d.addEventListener("toggle", function(){
+            if(!d.open){
+              submitIfDirty(d);
+            }
+          });
+        });
+
+        document.addEventListener("click", function(e){
+          multis.forEach(function(d){
+            if(!d.open) return;
+            if(d.contains(e.target)) return;
+            d.open = false;
+            submitIfDirty(d);
+          });
+        });
+      })();
+    </script>
+
+    {# Main column: welcome tile + feed (unchanged) #}
+    <div class="home-center">
+
+      {# Mobile-only toggle button for the filter sidebar #}
+      <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Filters</button>
+
+      {# --- Welcome tile --- #}
+      <div class="card ticket-card">
+    <div class="home-intro" style="margin: 0;">
+      <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
+
+      <div class="home-intro-body">
+        EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers to identify the speeds at which enforcement most commonly occurs. Rather than relying on posted limits alone, this data helps reveal how speeding laws are actually enforced across different roads and states.
+      </div>
+
+      <div class="home-intro-body" style="margin-top:8px;">
+        By analyzing thousands of tickets, EnforcedSpeed highlights the speed at which the vast majority of drivers are cited, providing a clearer picture of real-world enforcement patterns.
+      </div>
+
+      <div class="home-intro-disclaimer">
+        <span class="home-intro-disclaimer-lead">Important:</span> EnforcedSpeed is an informational data platform only. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
+      </div>
     </div>
-  
-    {# Definition text removed (now shown per-ticket in each card). #}
   </div>
 
-    {% for r in reports %}
+      {# Feed starts immediately below welcome card. #}
+
+{% for r in reports %}
   {% set state_code = (r.state.split(' - ')[0] if ' - ' in r.state else r.state) %}
   {% set state_name = (r.state.split(' - ')[-1] if ' - ' in r.state else r.state) %}
   <div class="card ticket-card" style="margin-top:16px;">
@@ -162,7 +363,7 @@
             <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
             <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
             <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
-            <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">Members only.</span>
+            <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">(Must be logged in)</span>
           {% endif %}
         </div>
 
@@ -285,7 +486,7 @@
 
     </div>
   {% else %}
-    <div class="card ticket-card">
+    <div class="card ticket-card" style="margin-top:16px;">
       <p>No posts yet. Be the first to <a href="{{ url_for('submit') }}">submit a ticket</a>.</p>
     </div>
   {% endfor %}
@@ -326,7 +527,7 @@
 
   .ticket-top{margin-top:-10px}
   .ticket-user{font-weight:400}
-  .ticket-user .user-link{font-weight:800}
+  .ticket-user .user-link{font-weight:500}
   .ticket-date{font-weight:400}
   /* Header layout: username on the left, OCR pill top-right aligned to username line. */
   .ticket-headwrap{display:block}
@@ -339,12 +540,12 @@
 
   /* Ticket card center (Version 5). */
   .ticket-center{margin-top:12px;text-align:center;position:relative}
-  .ticket-roadstate{font-size:20px;font-weight:800;color:#111827;letter-spacing:.01em}
+  .ticket-roadstate{font-size:20px;font-weight:600;color:#111827;letter-spacing:.01em}
   /* Speed line: keep the "90 in a 65" centered, and place "+25 mph" in the center of the right-hand side. */
   .ticket-speedrow{margin-top:10px;display:flex;justify-content:center;align-items:baseline}
-    .ticket-speedtext{font-size:18px;font-weight:700;color:#111827;display:flex;align-items:baseline;gap:10px}
+    .ticket-speedtext{font-size:18px;font-weight:600;color:#111827;display:flex;align-items:baseline;gap:10px}
   .ticket-speedin{font-weight:600;color:#111827}
-  .ticket-overageblue{font-size:18px;font-weight:800;color:#2563eb;white-space:nowrap}
+  .ticket-overageblue{font-size:18px;font-weight:600;color:#2563eb;white-space:nowrap}
   /* Float the +mph BETWEEN road/state and speed line (center-right). */
   .ticket-overagefloat{position:absolute;top:36px;left: calc(70% + 14px);transform:translate(-50%,-50%);}
   /* Add a touch more whitespace above/below the EnforcedSpeed sentence. */
@@ -478,10 +679,41 @@
     return false;
   }
 
-  document.addEventListener('DOMContentLoaded', function(){
+  
+
+
+  // --- Mobile helpers (home) ---
+  function initHomeFiltersToggle(){
+    var btn = document.getElementById('homeFiltersToggle');
+    var sidebar = document.getElementById('homeFiltersSidebar');
+    if(!btn || !sidebar) return;
+
+    function setCollapsed(v){
+      if(v){ sidebar.classList.add('is-collapsed'); }
+      else{ sidebar.classList.remove('is-collapsed'); }
+    }
+
+    try{
+      if(window.matchMedia && window.matchMedia('(max-width: 980px)').matches){
+        setCollapsed(true);
+      }
+    }catch(e){}
+
+    btn.addEventListener('click', function(){
+      sidebar.classList.toggle('is-collapsed');
+    });
+  }
+document.addEventListener('DOMContentLoaded', function(){
     try{ convertLocalTimes(); }catch(e){}
+    try{ initHomeFiltersToggle(); }catch(e){}
   });
 </script>
 
+    </div> {# /home-center #}
+
+    {# Right rail reserved for future ads/promos (desktop). Hidden on narrower screens. #}
+    <div class="home-right"></div>
+
+</div> {# /home-shell #}
 
 {% endblock %}

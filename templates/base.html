@@ -20,24 +20,38 @@
     .header-search{position:relative;}
 
     .site-header{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e5e7eb;}
-    .site-header .inner{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:16px;padding:10px 16px;}
+    /* Reddit-style header layout:
+       - full width
+       - left brand aligned to viewport left
+       - search aligned to the feed column width (v108-like)
+       - nav/actions aligned to viewport right */
+    .site-header .inner{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 20px;
+      box-sizing:border-box;
+      position:relative;
+    }
     .brand-link{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;}
     .brand-logo{height:42px;width:auto;display:block;}
-        .brand-text{font-weight:900;font-size:18px;letter-spacing:.2px;color:#111;}
-.header-search{flex:1;display:flex;justify-content:center;}
-    .header-search form{width:100%;max-width:520px;display:flex;}
+    .brand-text{font-weight:600;font-size:20px;letter-spacing:.2px;color:#111;}
+    /* Centered search: visually aligned to the feed column width, independent of the left rail. */
+    .header-search{position:absolute;left:50%;transform:translateX(-50%);width:min(720px, calc(100% - 520px));}
+    .header-search form{width:100%;display:flex;}
     .header-search input[type="text"]{width:100%;padding:10px 14px;border:1px solid #d1d5db;border-radius:999px;background:#f3f4f6;outline:none;}
     .header-search input[type="text"]:focus{background:#fff;border-color:#9ca3af;}
-    .header-nav{display:flex;align-items:center;gap:14px;white-space:nowrap;margin-left:auto;}
+    .header-nav{display:flex;align-items:center;gap:14px;white-space:nowrap;}
     .header-nav a{color:#111827;text-decoration:none;font-weight:600;}
     .header-nav a:hover{text-decoration:underline;}
     .nav-user{display:flex;align-items:center;gap:8px;}
     .avatar{width:22px;height:22px;border-radius:999px;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;}
     .avatar svg{width:14px;height:14px;opacity:.75;}
-    @media (max-width: 720px){
-      .site-header .inner{flex-wrap:wrap;}
-      .header-search{order:3;width:100%;}
-      .header-search form{max-width:none;}
+    @media (max-width: 980px){
+      .site-header .inner{flex-direction:column; align-items:stretch; gap:10px;}
+      .header-search{position:relative; left:auto; transform:none; width:100%;}
+      .header-nav{justify-content:flex-start; flex-wrap:wrap; row-gap:8px;}
     }
   </style>
 </head>
@@ -49,10 +63,21 @@
         <span class="brand-text">EnforcedSpeed</span>
       </a>
 
+      <div class="header-search">
+        <form action="{{ url_for('search') }}" method="get">
+          <input
+            type="text"
+            id="global-search"
+            name="q"
+            placeholder="Search road, state, or username"
+            autocomplete="off"
+          >
+        </form>
+        <div id="search-suggest" class="search-suggest" style="display:none;"></div>
+      </div>
+
       <nav class="header-nav">
-        {% if request.endpoint != 'home' %}
         <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">Home</a>
-        {% endif %}
         <a href="{{ url_for('submit') }}" class="{{ 'active' if request.endpoint=='submit' else '' }}">Submit a Ticket</a>
         <a href="{{ url_for('strictness') }}" class="{{ 'active' if request.endpoint=='strictness' else '' }}">Rankings</a>
 

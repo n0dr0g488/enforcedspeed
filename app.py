@@ -23,7 +23,7 @@ from typing import Dict, List
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
-from sqlalchemy import text, func, tuple_
+from sqlalchemy import text, func, tuple_, or_, and_
 from sqlalchemy.orm import joinedload
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sendgrid import SendGridAPIClient
@@ -541,12 +541,223 @@ def create_app() -> Flask:
         page = request.args.get("page", 1, type=int)
         per_page = 20
 
-        q = SpeedReport.query.options(joinedload(SpeedReport.user)).order_by(SpeedReport.created_at.desc())
+        # --- Feed filters (GET) ---
+        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_road = (request.args.get("road") or "").strip()
+
+        # Speed limit buckets (posted_speed)
+        # UI supports multi-select via repeated speed_limit= values.
+        # Back-compat: older UI used a single ?speed_limit=<bucket>.
+        filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
+        # Normalize: ignore 'any' and de-dup while preserving order.
+        filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
+        filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
+
+        # Overage buckets (ticketed_speed - posted_speed)
+        # New UI supports multi-select via repeated overage= values.
+        # Back-compat: old UI used a single ?over=<bucket>.
+        filter_over_list = [v.strip() for v in request.args.getlist("overage") if (v or "").strip()]
+        legacy_over = (request.args.get("over") or "").strip()
+        if legacy_over and legacy_over not in ("all", ""):
+            filter_over_list = list(dict.fromkeys(filter_over_list + [legacy_over]))
+
+        # Evidence filters
+        filter_photo_only = (request.args.get("photo_only") == "1")
+        filter_verify = (request.args.get("verify") or "any").strip()
+
+        # Date filter (created_at)
+        filter_date = (request.args.get("date") or "any").strip()
+
+        # Back-compat: old ?verified_photo=1 means 'verified photos only'
+        if request.args.get("verified_photo") == "1":
+            filter_photo_only = True
+            filter_verify = "verified"
+
+        # Sort
+        filter_sort = (request.args.get("sort") or "new").strip()
+
+        # State dropdown options (2-letter codes)
+        state_filter_options = []
+        rows = db.session.query(SpeedReport.state).distinct().all()
+        seen = set()
+        for (sv,) in rows:
+            if not sv:
+                continue
+            code = sv.split(' - ')[0].strip().upper()
+            if len(code) != 2 or not code.isalpha():
+                continue
+            if code in seen:
+                continue
+            seen.add(code)
+            state_filter_options.append({"code": code})
+        state_filter_options.sort(key=lambda d: d["code"])
+
+        speed_limit_buckets = [
+            {"value": "any", "label": "Any"},
+            {"value": "25-35", "label": "25–35 mph"},
+            {"value": "40-50", "label": "40–50 mph"},
+            {"value": "55", "label": "55 mph"},
+            {"value": "65", "label": "65 mph"},
+            {"value": "70+", "label": "70+ mph"},
+        ]
+
+        over_buckets = [
+            {"value": "all", "label": "Any"},
+            {"value": "5-9", "label": "5–9 mph"},
+            {"value": "10-14", "label": "10–14 mph"},
+            {"value": "15-19", "label": "15–19 mph"},
+            {"value": "20+", "label": "20+ mph"},
+        ]
+
+        date_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "7", "label": "Last 7 days"},
+            {"value": "30", "label": "Last 30 days"},
+            {"value": "90", "label": "Last 90 days"},
+            {"value": "365", "label": "Last year"},
+        ]
+
+        verify_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "verified", "label": "Verified (Automated)"},
+            {"value": "not_verified", "label": "Not verified"},
+        ]
+
+        filters_active = bool(
+            filter_state
+            or filter_road
+            or bool(filter_speed_limit_list)
+            or bool(filter_over_list)
+            or filter_photo_only
+            or (filter_verify not in ("", "any"))
+            or (filter_date not in ("", "any"))
+            or (filter_sort not in ("", "new"))
+            or hide_anon
+        )
+
+        # Base query
+        q = SpeedReport.query.options(joinedload(SpeedReport.user))
+
+        # Hide anonymous (members only)
         if hide_anon:
             q = q.filter(SpeedReport.user_id.isnot(None))
 
+        # State filter (2-letter code prefix)
+        if filter_state:
+            q = q.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+
+        # Date filter
+        if filter_date not in ("", "any"):
+            try:
+                days = int(filter_date)
+            except Exception:
+                days = 0
+            if days > 0:
+                q = q.filter(SpeedReport.created_at >= (datetime.utcnow() - timedelta(days=days)))
+
+        # Road filter (forgiving: match normalized bucket OR partial raw text)
+        if filter_road:
+            try:
+                road_key = normalize_road(filter_road, filter_state)
+            except Exception:
+                road_key = ""
+            conds = [SpeedReport.road_name.ilike(f"%{filter_road}%")]
+            if road_key:
+                conds.append(SpeedReport.road_key == road_key)
+            q = q.filter(or_(*conds))
+
+        # Speed limit filter (posted_speed) — multi-select buckets.
+        if filter_speed_limit_list:
+            sl_conds = []
+            for v in filter_speed_limit_list:
+                if v == "25-35":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
+                elif v == "40-50":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
+                elif v == "55":
+                    sl_conds.append(SpeedReport.posted_speed == 55)
+                elif v == "65":
+                    sl_conds.append(SpeedReport.posted_speed == 65)
+                elif v == "70+":
+                    sl_conds.append(SpeedReport.posted_speed >= 70)
+            if sl_conds:
+                q = q.filter(or_(*sl_conds))
+
+        # Overage filter (ticketed_speed - posted_speed)
+        expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
+        if filter_over_list:
+            over_conds = []
+            for v in filter_over_list:
+                if v == "5-9":
+                    over_conds.append(and_(expr >= 5, expr <= 9))
+                elif v == "10-14":
+                    over_conds.append(and_(expr >= 10, expr <= 14))
+                elif v == "15-19":
+                    over_conds.append(and_(expr >= 15, expr <= 19))
+                elif v == "20+":
+                    over_conds.append(expr >= 20)
+            if over_conds:
+                q = q.filter(or_(*over_conds))
+
+        # Evidence: photo only
+        if filter_photo_only:
+            q = q.filter(SpeedReport.photo_key.isnot(None))
+
+        # Evidence: verification status (implies photo exists)
+        if filter_verify == "verified":
+            q = q.filter(
+                SpeedReport.photo_key.isnot(None),
+                or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+            )
+        elif filter_verify == "not_verified":
+            q = q.filter(
+                SpeedReport.photo_key.isnot(None),
+                ~or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+            )
+
+        # Sort
+        if filter_sort == "old":
+            q = q.order_by(SpeedReport.created_at.asc())
+        elif filter_sort == "most_over":
+            q = q.order_by(expr.desc(), SpeedReport.created_at.desc())
+        elif filter_sort == "least_over":
+            # Back-compat with older UI
+            q = q.order_by(expr.asc(), SpeedReport.created_at.desc())
+        elif filter_sort in ("most_strict", "least_strict"):
+            # Strictness proxy for the feed: the 90% enforced overage threshold for this (state, road_key).
+            # Lower threshold = more strict.
+            p90_over = func.percentile_cont(0.1).within_group(expr.asc())
+            subq = (
+                db.session.query(
+                    SpeedReport.state.label("st"),
+                    SpeedReport.road_key.label("rk"),
+                    p90_over.label("p90_over"),
+                )
+                .group_by(SpeedReport.state, SpeedReport.road_key)
+                .subquery()
+            )
+            q = q.join(subq, and_(SpeedReport.state == subq.c.st, SpeedReport.road_key == subq.c.rk))
+            if filter_sort == "most_strict":
+                q = q.order_by(subq.c.p90_over.asc(), SpeedReport.created_at.desc())
+            else:
+                q = q.order_by(subq.c.p90_over.desc(), SpeedReport.created_at.desc())
+        else:
+            q = q.order_by(SpeedReport.created_at.desc())
+
         pagination = q.paginate(page=page, per_page=per_page, error_out=False)
         reports = pagination.items
+
+        # Road suggestions for predictive input (datalist).
+        # Keep it light: show top distinct road_names for the selected state (or all).
+        road_suggestions: List[str] = []
+        try:
+            rq = db.session.query(SpeedReport.road_name).filter(SpeedReport.road_name.isnot(None))
+            if filter_state:
+                rq = rq.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+            rows = rq.distinct().order_by(SpeedReport.road_name.asc()).limit(40).all()
+            road_suggestions = [rn for (rn,) in rows if rn]
+        except Exception:
+            road_suggestions = []
 
         # Compute per-post min/max percentiles using only group min/max (fast, stable meaning).
         keys_a = {(r.state, r.road_key) for r in reports}  # Road + State group
@@ -557,6 +768,7 @@ def create_app() -> Flask:
         # Road + State: true percentile rank within the (state, road_key) distribution.
         # Percent = % of tickets in the same group with overage <= this ticket's overage.
         a_dist: Dict[tuple[str, str], List[float]] = {}
+        b_dist: Dict[tuple[str, int], List[float]] = {}
         if keys_a:
             rows = (
                 db.session.query(
@@ -572,9 +784,6 @@ def create_app() -> Flask:
             for k, vals in a_dist.items():
                 vals.sort()
 
-
-        
-                b_dist = {}
         if keys_b:
             rows = (
                 db.session.query(
@@ -756,6 +965,21 @@ def create_app() -> Flask:
             delete_comment_form=delete_comment_form,
             like_form=like_form,
             comment_form=comment_form,
+            state_filter_options=state_filter_options,
+            filter_state=filter_state,
+            filter_road=filter_road,
+            speed_limit_buckets=speed_limit_buckets,
+            filter_speed_limit_list=filter_speed_limit_list,
+            over_buckets=over_buckets,
+            filter_over_list=filter_over_list,
+            filter_photo_only=filter_photo_only,
+            verify_options=verify_options,
+            filter_verify=filter_verify,
+            date_options=date_options,
+            filter_date=filter_date,
+            road_suggestions=road_suggestions,
+            filter_sort=filter_sort,
+            filters_active=filters_active,
         )
 
 

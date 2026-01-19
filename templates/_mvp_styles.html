@@ -2,6 +2,58 @@
 
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
       .wrap { max-width: 720px; margin: 40px auto; padding: 0 16px; }
+
+      /* Desktop home layout (Reddit-style rails):
+         - Left rail is pinned to the viewport edge.
+         - Center feed stays the v108-like width and is truly centered in the viewport.
+         This intentionally allows "empty" background space between the left rail and the centered feed on wide screens. */
+      .home-shell{
+        position:relative;
+        padding: 20px 20px;
+      }
+
+      /* Keep the feed/cards in a constrained, centered column (v108-like). */
+      .home-center{
+        max-width: 720px;
+        margin: 0 auto;
+        min-width: 0;
+      }
+
+      /* Left rail: pinned to viewport left; does NOT affect feed centering. */
+      .home-left{
+        position: fixed;
+        left: 20px;
+        top: 84px;
+        width: 275px;
+        max-height: calc(100vh - 104px);
+        overflow: auto;
+        align-self: start;
+      }
+
+      /* Reserved for future right-rail ads/content. (Not rendered yet.) */
+      .home-right{ display:none; }
+
+      /* Mobile / narrow screens: collapse rails. */
+      .home-filters-toggle{
+        display:none;
+        width:100%;
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #fff;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .home-filters-toggle:hover{ background:#f9fafb; }
+      .home-left.is-collapsed{ display:none; }
+
+      /* When the viewport is too narrow for a pinned rail + centered feed, collapse the rail into the mobile toggle. */
+      @media (max-width: 1100px){
+        .home-shell{ padding: 16px 16px; }
+        .home-left{ position: static; width: auto; max-height: none; overflow: visible; }
+        .home-filters-toggle{ display:inline-block; }
+      }
       .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 8px 26px rgba(0,0,0,.08); }
       h1 { margin: 0; font-size: 28px; text-align: center; }
       p { margin: 10px 0 18px; color: #444; line-height: 1.45; text-align: center; }
@@ -182,5 +234,262 @@
 .ticket-total-link:hover{ text-decoration: underline; }
 .ticket-actions .ticket-total{ margin-left:auto; text-align:right; flex: 1; }
 .ticket-actions .ticket-total a{ display:inline-block; }
+
+
+
+/* --- Feed filterbar (home) --- */
+.filterbar{ margin:0; }
+.filterbar-row{
+  display:flex;
+  align-items:flex-end;
+  gap:14px;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  padding-bottom:2px;
+}
+.filterbar-row::-webkit-scrollbar{ height:8px; }
+.filterbar-item{ display:flex; flex-direction:column; gap:4px; }
+.filterbar-grow{ flex:1 1 240px; min-width:220px; }
+.filterbar-label{ font-size:12px; color:#6b7280; font-weight:700; margin:0; }
+.filterbar-input{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border:1px solid #d6d9dd;
+  border-radius:10px;
+  font-size:14px;
+  background:#fff;
+}
+.filterbar-select{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border:1px solid #d6d9dd;
+  border-radius:10px;
+  font-size:14px;
+  background:#fff;
+}
+.filterbar-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid #d6d9dd;
+  border-radius:10px;
+  background:#fff;
+  font-size:14px;
+  font-weight:700;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.filterbar-pop{
+  position:absolute;
+  margin-top:8px;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(0,0,0,.08);
+  background:#fff;
+  box-shadow:0 10px 28px rgba(0,0,0,.12);
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  z-index:50;
+  min-width:240px;
+}
+.chip-btn{
+  appearance:none;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.chip-btn.is-on{ background:#111827; border-color:#111827; color:#fff; }
+
+/* Checkbox chips (multi-select overage) */
+.chip-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip-input{ position:absolute; opacity:0; pointer-events:none; }
+.chip-label{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  user-select:none;
+}
+.chip-input:checked + .chip-label{ background:#111827; border-color:#111827; color:#fff; }
+
+/* Segmented control (verification) */
+.seg{ display:flex; flex-wrap:wrap; gap:8px; }
+.seg-input{ position:absolute; opacity:0; pointer-events:none; }
+.seg-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+  user-select:none;
+}
+.seg-input:checked + .seg-pill{ background:#111827; border-color:#111827; color:#fff; }
+.filterbar-ghost{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.filterbar-ghost:hover{ background:#f3f4f6; }
+.filterbar-clear{ display:inline-flex; align-items:center; padding:10px 12px; font-weight:800; color:#6b7280; text-decoration:none; }
+.filterbar-clear:hover{ text-decoration:underline; }
+
+/* --- Filter rail structure (home) --- */
+.filterbox{ display:block; }
+.filterbox-title{ font-size:14px; font-weight:900; color:#111827; margin:0 0 4px 0; }
+.filterbox-sub{ font-size:12px; color:#6b7280; margin:0 0 10px 0; }
+.filterbox-section{
+  font-size:11px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:#9ca3af;
+  font-weight:900;
+  /* Keep section headers visually tight and consistent across the rail */
+  margin-top:4px;
+}
+/* Stack layout used in the left filter rail; slightly tighter vertical rhythm */
+.filterbar-row--stack{ flex-direction:column; align-items:stretch; gap:6px; overflow:visible; }
+.filterbar-rowline{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+
+/* Extra-tight blocks (Evidence / Visibility) */
+.filterbar-item--tight{ margin-top:-1px; }
+.filterbar-item--tight .filterbar-rowline{ margin-top:0; }
+.filterbar-item--tight .filterbar-rowline + .filterbar-rowline{ margin-top:4px; }
+
+/* Very tight helper text for '(Must be logged in)' under Hide anonymous */
+.filter-helper-tight{ margin-top:1px; font-size:11px; line-height:1.15; }
+
+/* Pinned Clear button at bottom of left rail */
+.filterbox-footer{
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 10px 0 0 0;
+  margin-top: 4px;
+  border-top: 1px solid #f3f4f6;
+}
+.filterbar-clear{
+  display:block;
+  text-align:center;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  color:#111827;
+  font-weight:900;
+  text-decoration:none;
+}
+.filterbar-clear:hover{ background:#f3f4f6; text-decoration:none; }
+.filterbar-clear.is-disabled{ opacity:.45; pointer-events:none; }
+
+/* Compact multi-select dropdown (overage) */
+.multi{ border:1px solid #e5e7eb; border-radius:12px; background:#fff; overflow:hidden; }
+.multi-summary{
+  list-style:none;
+  cursor:pointer;
+  padding:10px 12px;
+  font-size:13px;
+  font-weight:800;
+  color:#111827;
+}
+.multi-summary::-webkit-details-marker{ display:none; }
+.multi[open] .multi-summary{ border-bottom:1px solid #f3f4f6; background:#f9fafb; }
+.multi-panel{ padding:6px 10px; display:flex; flex-direction:column; gap:4px; }
+.multi-opt{ display:flex; align-items:center; gap:10px; font-size:13px; font-weight:700; color:#111827; cursor:pointer; }
+.multi-opt input{ width:16px; height:16px; }
+
+/* Multi-select Done button */
+.multi-done{
+  width:100%;
+  margin-top:6px;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  font-weight:900;
+  font-size:12px;
+  cursor:pointer;
+}
+.multi-done:hover{ background:#f3f4f6; }
+
+/* Tighter toggle rows in Evidence/Visibility */
+.filterbar-rowline--tight{ line-height:1.1; }
+
+/* Extra-tight helper text (e.g., "Must be logged in") */
+.filterbox-helper-tight{ margin-top:0; line-height:1.15; font-size:11px; }
+
+/* Reduce default label spacing inside the filter rail to avoid big vertical gaps */
+.filterbox label{ margin:0; }
+
+
+/* Multi-select chips (overage) */
+.chip-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip-input{ position:absolute; opacity:0; pointer-events:none; }
+.chip-label{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  user-select:none;
+}
+.chip-input:checked + .chip-label{ background:#111827; border-color:#111827; color:#fff; }
+
+/* Segmented control (verification) */
+.seg{ display:flex; flex-wrap:wrap; gap:8px; }
+.seg-input{ position:absolute; opacity:0; pointer-events:none; }
+.seg-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  user-select:none;
+}
+.seg-input:checked + .seg-pill{ background:#111827; border-color:#111827; color:#fff; }
+
+/* small switch (verified photo) */
+.switch{ position:relative; display:inline-block; width:44px; height:26px; }
+.switch input{ opacity:0; width:0; height:0; }
+.slider{ position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#e5e7eb; transition:.15s; border-radius:999px; }
+.slider:before{ position:absolute; content:""; height:20px; width:20px; left:3px; top:3px; background:white; transition:.15s; border-radius:999px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+.switch input:checked + .slider{ background:#111827; }
+.switch input:checked + .slider:before{ transform:translateX(18px); }
 
 </style>

@@ -30,8 +30,16 @@
         align-self: start;
       }
 
-      /* Reserved for future right-rail ads/content. (Not rendered yet.) */
-      .home-right{ display:none; }
+      /* Right rail (mini-map). Pinned to viewport right; does NOT affect feed centering. */
+      .home-right{
+        position: fixed;
+        right: 20px;
+        top: 84px;
+        width: 320px;
+        max-height: calc(100vh - 104px);
+        overflow: auto;
+        align-self: start;
+      }
 
       /* Mobile / narrow screens: collapse rails. */
       .home-filters-toggle{
@@ -52,7 +60,13 @@
       @media (max-width: 1100px){
         .home-shell{ padding: 16px 16px; }
         .home-left{ position: static; width: auto; max-height: none; overflow: visible; }
+        .home-right{ display:none; }
         .home-filters-toggle{ display:inline-block; }
+      }
+
+      /* If the viewport can't comfortably fit both rails, hide the right rail first. */
+      @media (max-width: 1400px){
+        .home-right{ display:none; }
       }
       .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 8px 26px rgba(0,0,0,.08); }
       h1 { margin: 0; font-size: 28px; text-align: center; }

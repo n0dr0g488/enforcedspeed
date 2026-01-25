@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="home-shell">
+
+    <aside class="home-left" id="homeFiltersSidebar">
+      <div class="card ticket-card">
+        <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
+          <div class="filterbox">
+            <div class="filterbox-title">Filter map pins</div>
+
+            <div class="filterbox-section">Location</div>
+
+            <div class="filterbar-row filterbar-row--stack">
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-state">State</label>
+                <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
+                  <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
+                  {% for opt in state_filter_options %}
+                    <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-road">Road</label>
+                <input id="filter-road" name="road" class="filterbar-input" type="text" value="{{ filter_road or '' }}" placeholder="I-95, US-1, SR-520" autocomplete="off">
+              </div>
+
+              <div class="filterbox-section">Enforcement</div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
+                {% set ssel = [] %}
+                {% for b in speed_limit_buckets %}
+                  {% if b.value in filter_speed_limit_list and b.value != 'any' %}
+                    {% set _ = ssel.append(b.label) %}
+                  {% endif %}
+                {% endfor %}
+
+                <details class="multi" data-multi>
+                  <summary class="multi-summary">
+                    {% if ssel|length == 0 %}Any{% else %}{{ ssel|join(', ') }}{% endif %}
+                  </summary>
+                  <div class="multi-panel">
+                    {% for b in speed_limit_buckets %}
+                      {% if b.value != 'any' %}
+                        {% set _id = 'sl-' ~ b.value %}
+                        <label class="multi-opt">
+                          <input type="checkbox" id="{{ _id }}" name="speed_limit" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_speed_limit_list %}checked{% endif %}>
+                          <span>{{ b.label }}</span>
+                        </label>
+                      {% endif %}
+                    {% endfor %}
+                    <button type="button" class="multi-done" data-multi-done>Done</button>
+                  </div>
+                </details>
+              </div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label">Overage (mph over)</label>
+                {% set sel = [] %}
+                {% for b in over_buckets %}
+                  {% if b.value in filter_over_list %}
+                    {% set _ = sel.append(b.label) %}
+                  {% endif %}
+                {% endfor %}
+
+                <details class="multi" data-multi>
+                  <summary class="multi-summary">
+                    {% if sel|length == 0 %}Any{% else %}{{ sel|join(', ') }}{% endif %}
+                  </summary>
+                  <div class="multi-panel">
+                    {% for b in over_buckets %}
+                      {% if b.value != 'all' %}
+                        {% set _id = 'ov-' ~ b.value %}
+                        <label class="multi-opt">
+                          <input type="checkbox" id="{{ _id }}" name="overage" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_over_list %}checked{% endif %}>
+                          <span>{{ b.label }}</span>
+                        </label>
+                      {% endif %}
+                    {% endfor %}
+                    <button type="button" class="multi-done" data-multi-done>Done</button>
+                  </div>
+                </details>
+              </div>
+
+              <div class="filterbox-section">Evidence</div>
+
+              <div class="filterbar-item filterbar-item--tight">
+                <div class="filterbar-rowline filterbar-rowline--tight">
+                  <label class="filterbar-label" for="filter-photo-only" style="margin:0;">Photo submitted</label>
+                  <label class="switch">
+                    <input type="checkbox" id="filter-photo-only" name="photo_only" value="1" {% if filter_photo_only %}checked{% endif %} onchange="this.form.submit()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo verified</label>
+                  <label class="switch">
+                    <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="filterbox-section">Visibility</div>
+
+              <div class="filterbar-item filterbar-item--tight">
+                <div class="filterbar-rowline filterbar-rowline--tight">
+                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous</label>
+                  <label class="switch">
+                    <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                {% if not current_user.is_authenticated %}
+                  <div class="subtle filter-helper-tight">(Must be logged in)</div>
+                {% endif %}
+              </div>
+
+              <div class="filterbox-section">Date</div>
+
+              <div class="filterbar-item">
+                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
+                  {% for o in date_options %}
+                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="filterbox-section">Order</div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-sort">Sort by</label>
+                <select id="filter-sort" name="sort" class="filterbar-select" onchange="this.form.submit()">
+                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
+                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
+                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
+                  <option value="least_over" {% if filter_sort == 'least_over' or filter_sort == 'least_strict' %}selected{% endif %}>Least over</option>
+                </select>
+              </div>
+
+              <div class="filterbox-footer">
+                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('map_view') }}">Clear</a>
+              </div>
+
+            </div>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <main class="home-center">
+      <div class="card ticket-card" style="padding:14px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+          <div>
+            <div class="ticket-title" style="margin:0;">Map</div>
+            <div class="subtle" style="margin-top:2px;">Shows tickets with a pinned location.</div>
+          </div>
+        </div>
+
+        {% if not maps_api_key %}
+          <div class="subtle" style="margin-top:12px;">
+            Google Maps key not configured. Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map.
+          </div>
+        {% else %}
+          <div id="esMap" style="width:100%; height:72vh; border-radius:14px; overflow:hidden;"></div>
+          <div class="subtle" id="esMapMeta" style="margin-top:10px;"></div>
+        {% endif %}
+      </div>
+    </main>
+
+    <aside class="home-right"></aside>
+
+</div>
+
+{% if maps_api_key %}
+  <script>
+    let ES_MAP;
+    let ES_INFO;
+    let ES_MARKERS = [];
+
+    function esClearMarkers() {
+      for (const m of ES_MARKERS) {
+        try { m.setMap(null); } catch(e) {}
+      }
+      ES_MARKERS = [];
+    }
+
+    async function esLoadPins() {
+      const meta = document.getElementById('esMapMeta');
+      if (meta) meta.textContent = 'Loading pins...';
+
+      const url = '/api/map_pins' + window.location.search;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const data = await res.json();
+
+      if (!data || !data.ok) {
+        if (meta) meta.textContent = 'Could not load pins.';
+        return;
+      }
+
+      esClearMarkers();
+      const pins = data.pins || [];
+      if (meta) meta.textContent = pins.length + ' pins shown (max 1500).';
+
+      let bounds = new google.maps.LatLngBounds();
+      for (const p of pins) {
+        if (p.lat == null || p.lng == null) continue;
+        const pos = { lat: Number(p.lat), lng: Number(p.lng) };
+        bounds.extend(pos);
+
+        const m = new google.maps.Marker({ position: pos, map: ES_MAP });
+        m.addListener('click', () => {
+          const title = `${p.road || 'Road'}, ${p.state || ''}`;
+          const over = (Number(p.ticketed) - Number(p.posted));
+          const html = `
+            <div style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:240px;">
+              <div style="font-weight:600; margin-bottom:4px;">${title}</div>
+              <div style="font-size:13px;">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over})</span></div>
+              <div style="font-size:13px; margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
+            </div>
+          `;
+          ES_INFO.setContent(html);
+          ES_INFO.open({ anchor: m, map: ES_MAP });
+        });
+        ES_MARKERS.push(m);
+      }
+
+      try {
+        if (pins.length > 0) {
+          ES_MAP.fitBounds(bounds);
+        }
+      } catch(e) {}
+    }
+
+    window.esInitMap = async function() {
+      ES_MAP = new google.maps.Map(document.getElementById('esMap'), {
+        center: { lat: 39.5, lng: -98.35 },
+        zoom: 4,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      });
+      ES_INFO = new google.maps.InfoWindow();
+      await esLoadPins();
+    }
+  </script>
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key|urlencode }}&callback=esInitMap"></script>
+{% endif %}
+
+{% endblock %}

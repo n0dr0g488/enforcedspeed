@@ -60,3 +60,11 @@ class Config:
     if SQLALCHEMY_DATABASE_URI.startswith("postgresql+pg8000://"):
         # pg8000 uses a pure-Python connection; keep a short timeout to avoid hanging.
         SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {"timeout": 3}
+
+    # Google Maps Platform
+    # Public key (safe to expose in templates). Restrict by HTTP referrer and API.
+    GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+
+    # Server key for Roads API calls (keep private; do not expose to clients).
+    # Recommended restrictions: API restriction (Roads API) and server-side usage controls.
+    GOOGLE_MAPS_SERVER_KEY = os.environ.get("GOOGLE_MAPS_SERVER_KEY", "").strip()

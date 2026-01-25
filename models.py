@@ -181,6 +181,23 @@ class SpeedReport(db.Model):
     ocr_job_id = db.Column(db.String(64), nullable=True)
     ocr_error = db.Column(db.Text, nullable=True)
 
+    # Mapping (optional)
+    location_hint = db.Column(db.String(200), nullable=True)
+
+    # Raw user-selected coordinates (before snapping). Stored for tuning/analytics.
+    raw_lat = db.Column(db.Float, nullable=True)
+    raw_lng = db.Column(db.Float, nullable=True)
+
+    # Final coordinates used for mapping (may be snapped to nearest road).
+    lat = db.Column(db.Float, nullable=True, index=True)
+    lng = db.Column(db.Float, nullable=True, index=True)
+
+    # Where lat/lng came from: none|user_pin|user_pin_snapped
+    lat_lng_source = db.Column(db.String(30), nullable=True)
+
+    # Place ID from Places Autocomplete (routes can return a place_id)
+    google_place_id = db.Column(db.String(128), nullable=True)
+
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -35,6 +35,23 @@
           <label for="road_name">{{ form.road_name.label.text }}</label>
           {{ form.road_name(id="road_name") }}
 
+          <div class="subtle" style="margin-top:6px;">
+            If Google Maps is enabled, choose the real road from autocomplete.
+          </div>
+          <div class="subtle" id="roadAutoError" style="margin-top:6px; color:#991b1b; display:none;"></div>
+
+          <label for="location_hint">{{ form.location_hint.label.text }}</label>
+          {{ form.location_hint(id="location_hint") }}
+
+          <div class="subtle" style="margin-top:6px;">
+            Optional, but helpful: nearest exit, town, landmark.
+          </div>
+
+          <button type="button" id="openPinModal" class="btn" style="margin-top:10px;">
+            Refine pin on map (optional)
+          </button>
+          <div class="subtle" id="pinStatus" style="margin-top:6px; display:none;"></div>
+
           <div class="preview" id="roadPreview" style="display:none;">
             <div class="row">
               <div class="subtle">Road bucket preview</div>
@@ -85,6 +102,32 @@
               </div>
             </div>
 
+<!-- Pin refine modal (Google Maps, optional) -->
+<div id="pinModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" id="pinModalBackdrop"></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
+    <div class="modal-title" id="pinModalTitle">Refine pin on map</div>
+    <div class="subtle" style="margin-top:6px;">
+      Drag the pin to the closest spot on the road. We'll snap it to the nearest road line.
+    </div>
+    <div id="pinMap" style="width:100%; height:340px; margin-top:12px; border:1px solid #e5e7eb; border-radius:12px;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" id="cancelPin">Cancel</button>
+      <button type="button" class="btn" id="savePin">Save pin</button>
+    </div>
+    <div class="subtle" id="pinModalMsg" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<style>
+  .modal{position:fixed;inset:0;z-index:2000;}
+  .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.35);}
+  .modal-card{position:relative;max-width:720px;width:calc(100% - 24px);margin:60px auto 0 auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:16px;}
+  .modal-title{font-weight:600;font-size:18px;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;}
+  .btn-secondary{background:#f3f4f6;color:#111827;border:1px solid #e5e7eb;}
+</style>
+
             <div class="block">
               <strong>Least Strict</strong>
               <ol>
@@ -123,6 +166,358 @@
       const badgeEl = document.getElementById("bucketKeyBadge");
       const hintEl = document.getElementById("bucketHint");
       const ambEl = document.getElementById("bucketAmbiguity");
+
+      // --- Google Maps (optional) ---
+      const mapsKey = "{{ maps_api_key|e }}";
+      const openPinBtn = document.getElementById("openPinModal");
+      const pinStatusEl = document.getElementById("pinStatus");
+      const pinModal = document.getElementById("pinModal");
+      const pinBackdrop = document.getElementById("pinModalBackdrop");
+      const cancelPin = document.getElementById("cancelPin");
+      const savePin = document.getElementById("savePin");
+      const pinModalMsg = document.getElementById("pinModalMsg");
+      const rawLatEl = document.getElementById("raw_lat");
+      const rawLngEl = document.getElementById("raw_lng");
+      const latEl = document.getElementById("lat");
+      const lngEl = document.getElementById("lng");
+      const placeIdEl = document.getElementById("google_place_id");
+
+      let _mapsLoaded = false;
+      let _map = null;
+      let _marker = null;
+      let _autocomplete = null;
+
+      function setPinStatus(text) {
+        if (!pinStatusEl) return;
+        pinStatusEl.style.display = text ? "block" : "none";
+        pinStatusEl.textContent = text || "";
+      }
+
+      function loadGoogleMaps(callback) {
+        if (_mapsLoaded && window.google && window.google.maps) {
+          callback();
+          return;
+        }
+        if (!mapsKey) {
+          callback();
+          return;
+        }
+        const existing = document.getElementById("gmapScript");
+        if (existing) {
+          // Script already requested; wait for it.
+          const iv = setInterval(() => {
+            if (window.google && window.google.maps) {
+              clearInterval(iv);
+              _mapsLoaded = true;
+              callback();
+            }
+          }, 50);
+          return;
+        }
+        window.__esMapsInit = () => {
+          _mapsLoaded = true;
+          callback();
+        };
+        const s = document.createElement("script");
+        s.id = "gmapScript";
+        s.async = true;
+        s.defer = true;
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&libraries=places&callback=__esMapsInit`;
+        document.head.appendChild(s);
+      }
+
+      function openModal() {
+        if (!pinModal) return;
+        pinModal.style.display = "block";
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeModal() {
+        if (!pinModal) return;
+        pinModal.style.display = "none";
+        document.body.style.overflow = "";
+      }
+
+      function ensureMap(center) {
+        if (!_mapsLoaded || !window.google || !window.google.maps) return;
+        const c = center || { lat: 39.8283, lng: -98.5795 }; // US center
+        if (!_map) {
+          _map = new google.maps.Map(document.getElementById("pinMap"), {
+            center: c,
+            zoom: center ? 11 : 5,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+          });
+          _marker = new google.maps.Marker({
+            position: c,
+            map: _map,
+            draggable: true,
+          });
+        } else {
+          _map.setCenter(c);
+          _map.setZoom(center ? 11 : 5);
+          _marker.setPosition(c);
+        }
+      }
+
+      async function snapAndStore(lat, lng) {
+        // Always store the raw pin.
+        if (rawLatEl) rawLatEl.value = String(lat);
+        if (rawLngEl) rawLngEl.value = String(lng);
+
+        // Default to raw.
+        if (latEl) latEl.value = String(lat);
+        if (lngEl) lngEl.value = String(lng);
+
+        if (!mapsKey) return { lat, lng, snapped: false };
+
+        try {
+          const url = `/api/snap_road?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
+          const res = await fetch(url, { credentials: "same-origin" });
+          const data = await res.json();
+          if (data && data.ok && data.lat != null && data.lng != null) {
+            if (latEl) latEl.value = String(data.lat);
+            if (lngEl) lngEl.value = String(data.lng);
+            return { lat: data.lat, lng: data.lng, snapped: !!data.snapped };
+          }
+        } catch (e) {
+          // fall back silently
+        }
+        return { lat, lng, snapped: false };
+      }
+
+
+      // --- State-bounded road autocomplete (bias + optional strict bounds) ---
+      // Bounding boxes sourced from 2017 US Census shapefile extents (NAD83) published by Anthony Louis D'Agostino.
+      // (xmin,ymin,xmax,ymax) per state: https://anthonylouisdagostino.com/bounding-boxes-for-all-us-states/
+      const _STATE_BOUNDS = {"AL":{"w":-88.473227,"s":30.223334,"e":-84.88908,"n":35.008028},"AK":{"w":-179.148909,"s":51.214183,"e":179.77847,"n":71.365162},"AZ":{"w":-114.81651,"s":31.332177,"e":-109.045223,"n":37.00426},"AR":{"w":-94.617919,"s":33.004106,"e":-89.644395,"n":36.4996},"CA":{"w":-124.409591,"s":32.534156,"e":-114.131211,"n":42.009518},"CO":{"w":-109.060253,"s":36.992426,"e":-102.041524,"n":41.003444},"CT":{"w":-73.727775,"s":40.980144,"e":-71.786994,"n":42.050587},"DE":{"w":-75.788658,"s":38.451013,"e":-75.048939,"n":39.839007},"DC":{"w":-77.119759,"s":38.791645,"e":-76.909395,"n":38.99511},"FL":{"w":-87.634938,"s":24.523096,"e":-80.031362,"n":31.000888},"GA":{"w":-85.605165,"s":30.357851,"e":-80.839729,"n":35.000659},"HI":{"w":-178.334698,"s":18.910361,"e":-154.806773,"n":28.402123},"ID":{"w":-117.243027,"s":41.988057,"e":-111.043564,"n":49.001146},"IL":{"w":-91.513079,"s":36.970298,"e":-87.494756,"n":42.508481},"IN":{"w":-88.09776,"s":37.771742,"e":-84.784579,"n":41.760592},"IA":{"w":-96.639704,"s":40.375501,"e":-90.140061,"n":43.501196},"KS":{"w":-102.051744,"s":36.993016,"e":-94.588413,"n":40.003162},"KY":{"w":-89.571509,"s":36.497129,"e":-81.964971,"n":39.147458},"LA":{"w":-94.043147,"s":28.928609,"e":-88.817017,"n":33.019457},"ME":{"w":-71.083924,"s":42.977764,"e":-66.949895,"n":47.459686},"MD":{"w":-79.487651,"s":37.911717,"e":-75.048939,"n":39.723043},"MA":{"w":-73.508142,"s":41.237964,"e":-69.928393,"n":42.886589},"MI":{"w":-90.418136,"s":41.696118,"e":-82.413474,"n":48.2388},"MN":{"w":-97.239209,"s":43.499356,"e":-89.491739,"n":49.384358},"MS":{"w":-91.655009,"s":30.173943,"e":-88.097888,"n":34.996052},"MO":{"w":-95.774704,"s":35.995683,"e":-89.098843,"n":40.61364},"MT":{"w":-116.050003,"s":44.358221,"e":-104.039138,"n":49.00139},"NE":{"w":-104.053514,"s":39.999998,"e":-95.30829,"n":43.001708},"NV":{"w":-120.005746,"s":35.001857,"e":-114.039648,"n":42.002207},"NH":{"w":-72.557247,"s":42.69699,"e":-70.610621,"n":45.305476},"NJ":{"w":-75.559614,"s":38.928519,"e":-73.893979,"n":41.357423},"NM":{"w":-109.050173,"s":31.332301,"e":-103.001964,"n":37.000232},"NY":{"w":-79.762152,"s":40.496103,"e":-71.856214,"n":45.01585},"NC":{"w":-84.321869,"s":33.842316,"e":-75.460621,"n":36.588117},"ND":{"w":-104.0489,"s":45.935054,"e":-96.554507,"n":49.000574},"OH":{"w":-84.820159,"s":38.403202,"e":-80.518693,"n":41.977523},"OK":{"w":-103.002565,"s":33.615833,"e":-94.430662,"n":37.002206},"OR":{"w":-124.566244,"s":41.991794,"e":-116.463504,"n":46.292035},"PA":{"w":-80.519891,"s":39.7198,"e":-74.689516,"n":42.26986},"RI":{"w":-71.862772,"s":41.146339,"e":-71.12057,"n":42.018798},"SC":{"w":-83.35391,"s":32.0346,"e":-78.54203,"n":35.215402},"SD":{"w":-104.057698,"s":42.479635,"e":-96.436589,"n":45.94545},"TN":{"w":-90.310298,"s":34.982972,"e":-81.6469,"n":36.678118},"TX":{"w":-106.645646,"s":25.837377,"e":-93.508292,"n":36.500704},"UT":{"w":-114.052962,"s":36.997968,"e":-109.041058,"n":42.001567},"VT":{"w":-73.43774,"s":42.726853,"e":-71.464555,"n":45.016659},"VA":{"w":-83.675395,"s":36.540738,"e":-75.242266,"n":39.466012},"WA":{"w":-124.763068,"s":45.543541,"e":-116.915989,"n":49.002494},"WV":{"w":-82.644739,"s":37.201483,"e":-77.719519,"n":40.638801},"WI":{"w":-92.888114,"s":42.491983,"e":-86.805415,"n":47.080621},"WY":{"w":-111.056888,"s":40.994746,"e":-104.05216,"n":45.005904}};
+      const _STATE_NAME_TO_CODE = {"alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO","connecticut":"CT","delaware":"DE","district of columbia":"DC","florida":"FL","georgia":"GA","hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA","kansas":"KS","kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA","michigan":"MI","minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT","nebraska":"NE","nevada":"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK","oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD","tennessee":"TN","texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY"};
+
+      function _normalizeStateToCode(raw) {
+        if (!raw) return "";
+        const v = String(raw).trim();
+        const m = v.match(/^\s*([A-Za-z]{2})\b/);
+        if (m) return m[1].toUpperCase();
+
+        // Normalize full name (strip punctuation, collapse spaces).
+        let name = v.toLowerCase().trim();
+        name = name.replace(/[^a-z\s]/g, " ");
+        name = name.replace(/\s+/g, " ").trim();
+        return _STATE_NAME_TO_CODE[name] || "";
+      }
+
+      function _applyStateBiasToRoadAutocomplete() {
+        if (!_autocomplete || !stateEl) return;
+
+        const code = _normalizeStateToCode(stateEl.value);
+        const b = code ? _STATE_BOUNDS[code] : null;
+
+        if (!b || !window.google || !window.google.maps) {
+          // If state is empty or unknown, remove strict bounds but keep US restriction.
+          try {
+            _autocomplete.setOptions({ strictBounds: false, componentRestrictions: { country: "us" } });
+          } catch (e) {}
+          return;
+        }
+
+        try {
+          const sw = new google.maps.LatLng(b.s, b.w);
+          const ne = new google.maps.LatLng(b.n, b.e);
+          const bounds = new google.maps.LatLngBounds(sw, ne);
+          _autocomplete.setBounds(bounds);
+
+          // Constrain suggestions to the selected state bounds.
+          _autocomplete.setOptions({ strictBounds: true, componentRestrictions: { country: "us" } });
+        } catch (e) {
+          // If anything goes sideways, fall back gracefully.
+          try {
+            _autocomplete.setOptions({ strictBounds: false, componentRestrictions: { country: "us" } });
+          } catch (e2) {}
+        }
+      }
+
+      function initAutocomplete() {
+        const errEl = document.getElementById("roadAutoError");
+
+        function showErr(msg){
+          if(!errEl) return;
+          errEl.textContent = msg;
+          errEl.style.display = "block";
+        }
+
+        function clearErr(){
+          if(!errEl) return;
+          errEl.textContent = "";
+          errEl.style.display = "none";
+        }
+
+        function _placeStateCode(place){
+          try {
+            const comps = (place && place.address_components) ? place.address_components : [];
+            for (const c of comps) {
+              const types = c && c.types ? c.types : [];
+              if (types.includes("administrative_area_level_1")) {
+                return (c.short_name || "").toUpperCase();
+              }
+            }
+          } catch (e) {}
+          return "";
+        }
+
+        // Google renders predictions into a .pac-container. Even with strictBounds,
+        // interstate queries can still surface out-of-state matches. To meet our UX
+        // requirement ("narrow the dropdown to the selected state"), we hide any
+        // predictions that don't include the chosen state code.
+        function _filterPacDropdownToState(){
+          const chosen = stateEl ? _normalizeStateToCode(stateEl.value) : "";
+          if (!chosen) return;
+
+          try {
+            const containers = document.querySelectorAll(".pac-container");
+            containers.forEach((c) => {
+              const items = c.querySelectorAll(".pac-item");
+              if (!items || !items.length) return;
+              items.forEach((it) => {
+                const t = (it.textContent || "").toUpperCase();
+                // Common formats include ", ME, USA" or " ME " within the line.
+                const ok = t.includes(`, ${chosen},`) || t.includes(` ${chosen} `) || t.endsWith(` ${chosen}, USA`);
+                it.style.display = ok ? "" : "none";
+              });
+            });
+          } catch (e) {
+            // silent
+          }
+        }
+
+        if (!mapsKey) return;
+        if (!_mapsLoaded || !window.google || !window.google.maps) return;
+        if (!window.google.maps.places || !window.google.maps.places.Autocomplete) {
+          // Map can load without Places; autocomplete requires Places library + key permission.
+          showErr("Road autocomplete is unavailable (Places API not authorized). Check key restrictions + Places API.");
+          return;
+        }
+        try {
+                    // Build initial bounds/strictness from current state selection (so Google applies it from the start).
+          let _initialBounds = null;
+          let _initialStrict = false;
+          try {
+            const _code0 = stateEl ? _normalizeStateToCode(stateEl.value) : "";
+            const _b0 = _code0 ? _STATE_BOUNDS[_code0] : null;
+            if (_b0) {
+              const _sw0 = new google.maps.LatLng(_b0.s, _b0.w);
+              const _ne0 = new google.maps.LatLng(_b0.n, _b0.e);
+              _initialBounds = new google.maps.LatLngBounds(_sw0, _ne0);
+              _initialStrict = true;
+            }
+          } catch (e) {}
+
+          _autocomplete = new google.maps.places.Autocomplete(roadEl, {
+            types: ["geocode"],
+            componentRestrictions: { country: "us" },
+            fields: ["name", "place_id", "geometry", "address_components", "formatted_address"],
+            ...( _initialBounds ? { bounds: _initialBounds, strictBounds: _initialStrict } : {} )
+          });
+
+          // Bias/limit suggestions to the selected state (if provided).
+          _applyStateBiasToRoadAutocomplete();
+          if (stateEl && !stateEl.dataset.roadBiasBound) {
+            stateEl.dataset.roadBiasBound = "1";
+            stateEl.addEventListener("change", _applyStateBiasToRoadAutocomplete);
+            stateEl.addEventListener("input", _applyStateBiasToRoadAutocomplete);
+            // Also re-filter the dropdown when state changes.
+            stateEl.addEventListener("change", () => setTimeout(_filterPacDropdownToState, 0));
+            stateEl.addEventListener("input", () => setTimeout(_filterPacDropdownToState, 0));
+          }
+
+          // Filter suggestions as the user types.
+          if (!roadEl.dataset.pacFilterBound) {
+            roadEl.dataset.pacFilterBound = "1";
+            roadEl.addEventListener("input", () => setTimeout(_filterPacDropdownToState, 0));
+            roadEl.addEventListener("focus", () => setTimeout(_filterPacDropdownToState, 0));
+          }
+
+
+          _autocomplete.addListener("place_changed", () => {
+            const p = _autocomplete.getPlace();
+            if (!p) return;
+
+            // Enforce that the selected road belongs to the chosen state.
+            const chosen = stateEl ? _normalizeStateToCode(stateEl.value) : "";
+            if (chosen) {
+              const ps = _placeStateCode(p);
+              if (ps && ps !== chosen) {
+                showErr(`That result is in ${ps}, not ${chosen}. Please pick a road in ${chosen}.`);
+                roadEl.value = "";
+                if (placeIdEl) placeIdEl.value = "";
+                if (latEl) latEl.value = "";
+                if (lngEl) lngEl.value = "";
+                setPinStatus("No pin yet.");
+                return;
+              }
+            }
+
+            clearErr();
+            if (p.name) roadEl.value = p.name;
+            if (placeIdEl && p.place_id) placeIdEl.value = p.place_id;
+            if (p.geometry && p.geometry.location) {
+              const loc = p.geometry.location;
+              // Pre-fill pin to the selected road geometry for convenience.
+              snapAndStore(loc.lat(), loc.lng()).then(r => {
+                if (r && r.lat != null && r.lng != null) {
+                  setPinStatus(`Pinned: ${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`);
+                }
+              });
+            }
+          });
+        } catch (e) {
+          showErr("Road autocomplete failed to initialize. Check your Google Maps key + Places API.");
+        }
+      }
+
+      if (openPinBtn) {
+        if (!mapsKey) {
+          openPinBtn.disabled = true;
+          openPinBtn.title = "Maps is not configured yet (missing GOOGLE_MAPS_API_KEY).";
+        }
+        openPinBtn.addEventListener("click", () => {
+          if (!mapsKey) return;
+          loadGoogleMaps(() => {
+            initAutocomplete();
+            const lat0 = parseFloat((latEl && latEl.value) || "");
+            const lng0 = parseFloat((lngEl && lngEl.value) || "");
+            const has = Number.isFinite(lat0) && Number.isFinite(lng0);
+            ensureMap(has ? { lat: lat0, lng: lng0 } : null);
+            pinModalMsg.textContent = "";
+            openModal();
+          });
+        });
+      }
+
+      if (pinBackdrop) pinBackdrop.addEventListener("click", closeModal);
+      if (cancelPin) cancelPin.addEventListener("click", closeModal);
+
+      if (savePin) {
+        savePin.addEventListener("click", async () => {
+          if (!_marker) return;
+          const pos = _marker.getPosition();
+          if (!pos) return;
+          const lat = pos.lat();
+          const lng = pos.lng();
+          pinModalMsg.textContent = "Saving...";
+          const r = await snapAndStore(lat, lng);
+          pinModalMsg.textContent = r.snapped ? "Saved (snapped to road)." : "Saved.";
+          setPinStatus(`Pinned: ${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`);
+          setTimeout(() => closeModal(), 200);
+        });
+      }
+
+      // If maps is configured, load script lazily and attach autocomplete to the road field.
+      if (mapsKey) {
+        loadGoogleMaps(() => {
+          initAutocomplete();
+        });
+      }
 
       const postedEl = document.getElementById("posted_speed");
       const ticketedEl = document.getElementById("ticketed_speed");

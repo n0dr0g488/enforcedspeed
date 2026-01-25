@@ -16,6 +16,9 @@ import io
 import uuid
 import re
 import math
+import json
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta
 from statistics import median
 from bisect import bisect_right
@@ -210,6 +213,35 @@ def ensure_schema_patches() -> None:
         db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_error TEXT"))
         db.session.commit()
 
+    # Mapping (optional) columns for speed_reports.
+    if not column_exists("speed_reports", "location_hint"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN location_hint VARCHAR(200)"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "raw_lat"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN raw_lat DOUBLE PRECISION"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "raw_lng"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN raw_lng DOUBLE PRECISION"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "lat"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN lat DOUBLE PRECISION"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "lng"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN lng DOUBLE PRECISION"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "lat_lng_source"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN lat_lng_source VARCHAR(30)"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "google_place_id"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN google_place_id VARCHAR(128)"))
+        db.session.commit()
+
     # Add parent_id to comments for threaded replies.
     if not column_exists("comments", "parent_id"):
         db.session.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
@@ -233,6 +265,34 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_helpers():
         return {"format_road_bucket": format_road_bucket}
+
+    def snap_to_nearest_road(lat: float, lng: float):
+        """Snap a single point to the nearest road using Google Roads API.
+
+        Requires Config.GOOGLE_MAPS_SERVER_KEY. Returns (snapped_lat, snapped_lng) or (None, None).
+        """
+        key = app.config.get("GOOGLE_MAPS_SERVER_KEY") or ""
+        if not key:
+            return None, None
+
+        try:
+            q = urllib.parse.urlencode({"points": f"{lat},{lng}", "key": key})
+            url = f"https://roads.googleapis.com/v1/nearestRoads?{q}"
+            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                payload = resp.read().decode("utf-8")
+            data = json.loads(payload)
+            pts = data.get("snappedPoints") or []
+            if not pts:
+                return None, None
+            loc = (pts[0] or {}).get("location") or {}
+            slat = loc.get("latitude")
+            slng = loc.get("longitude")
+            if slat is None or slng is None:
+                return None, None
+            return float(slat), float(slng)
+        except Exception:
+            return None, None
 
     with app.app_context():
         try:
@@ -946,6 +1006,27 @@ def create_app() -> Flask:
         comment_form = CommentForm()
         delete_comment_form = DeleteCommentForm()
 
+        # Home mini-map: only plot tickets that already have coordinates.
+        map_pins = []
+        for r in reports:
+            try:
+                if r.lat is None or r.lng is None:
+                    continue
+                map_pins.append(
+                    {
+                        "id": int(r.id),
+                        "lat": float(r.lat),
+                        "lng": float(r.lng),
+                        "state": (r.state or ""),
+                        "road": (r.road_key or r.road_name or ""),
+                        "url": url_for("bucket_tickets", state=r.state, road=(r.road_key or ""))
+                        if (r.state and (r.road_key or ""))
+                        else None,
+                    }
+                )
+            except Exception:
+                continue
+
         return render_template(
 
             "home_feed.html",
@@ -980,6 +1061,118 @@ def create_app() -> Flask:
             road_suggestions=road_suggestions,
             filter_sort=filter_sort,
             filters_active=filters_active,
+            maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
+            map_pins=map_pins,
+        )
+
+
+    @app.get("/map")
+    def map_view():
+        """Map view of tickets that have lat/lng."""
+        hide_anon_requested = (request.args.get("hide_anon") == "1")
+        if hide_anon_requested and not current_user.is_authenticated:
+            flash("You must be logged in to hide anonymous posts.", "info")
+
+        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        # --- Filter parsing matches /home (so links are interchangeable) ---
+        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_road = (request.args.get("road") or "").strip()
+
+        filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
+        filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
+        filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
+
+        filter_over_list = [v.strip() for v in request.args.getlist("overage") if (v or "").strip()]
+        legacy_over = (request.args.get("over") or "").strip()
+        if legacy_over and legacy_over not in ("all", ""):
+            filter_over_list = list(dict.fromkeys(filter_over_list + [legacy_over]))
+
+        filter_photo_only = (request.args.get("photo_only") == "1")
+        filter_verify = (request.args.get("verify") or "any").strip()
+        filter_date = (request.args.get("date") or "any").strip()
+        filter_sort = (request.args.get("sort") or "new").strip()
+
+        if request.args.get("verified_photo") == "1":
+            filter_photo_only = True
+            filter_verify = "verified"
+
+        # Options for filter rail (mirrors home).
+        state_filter_options = []
+        rows = db.session.query(SpeedReport.state).distinct().all()
+        seen = set()
+        for (sv,) in rows:
+            if not sv:
+                continue
+            code = sv.split(" - ")[0].strip().upper()
+            if len(code) != 2 or not code.isalpha():
+                continue
+            if code in seen:
+                continue
+            seen.add(code)
+            state_filter_options.append({"code": code})
+        state_filter_options.sort(key=lambda d: d["code"])
+
+        speed_limit_buckets = [
+            {"value": "any", "label": "Any"},
+            {"value": "25-35", "label": "25–35 mph"},
+            {"value": "40-50", "label": "40–50 mph"},
+            {"value": "55", "label": "55 mph"},
+            {"value": "65", "label": "65 mph"},
+            {"value": "70+", "label": "70+ mph"},
+        ]
+
+        over_buckets = [
+            {"value": "all", "label": "Any"},
+            {"value": "5-9", "label": "5–9 mph"},
+            {"value": "10-14", "label": "10–14 mph"},
+            {"value": "15-19", "label": "15–19 mph"},
+            {"value": "20+", "label": "20+ mph"},
+        ]
+
+        date_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "7", "label": "Last 7 days"},
+            {"value": "30", "label": "Last 30 days"},
+            {"value": "90", "label": "Last 90 days"},
+            {"value": "365", "label": "Last year"},
+        ]
+
+        verify_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "verified", "label": "Verified (Automated)"},
+            {"value": "not_verified", "label": "Not verified"},
+        ]
+
+        filters_active = bool(
+            filter_state
+            or filter_road
+            or bool(filter_speed_limit_list)
+            or bool(filter_over_list)
+            or filter_photo_only
+            or (filter_verify not in ("", "any"))
+            or (filter_date not in ("", "any"))
+            or hide_anon
+        )
+
+        return render_template(
+            "map_page.html",
+            hide_anon=hide_anon,
+            state_filter_options=state_filter_options,
+            filter_state=filter_state,
+            filter_road=filter_road,
+            speed_limit_buckets=speed_limit_buckets,
+            filter_speed_limit_list=filter_speed_limit_list,
+            over_buckets=over_buckets,
+            filter_over_list=filter_over_list,
+            filter_photo_only=filter_photo_only,
+            verify_options=verify_options,
+            filter_verify=filter_verify,
+            date_options=date_options,
+            filter_date=filter_date,
+            filter_sort=filter_sort,
+            filters_active=filters_active,
+            maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
         )
 
 
@@ -1128,6 +1321,7 @@ def create_app() -> Flask:
             least_strict=least_strict,
             hide_anon=hide_anon,
             state_options=STATE_OPTIONS,
+            maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
         )
 
 
@@ -1146,6 +1340,7 @@ def create_app() -> Flask:
                 least_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["least_strict"],
                 hide_anon=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"),
                 state_options=STATE_OPTIONS,
+                maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
             )
 
         report = SpeedReport(
@@ -1157,6 +1352,52 @@ def create_app() -> Flask:
             user_id=(current_user.id if current_user.is_authenticated else None),
         )
         report.refresh_road_key()
+
+        # Optional mapping fields (filled by client-side JS).
+        try:
+            report.location_hint = (getattr(form, "location_hint", None).data or "").strip() or None
+        except Exception:
+            report.location_hint = None
+
+        def _to_float(val):
+            try:
+                if val is None:
+                    return None
+                s = str(val).strip()
+                if not s:
+                    return None
+                return float(s)
+            except Exception:
+                return None
+
+        raw_lat = _to_float(getattr(form, "raw_lat", None).data if getattr(form, "raw_lat", None) else None)
+        raw_lng = _to_float(getattr(form, "raw_lng", None).data if getattr(form, "raw_lng", None) else None)
+        lat = _to_float(getattr(form, "lat", None).data if getattr(form, "lat", None) else None)
+        lng = _to_float(getattr(form, "lng", None).data if getattr(form, "lng", None) else None)
+
+        report.raw_lat = raw_lat
+        report.raw_lng = raw_lng
+        report.lat = lat
+        report.lng = lng
+        if lat is not None and lng is not None:
+            report.lat_lng_source = "user_pin"
+
+            # If a server key is configured, snap to the nearest road before saving.
+            slat, slng = snap_to_nearest_road(lat, lng)
+            if slat is not None and slng is not None:
+                # Preserve raw pin if missing.
+                if report.raw_lat is None:
+                    report.raw_lat = lat
+                if report.raw_lng is None:
+                    report.raw_lng = lng
+                report.lat = slat
+                report.lng = slng
+                report.lat_lng_source = "user_pin_snapped"
+
+        try:
+            report.google_place_id = (getattr(form, "google_place_id", None).data or "").strip() or None
+        except Exception:
+            report.google_place_id = None
 
         db.session.add(report)
         db.session.commit()
@@ -1438,6 +1679,148 @@ def create_app() -> Flask:
                 "ambiguity_options": ambiguity_options,
             }
         )
+
+    @app.get("/api/snap_road")
+    def api_snap_road():
+        """Snap a lat/lng to the nearest road (server-side).
+
+        This endpoint is optional; if GOOGLE_MAPS_SERVER_KEY is not configured, it returns the input.
+        """
+        lat = request.args.get("lat", type=float)
+        lng = request.args.get("lng", type=float)
+        if lat is None or lng is None:
+            return jsonify({"ok": False, "error": "missing_lat_lng"}), 400
+
+        slat, slng = snap_to_nearest_road(lat, lng)
+        if slat is None or slng is None:
+            return jsonify({"ok": True, "snapped": False, "lat": lat, "lng": lng})
+        return jsonify({"ok": True, "snapped": True, "lat": slat, "lng": slng})
+
+    @app.get("/api/map_pins")
+    def api_map_pins():
+        """Return map pins filtered like the feed, but only tickets with lat/lng."""
+        hide_anon_requested = (request.args.get("hide_anon") == "1")
+        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        # --- same filter semantics as /home ---
+        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_road = (request.args.get("road") or "").strip()
+
+        filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
+        filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
+        filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
+
+        filter_over_list = [v.strip() for v in request.args.getlist("overage") if (v or "").strip()]
+        legacy_over = (request.args.get("over") or "").strip()
+        if legacy_over and legacy_over not in ("all", ""):
+            filter_over_list = list(dict.fromkeys(filter_over_list + [legacy_over]))
+
+        filter_photo_only = (request.args.get("photo_only") == "1")
+        filter_verify = (request.args.get("verify") or "any").strip()
+        filter_date = (request.args.get("date") or "any").strip()
+        filter_sort = (request.args.get("sort") or "new").strip()
+        if request.args.get("verified_photo") == "1":
+            filter_photo_only = True
+            filter_verify = "verified"
+
+        q = SpeedReport.query.options(joinedload(SpeedReport.user))
+
+        # Only pinned tickets
+        q = q.filter(SpeedReport.lat.isnot(None)).filter(SpeedReport.lng.isnot(None))
+
+        if hide_anon:
+            q = q.filter(SpeedReport.user_id.isnot(None))
+
+        if filter_state:
+            q = q.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+
+        if filter_date not in ("", "any"):
+            try:
+                days = int(filter_date)
+            except Exception:
+                days = 0
+            if days > 0:
+                q = q.filter(SpeedReport.created_at >= (datetime.utcnow() - timedelta(days=days)))
+
+        if filter_road:
+            try:
+                road_key = normalize_road(filter_road, filter_state)
+            except Exception:
+                road_key = ""
+            conds = [SpeedReport.road_name.ilike(f"%{filter_road}%")]
+            if road_key:
+                conds.append(SpeedReport.road_key == road_key)
+            q = q.filter(or_(*conds))
+
+        if filter_speed_limit_list:
+            sl_conds = []
+            for v in filter_speed_limit_list:
+                if v == "25-35":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
+                elif v == "40-50":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
+                elif v == "55":
+                    sl_conds.append(SpeedReport.posted_speed == 55)
+                elif v == "65":
+                    sl_conds.append(SpeedReport.posted_speed == 65)
+                elif v == "70+":
+                    sl_conds.append(SpeedReport.posted_speed >= 70)
+            if sl_conds:
+                q = q.filter(or_(*sl_conds))
+
+        expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
+        if filter_over_list:
+            over_conds = []
+            for v in filter_over_list:
+                if v == "5-9":
+                    over_conds.append(and_(expr >= 5, expr <= 9))
+                elif v == "10-14":
+                    over_conds.append(and_(expr >= 10, expr <= 14))
+                elif v == "15-19":
+                    over_conds.append(and_(expr >= 15, expr <= 19))
+                elif v == "20+":
+                    over_conds.append(expr >= 20)
+            if over_conds:
+                q = q.filter(or_(*over_conds))
+
+        if filter_photo_only:
+            q = q.filter(SpeedReport.photo_key.isnot(None))
+
+        if filter_verify == "verified":
+            q = q.filter(SpeedReport.ocr_status == "verified")
+        elif filter_verify == "not_verified":
+            q = q.filter(or_(SpeedReport.ocr_status.is_(None), SpeedReport.ocr_status != "verified"))
+
+        # Hard cap pins returned to keep the page snappy.
+        # Ordering (keep semantics aligned with the feed where possible).
+        if filter_sort == "old":
+            q = q.order_by(SpeedReport.created_at.asc())
+        elif filter_sort == "most_over":
+            q = q.order_by((SpeedReport.ticketed_speed - SpeedReport.posted_speed).desc(), SpeedReport.created_at.desc())
+        elif filter_sort in ("least_over", "least_strict"):
+            q = q.order_by((SpeedReport.ticketed_speed - SpeedReport.posted_speed).asc(), SpeedReport.created_at.desc())
+        else:
+            q = q.order_by(SpeedReport.created_at.desc())
+
+        rows = q.limit(1500).all()
+
+        pins = []
+        for r in rows:
+            pins.append(
+                {
+                    "id": r.id,
+                    "lat": r.lat,
+                    "lng": r.lng,
+                    "state": normalize_state_group(r.state),
+                    "road": r.road_name,
+                    "posted": r.posted_speed,
+                    "ticketed": r.ticketed_speed,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "username": (r.user.username if getattr(r, "user", None) else None),
+                }
+            )
+
+        return jsonify({"ok": True, "count": len(pins), "pins": pins})
 
     
     @app.get("/api/search_suggest")

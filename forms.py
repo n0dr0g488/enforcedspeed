@@ -62,6 +62,19 @@ class SpeedReportForm(FlaskForm):
         render_kw={"placeholder": "e.g., I-95, US-50, VA-288, Main St"},
     )
 
+    location_hint = StringField(
+        "Nearest exit / city (optional)",
+        validators=[Optional(), Length(max=200, message="Keep it under 200 characters.")],
+        render_kw={"placeholder": "Ex: Exit 118 / near Richmond / US-64 interchange"},
+    )
+
+    # Map refine (optional). These are filled by client-side JS.
+    raw_lat = HiddenField()
+    raw_lng = HiddenField()
+    lat = HiddenField()
+    lng = HiddenField()
+    google_place_id = HiddenField()
+
     posted_speed = IntegerField(
         "Posted speed limit",
         validators=[

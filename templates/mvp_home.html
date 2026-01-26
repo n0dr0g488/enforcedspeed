@@ -47,10 +47,6 @@
             Optional, but helpful: nearest exit, town, landmark.
           </div>
 
-          <button type="button" id="openPinModal" class="btn" style="margin-top:10px;">
-            Refine pin on map (optional)
-          </button>
-          <div class="subtle" id="pinStatus" style="margin-top:6px; display:none;"></div>
 
           <div class="preview" id="roadPreview" style="display:none;">
             <div class="row">
@@ -61,46 +57,10 @@
             <div class="subtle" id="bucketAmbiguity" style="margin-top:10px;"></div>
           </div>
 
-          <label for="posted_speed">{{ form.posted_speed.label.text }}</label>
-          {{ form.posted_speed(id="posted_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
-
-          <label for="ticketed_speed">{{ form.ticketed_speed.label.text }}</label>
-          {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
-
-          <label for="photo">Photo (optional for OCR ticket verification)</label>
-          <div class="photo-field">
-            {{ form.photo(id="photo", accept="image/jpeg,image/png") }}
-            <div class="subtle" id="photoHint" style="margin-top:6px;">
-              JPG/JPEG or PNG only for now. iPhone HEIC is not supported yet.
-            </div>
-            <div class="subtle" style="margin-top:4px;">
-              Photo privacy: Uploaded photos are used only to attempt OCR verification and are automatically deleted shortly after processing (and always within 24 hours).
-            </div>
-            <div class="subtle" id="photoSelected" style="margin-top:4px;"></div>
-          </div>
-
-          <div class="blocks">
-            <div class="block">
-              <strong>Most Strict</strong>
-              <ol>
-                {% for r in most_strict %}
-                  <li>
-                    <span class="pill">{{ r.state }}</span>
-                    <span class="pill">{{ format_road_bucket(r.road) }}</span>
-	                    <br>
-                     +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
-                  </li>
-                {% endfor %}
-              </ol>
-
-              <div class="subtle right" style="margin-top: 6px;">
-                {% if hide_anon %}
-                  <a href="{{ url_for('strictness', hide_anon=1) }}">more</a>
-                {% else %}
-                  <a href="{{ url_for('strictness') }}">more</a>
-                {% endif %}
-              </div>
-            </div>
+          <button type="button" id="openPinModal" class="btn" style="margin-top:10px;">
+            Refine pin on map (optional)
+          </button>
+          <div class="subtle" id="pinStatus" style="margin-top:6px; display:none;"></div>
 
 <!-- Pin refine modal (Google Maps, optional) -->
 <div id="pinModal" class="modal" style="display:none;">
@@ -128,28 +88,24 @@
   .btn-secondary{background:#f3f4f6;color:#111827;border:1px solid #e5e7eb;}
 </style>
 
-            <div class="block">
-              <strong>Least Strict</strong>
-              <ol>
-                {% for r in least_strict %}
-                  <li>
-                    <span class="pill">{{ r.state }}</span>
-                    <span class="pill">{{ format_road_bucket(r.road) }}</span>
-	                    <br>
-                     +{{ '%.1f'|format(r.median_overage) }} mph <a href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
-                  </li>
-                {% endfor %}
-              </ol>
+<label for="posted_speed">{{ form.posted_speed.label.text }}</label>
+          {{ form.posted_speed(id="posted_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
 
-              <div class="subtle right" style="margin-top: 6px;">
-                {% if hide_anon %}
-                  <a href="{{ url_for('strictness', hide_anon=1) }}">more</a>
-                {% else %}
-                  <a href="{{ url_for('strictness') }}">more</a>
-                {% endif %}
-              </div>
+          <label for="ticketed_speed">{{ form.ticketed_speed.label.text }}</label>
+          {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
+
+          <label for="photo">Photo (optional for OCR ticket verification)</label>
+          <div class="photo-field">
+            {{ form.photo(id="photo", accept="image/jpeg,image/png") }}
+            <div class="subtle" id="photoHint" style="margin-top:6px;">
+              JPG/JPEG or PNG only for now. iPhone HEIC is not supported yet.
             </div>
+            <div class="subtle" style="margin-top:4px;">
+              Photo privacy: Uploaded photos are used only to attempt OCR verification and are automatically deleted shortly after processing (and always within 24 hours).
+            </div>
+            <div class="subtle" id="photoSelected" style="margin-top:4px;"></div>
           </div>
+
           {{ form.submit(class_="btn") }}
 
           <div class="subtle right" style="margin-top: 8px;">

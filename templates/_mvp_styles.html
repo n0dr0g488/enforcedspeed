@@ -1,7 +1,7 @@
 <style>
 
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
-      .wrap { max-width: 720px; margin: 40px auto; padding: 0 16px; }
+      .wrap { max-width: 720px; margin: 20px auto; padding: 0 16px; }
 
       /* Desktop home layout (Reddit-style rails):
          - Left rail is pinned to the viewport edge.
@@ -22,19 +22,67 @@
       /* Left rail: pinned to viewport left; does NOT affect feed centering. */
       .home-left{
         position: fixed;
-        left: 20px;
-        top: 84px;
+        left: 0;
+        top: 62px;
         width: 275px;
         max-height: calc(100vh - 104px);
         overflow: auto;
         align-self: start;
       }
 
+      /* v136: Left rail should feel built-in (no card bubble). */
+      .filters-rail{
+        background:#fff;
+        border:0;
+        border-right:1px solid #e5e7eb;
+        border-radius:0;
+        box-shadow:none;
+        padding:14px 14px 12px;
+      }
+      .filters-rail .filterbox{padding:0;margin:0;}
+
+      /* v140: Right rail map should match left rail (built-in, straight edges). */
+      .maps-rail{
+        background:#fff;
+        border:0;
+        border-left:1px solid #e5e7eb;
+        border-radius:0;
+        box-shadow:none;
+        padding:14px 14px 12px;
+      }
+      .filters-footer-links{
+        margin-top:12px;
+        padding-top:10px;
+        border-top:1px solid #eef1f5;
+        font-size:12px;
+        color:#6b7280;
+        display:flex;
+        gap:8px;
+        flex-wrap:wrap;
+        align-items:center;
+      }
+      .filters-footer-links a{
+        color:#6b7280;
+        text-decoration:none;
+        font-weight:500;
+      }
+      
+      .filters-footer-meta{
+        margin-top:6px;
+        font-size:12px;
+        color:#9ca3af;
+        line-height:1.35;
+      }
+.filters-footer-links a:hover{
+        text-decoration:underline;
+      }
+      .filters-footer-links .dot{color:#c1c7d0;}
+
       /* Right rail (mini-map). Pinned to viewport right; does NOT affect feed centering. */
       .home-right{
         position: fixed;
-        right: 20px;
-        top: 84px;
+        right: 0;
+        top: 62px;
         width: 320px;
         max-height: calc(100vh - 104px);
         overflow: auto;
@@ -80,6 +128,16 @@
       .footer { margin-top: 18px; text-align: center; color: #6b7280; font-size: 12px; }
       .subtle { color: #6b7280; font-size: 12px; }
       .right { text-align: right; }
+
+      /* Policy pages: keep headings centered, body text left-aligned for readability */
+      .policy-page h2{ text-align:center; }
+      .policy-page h3{ text-align:left; margin-top: 18px; }
+      .policy-page p{ text-align:left; }
+      .policy-page ul{ margin: 8px 0 14px 22px; padding:0; }
+      .policy-page li{ text-align:left; margin: 6px 0; }
+      .policy-page .policy-meta{ text-align:center; color:#6b7280; margin-top:-6px; }
+      .policy-page .policy-lead{ text-align:center; color:#374151; margin-top: 10px; }
+      .policy-page .policy-note{ color:#6b7280; font-size:12px; }
 
       /* Homepage intro card typography (Option A) */
       .home-intro-title{ font-weight: 700; font-size: 14px; color:#111827; margin: 0 0 6px 0; }
@@ -313,7 +371,8 @@
 }
 .chip-btn{
   appearance:none;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   border-radius:999px;
   padding:6px 10px;
@@ -330,7 +389,8 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   border-radius:999px;
   padding:6px 10px;
@@ -348,7 +408,8 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   border-radius:999px;
   padding:6px 10px;
@@ -364,7 +425,8 @@
   justify-content:center;
   padding:10px 12px;
   border-radius:10px;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   font-weight:800;
   cursor:pointer;
@@ -413,7 +475,8 @@
   text-align:center;
   padding:10px 12px;
   border-radius:12px;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   color:#111827;
   font-weight:900;
@@ -444,7 +507,8 @@
   margin-top:6px;
   padding:8px 10px;
   border-radius:10px;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   font-weight:900;
   font-size:12px;
@@ -469,7 +533,8 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   border-radius:999px;
   padding:6px 10px;
@@ -487,7 +552,8 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  border:1px solid #e5e7eb;
+  border:0;
+        border-right:1px solid #e5e7eb;
   background:#f9fafb;
   border-radius:999px;
   padding:6px 10px;
@@ -506,4 +572,48 @@
 .switch input:checked + .slider{ background:#111827; }
 .switch input:checked + .slider:before{ transform:translateX(18px); }
 
+
+      /* Feed: static map preview inside ticket card */
+      .ticket-staticmap-wrap{
+        width:100%;
+        margin-top:10px;
+        border:0;
+        border-right:1px solid #e5e7eb;
+        border-radius:12px;
+        overflow:hidden;
+        background:#f3f4f6;
+              position:relative;
+}
+      
+      .ticket-pin-refine{
+        position:absolute;
+        left:10px;
+        bottom:10px;
+        border:1px solid #e5e7eb;
+        background:rgba(255,255,255,0.92);
+        padding:6px 10px;
+        border-radius:999px;
+        font-size:13px;
+        font-weight:500;
+        cursor:pointer;
+      
+  z-index: 5;}
+      .ticket-pin-refine:hover{
+        background:rgba(255,255,255,0.98);
+      }
+
+.ticket-staticmap{
+        width:100%;
+        height:auto;
+        display:block;
+      }
+
+
+      /* Shared modal styles (used by pin refine modals) */
+      .modal{position:fixed;inset:0;z-index:2000;}
+      .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.35);}
+      .modal-card{position:relative;max-width:720px;width:calc(100% - 24px);margin:60px auto 0 auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:16px;}
+      .modal-title{font-weight:600;font-size:18px;}
+      .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;}
 </style>
+

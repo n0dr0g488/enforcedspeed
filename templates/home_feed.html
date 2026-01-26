@@ -5,7 +5,7 @@
 
     {# Left sidebar: sticky filters (desktop). Collapses behind button on mobile. #}
     <aside class="home-left" id="homeFiltersSidebar">
-      <div class="card ticket-card">
+      <div class="filters-rail">
         <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter speeding tickets</div>
@@ -157,7 +157,15 @@
 
             </div>
           </div>
+
 </form>
+
+        <div class="filters-footer-links">
+          <a href="{{ url_for('privacy') }}">Privacy</a>
+          <span class="dot">·</span>
+          <a href="{{ url_for('terms') }}">Terms</a>
+        </div>
+        <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed · Developed by Conor Gordon · Mindra LLC</div>
       </div>
     </aside>
 
@@ -237,16 +245,12 @@
       <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Filters</button>
 
       {# --- Welcome tile --- #}
-      <div class="card ticket-card">
+      <div class="filters-rail">
     <div class="home-intro" style="margin: 0;">
       <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
 
       <div class="home-intro-body">
-        EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers to identify the speeds at which enforcement most commonly occurs. Rather than relying on posted limits alone, this data helps reveal how speeding laws are actually enforced across different roads and states.
-      </div>
-
-      <div class="home-intro-body" style="margin-top:8px;">
-        By analyzing thousands of tickets, EnforcedSpeed highlights the speed at which the vast majority of drivers are cited, providing a clearer picture of real-world enforcement patterns.
+        EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers to identify the speeds at which enforcement most commonly occurs. By analyzing thousands of tickets, EnforcedSpeed highlights the speed at which the vast majority of drivers are cited.
       </div>
 
       <div class="home-intro-disclaimer">
@@ -314,6 +318,20 @@
   <div class="subtle ticket-date" style="margin-top:4px;">
     <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
   </div>
+
+{# --- Static map preview (feed hero) --- #}
+{% if r.lat and r.lng and maps_api_key %}
+  {% set _sm = static_map_url(r.lat, r.lng, zoom=11, width=640, height=340) %}
+  {% if _sm %}
+    <div class="ticket-staticmap-wrap">
+      {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
+        <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}">Refine pin</button>
+      {% endif %}
+      <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+    </div>
+  {% endif %}
+{% endif %}
+
 </div>
 
 {# --- Center: Road + State, speed/limit, ticket overage --- #}
@@ -492,17 +510,17 @@
   {% endfor %}
 
   {% if pagination.pages > 1 %}
-    <div class="card ticket-card">
+    <div class="card ticket-card" style="margin-top:16px;">
       <div class="row" style="justify-content:space-between;gap:12px;">
         <div>
           {% if pagination.has_prev %}
-            <a href="{{ url_for('home', page=pagination.prev_num, hide_anon=(1 if hide_anon else None)) }}">← Newer</a>
+            <a class="action-link" href="{{ url_for('home', page=pagination.prev_num, hide_anon=(1 if hide_anon else None)) }}">← Newer</a>
           {% endif %}
         </div>
         <div class="subtle">Page {{ pagination.page }} of {{ pagination.pages }}</div>
         <div>
           {% if pagination.has_next %}
-            <a href="{{ url_for('home', page=pagination.next_num, hide_anon=(1 if hide_anon else None)) }}">Older →</a>
+            <a class="action-link" href="{{ url_for('home', page=pagination.next_num, hide_anon=(1 if hide_anon else None)) }}">Older →</a>
           {% endif %}
         </div>
       </div>
@@ -713,17 +731,19 @@ document.addEventListener('DOMContentLoaded', function(){
 
     {# Right rail: mini-map of the current feed page (only tickets with lat/lng). #}
     <aside class="home-right" aria-label="Ticket map">
-      <div class="card ticket-card" style="padding:14px;">
+      <div class="maps-rail">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="font-weight:600;">Map (this page)</div>
+          <div style="display:flex; flex-direction:column; line-height:1.1;">
+            <div style="font-weight:600;">Ticket mini-map</div>
+            <div style="font-size:12px; color:#6b7280; margin-top:2px;">Last 20 tickets</div>
+          </div>
           <a class="subtle" href="{{ url_for('map_view') }}" style="text-decoration:none;">Open full map</a>
         </div>
 
         {% if map_pins and map_pins|length > 0 and maps_api_key %}
           <div class="subtle" style="margin-top:6px;">
-            Only tickets with a saved pin appear here.
           </div>
-          <div id="homeMiniMap" style="width:100%; height:260px; margin-top:10px; border:1px solid #e5e7eb; border-radius:12px; background:#f3f4f6;"></div>
+          <div id="homeMiniMap" style="width:100%; height:346px; margin-top:10px; border:1px solid #e5e7eb; border-radius:12px; background:#f3f4f6;"></div>
         {% elif not maps_api_key %}
           <div class="subtle" style="margin-top:10px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
         {% else %}
@@ -808,5 +828,151 @@ document.addEventListener('DOMContentLoaded', function(){
     {% endif %}
 
 </div> {# /home-shell #}
+
+
+{# --- Owner-only pin refine modal (feed) --- #}
+{% if current_user.is_authenticated and maps_api_key %}
+<div id="feedPinModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" id="feedPinBackdrop"></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="feedPinTitle">
+    <div class="modal-title" id="feedPinTitle">Refine pin</div>
+    <div class="subtle" style="margin-top:6px;">
+      Drag the pin to the closest spot on the road. We'll snap it to the nearest road line.
+    </div>
+    <div id="feedPinMap" style="width:100%; height:360px; margin-top:12px; border:1px solid #e5e7eb; border-radius:12px;"></div>
+    <div class="subtle" id="feedPinStatus" style="margin-top:10px; display:none;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="feedPinCancel">Cancel</button>
+      <button type="button" class="btn" id="feedPinSave">Save pin</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+{% if current_user.is_authenticated and maps_api_key %}
+<script>
+  (function(){
+    const modal = document.getElementById('feedPinModal');
+    if(!modal) return;
+
+    const backdrop = document.getElementById('feedPinBackdrop');
+    const btnCancel = document.getElementById('feedPinCancel');
+    const btnSave = document.getElementById('feedPinSave');
+    const statusEl = document.getElementById('feedPinStatus');
+    const mapEl = document.getElementById('feedPinMap');
+
+    let activeReportId = null;
+    let map = null;
+    let marker = null;
+
+    function showStatus(msg){
+      if(!statusEl) return;
+      statusEl.textContent = msg;
+      statusEl.style.display = 'block';
+    }
+    function clearStatus(){
+      if(!statusEl) return;
+      statusEl.textContent = '';
+      statusEl.style.display = 'none';
+    }
+
+    function close(){
+      modal.style.display = 'none';
+      activeReportId = null;
+      clearStatus();
+    }
+
+    function ensureGoogleMaps(cb){
+      if(window.google && google.maps){ cb(); return; }
+      if(window.__esFeedMapsLoading){
+        window.__esFeedMapsCallbacks.push(cb);
+        return;
+      }
+      window.__esFeedMapsLoading = true;
+      window.__esFeedMapsCallbacks = [cb];
+      const s = document.createElement('script');
+      s.src = "https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}";
+      s.async = true;
+      s.defer = true;
+      s.onload = function(){
+        const cbs = window.__esFeedMapsCallbacks || [];
+        window.__esFeedMapsCallbacks = [];
+        cbs.forEach(fn => { try{ fn(); }catch(e){} });
+      };
+      document.head.appendChild(s);
+    }
+
+    function open(reportId, lat, lng){
+      activeReportId = reportId;
+      modal.style.display = 'block';
+      clearStatus();
+
+      ensureGoogleMaps(function(){
+        const center = { lat: lat, lng: lng };
+        if(!map){
+          map = new google.maps.Map(mapEl, {
+            center: center,
+            zoom: 16,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+          });
+          marker = new google.maps.Marker({ position: center, map: map, draggable: true });
+        }else{
+          map.setCenter(center);
+          map.setZoom(16);
+          marker.setPosition(center);
+        }
+      });
+    }
+
+    function bindTriggers(){
+      document.querySelectorAll('.ticket-pin-refine').forEach(btn => {
+        btn.addEventListener('click', function(){
+          const rid = parseInt(btn.getAttribute('data-report-id') || '0', 10);
+          const lat = parseFloat(btn.getAttribute('data-lat') || '0');
+          const lng = parseFloat(btn.getAttribute('data-lng') || '0');
+          if(!rid || !lat || !lng) return;
+          open(rid, lat, lng);
+        });
+      });
+    }
+
+    async function save(){
+      if(!activeReportId || !marker) return;
+      const pos = marker.getPosition();
+      const lat = pos.lat();
+      const lng = pos.lng();
+      btnSave.disabled = true;
+      try{
+        const res = await fetch('/api/update_ticket_pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ report_id: activeReportId, lat: lat, lng: lng })
+        });
+        const data = await res.json().catch(()=>({}));
+        if(res.ok && data && data.ok){
+          showStatus(data.snapped ? 'Saved. Pin snapped to nearest road.' : 'Saved.');
+          // Reload to refresh static map image + any downstream aggregates.
+          setTimeout(()=>{ window.location.reload(); }, 450);
+        }else{
+          showStatus('Could not save pin. Please try again.');
+          btnSave.disabled = false;
+        }
+      }catch(e){
+        showStatus('Could not save pin. Please try again.');
+        btnSave.disabled = false;
+      }
+    }
+
+    if(backdrop) backdrop.addEventListener('click', close);
+    if(btnCancel) btnCancel.addEventListener('click', close);
+    if(btnSave) btnSave.addEventListener('click', save);
+
+    bindTriggers();
+  })();
+</script>
+{% endif %}
 
 {% endblock %}

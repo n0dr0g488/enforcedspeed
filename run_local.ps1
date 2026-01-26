@@ -8,6 +8,14 @@ Write-Host "Starting EnforcedSpeed (local)..." -ForegroundColor Cyan
 # Ensure we are running from the folder that contains this script (ZIP root)
 Set-Location -Path $PSScriptRoot
 
+function Try-GetFileHash($path) {
+  if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) {
+    return (Get-FileHash $path -Algorithm SHA256).Hash
+  }
+  return ""
+}
+
+
 # ---- Local DB + Redis (pin for local dev unless already set) ----
 if (-not $env:DATABASE_URL -or $env:DATABASE_URL.Trim() -eq "") {
     $env:DATABASE_URL = "postgresql+pg8000://enforcedspeed:enforcedspeed_password@localhost:5433/enforcedspeed_local"
@@ -56,7 +64,7 @@ $venvHealthy = (Test-Path $venvPy) -and (Test-Path $venvPip)
 # ---- Install/update dependencies (only when requirements.txt changes) ----
 $reqFile = Join-Path $PSScriptRoot "requirements.txt"
 $hashFile = Join-Path $PSScriptRoot "venv\\.requirements.sha256"
-$currentHash = (Get-FileHash $reqFile -Algorithm SHA256).Hash
+$currentHash = (Try-GetFileHash $reqFile)
 $previousHash = ""
 if (Test-Path $hashFile) { $previousHash = (Get-Content $hashFile -ErrorAction SilentlyContinue) }
 

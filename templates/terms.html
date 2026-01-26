@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Terms of Use · EnforcedSpeed{% endblock %}
+{% block content %}
+<div class="home-shell">
+  <div class="home-center">
+    <div class="card ticket-card policy-page">
+      <h2 style="margin-top:0">Terms of Use</h2>
+      <p class="policy-meta">Last updated: {{ last_updated }}</p>
+
+      <p class="policy-lead">
+        By accessing or using EnforcedSpeed, you agree to these Terms.
+      </p>
+
+      <h3>Informational use only</h3>
+      <p>
+        EnforcedSpeed is an informational data platform. Posted speed limits are the law and must always be obeyed.
+        EnforcedSpeed does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
+      </p>
+
+      <h3>Accounts</h3>
+      <p>
+        You are responsible for your account and for activities that occur under it. Keep your login credentials confidential and notify us if you believe your account has been compromised.
+      </p>
+
+      <h3>User submissions</h3>
+      <ul>
+        <li>You are responsible for the accuracy of information you submit.</li>
+        <li>Do not submit personal identifiers (names, addresses, driver’s license numbers, citation numbers, etc.).</li>
+        <li>Do not upload images containing sensitive personal information you do not want processed.</li>
+      </ul>
+
+      <h3>Photo uploads</h3>
+      <p>
+        If you upload a ticket photo for verification, you authorize us to process it for OCR verification.
+        <b>Photos are deleted within 24 hours</b>. We may keep verification status and non-sensitive derived fields needed to operate the site.
+      </p>
+
+      <h3>Acceptable use</h3>
+      <ul>
+        <li>No harassment, hate, threats, or illegal content.</li>
+        <li>No attempts to scrape, reverse engineer, overload, or disrupt the service.</li>
+        <li>No impersonation, deceptive submissions, or attempts to identify other users.</li>
+      </ul>
+
+      <h3>Content and moderation</h3>
+      <p>
+        You grant EnforcedSpeed a non-exclusive, worldwide license to host, display, and process the content you submit in order to operate and improve the service.
+        We may remove content or suspend accounts that violate these Terms, our policies, or harm the platform.
+      </p>
+
+      <h3>Intellectual property</h3>
+      <p>
+        The EnforcedSpeed service, branding, and site content (excluding user submissions) are owned by EnforcedSpeed and/or its licensors and are protected by applicable laws.
+      </p>
+
+      <h3>Disclaimers</h3>
+      <p>
+        The service is provided “as is” without warranties of any kind. We do not guarantee accuracy, completeness, or availability of the service or the data displayed.
+      </p>
+
+      <h3>Limitation of liability</h3>
+      <p>
+        To the maximum extent permitted by law, EnforcedSpeed will not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, arising from your use of the service.
+      </p>
+
+      <h3>Termination</h3>
+      <p>
+        We may suspend or terminate access to the service at any time for violation of these Terms or to protect the platform. You may stop using the service at any time.
+      </p>
+
+      <h3>Changes</h3>
+      <p>
+        We may update these Terms from time to time. The “Last updated” date above indicates when they were most recently revised.
+      </p>
+
+      <h3>Contact</h3>
+      <p>
+        Questions? Contact us at <b>{{ contact_email }}</b>.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

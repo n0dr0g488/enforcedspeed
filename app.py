@@ -127,6 +127,33 @@ def format_road_bucket(road_key: str) -> str:
     return road_key.upper()
 
 
+def static_map_url(lat: float | None, lng: float | None, *, zoom: int = 14, width: int = 640, height: int = 360) -> str:
+    """Build a Google Static Maps URL for a single pin (used as feed preview).
+
+    NOTE: This uses GOOGLE_MAPS_API_KEY (browser key). Restrict it by HTTP referrer in Google Cloud Console.
+    """
+    try:
+        from flask import current_app
+        key = (current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()
+    except Exception:
+        key = (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
+
+    if not key or lat is None or lng is None:
+        return ""
+
+    center = f"{lat:.6f},{lng:.6f}"
+    params = {
+        "center": center,
+        "zoom": str(int(zoom)),
+        "size": f"{int(width)}x{int(height)}",
+        "scale": "2",
+        "maptype": "roadmap",
+        "markers": f"color:red|{center}",
+        "key": key,
+    }
+    return "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params)
+
+
 def column_exists(table_name: str, column_name: str) -> bool:
     engine = db.engine
     dialect = engine.dialect.name
@@ -264,7 +291,7 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_helpers():
-        return {"format_road_bucket": format_road_bucket}
+        return {"format_road_bucket": format_road_bucket, "static_map_url": static_map_url}
 
     def snap_to_nearest_road(lat: float, lng: float):
         """Snap a single point to the nearest road using Google Roads API.
@@ -1696,6 +1723,52 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "snapped": False, "lat": lat, "lng": lng})
         return jsonify({"ok": True, "snapped": True, "lat": slat, "lng": slng})
 
+    @app.post("/api/update_ticket_pin")
+    @login_required
+    def api_update_ticket_pin():
+        """Owner-only: update an existing ticket's pin (raw + snapped lat/lng)."""
+        try:
+            payload = request.get_json(silent=True) or {}
+        except Exception:
+            payload = {}
+
+        try:
+            report_id = int(payload.get("report_id"))
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_report_id"}), 400
+
+        try:
+            lat = float(payload.get("lat"))
+            lng = float(payload.get("lng"))
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_lat_lng"}), 400
+
+        r = SpeedReport.query.get(report_id)
+        if not r:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        # Only the ticket owner can refine their own pin.
+        if not r.user_id or int(r.user_id) != int(current_user.id):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
+
+        r.raw_lat = lat
+        r.raw_lng = lng
+
+        slat, slng = snap_to_nearest_road(lat, lng)
+        if slat is None or slng is None:
+            r.lat = lat
+            r.lng = lng
+            r.lat_lng_source = "user_pin"
+            snapped = False
+        else:
+            r.lat = float(slat)
+            r.lng = float(slng)
+            r.lat_lng_source = "user_pin_snapped"
+            snapped = True
+
+        db.session.commit()
+        return jsonify({"ok": True, "snapped": snapped, "lat": r.lat, "lng": r.lng})
+
     @app.get("/api/map_pins")
     def api_map_pins():
         """Return map pins filtered like the feed, but only tickets with lat/lng."""
@@ -1887,6 +1960,53 @@ def create_app() -> Flask:
         # Keep top 5, users first, then states, then roads (current order)
         return jsonify(suggestions[:5])
 
+    @app.get("/api/tickets")
+    def api_tickets():
+        try:
+            limit = int(request.args.get("limit", "50"))
+        except Exception:
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        try:
+            offset = int(request.args.get("offset", "0"))
+        except Exception:
+            offset = 0
+        offset = max(0, offset)
+
+        reports = (
+            SpeedReport.query
+            .order_by(SpeedReport.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        items = []
+        for r in reports:
+            items.append({
+                "id": r.id,
+                "state": r.state,
+                "road": r.road_name,
+                "posted_speed": r.posted_speed,
+                "cited_speed": r.ticketed_speed,
+                "overage": (r.ticketed_speed - r.posted_speed)
+                    if (r.ticketed_speed is not None and r.posted_speed is not None)
+                    else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "lat": r.lat,
+                "lng": r.lng,
+                "verification_status": r.verification_status,
+                "ocr_status": r.ocr_status,
+            })
+
+        return jsonify({
+            "items": items,
+            "offset": offset,
+            "limit": limit,
+            "next_offset": offset + len(items),
+        })
+
     @app.get("/search")
     def search():
         q = (request.args.get("q") or "").strip()
@@ -1945,5 +2065,23 @@ def create_app() -> Flask:
 
 app = create_app()
 
+
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html", last_updated="2026-01-25", contact_email="support@enforcedspeed.com")
+
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html", last_updated="2026-01-25", contact_email="support@enforcedspeed.com")
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    import os
+
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "5000"))
+    debug = os.getenv("FLASK_DEBUG", "1") == "1"
+
+    app.run(host=host, port=port, debug=debug)

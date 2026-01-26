@@ -43,6 +43,8 @@
     .brand-link{grid-column:1;justify-self:start;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;}
     .brand-logo{height:42px;width:auto;display:block;}
     .brand-text{font-weight:600;font-size:20px;letter-spacing:.2px;color:#111;}
+    .tm{font-size:0.65em;vertical-align:super;line-height:0;margin-left:1px;}
+
     /* Centered search: visually aligned to the feed column width, independent of the left rail. */
     .header-search{
       grid-column:2;
@@ -78,7 +80,7 @@
     <div class="inner">
       <a class="brand-link" href="{{ url_for('home') }}">
         <img class="brand-logo" src="{{ url_for('static', filename='img/logo-sign-header.png') }}?v=10" alt="EnforcedSpeed">
-        <span class="brand-text">EnforcedSpeed</span>
+        <span class="brand-text">EnforcedSpeed<span class="tm">™</span></span>
       </a>
 
       <div class="header-search">
@@ -123,7 +125,7 @@
   {% block content %}{% endblock %}
 
   <footer class="footer">
-    © 2025–2026 EnforcedSpeed · Developed by Conor Gordon · Mindra LLC
+    © 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC
   </footer>
 
   <script>

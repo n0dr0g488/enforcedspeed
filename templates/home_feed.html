@@ -9,7 +9,6 @@
         <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter speeding tickets</div>
-
             <div class="filterbox-section">Location</div>
 
             <div class="filterbar-row filterbar-row--stack">
@@ -125,6 +124,16 @@
                 </div>
                 {% if not current_user.is_authenticated %}
                   <div class="subtle filter-helper-tight">(Must be logged in)</div>
+                {% endif %}
+                {% if is_admin %}
+                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:8px;">
+                  <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
+                  <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
+                    <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
+                    <option value="include" {% if deleted_mode == 'include' %}selected{% endif %}>Include</option>
+                    <option value="only" {% if deleted_mode == 'only' %}selected{% endif %}>Only</option>
+                  </select>
+                </div>
                 {% endif %}
               </div>
 
@@ -256,6 +265,11 @@
       <div class="home-intro-disclaimer">
         <span class="home-intro-disclaimer-lead">Important:</span> EnforcedSpeed is an informational data platform only. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
       </div>
+
+    {% if is_admin %}
+      </span>
+    {% endif %}
+
     </div>
   </div>
 
@@ -264,9 +278,10 @@
 {% for r in reports %}
   {% set state_code = (r.state.split(' - ')[0] if ' - ' in r.state else r.state) %}
   {% set state_name = (r.state.split(' - ')[-1] if ' - ' in r.state else r.state) %}
-  <div class="card ticket-card" style="margin-top:16px;">
+  <div class="card ticket-card{% if r.is_deleted %} ticket-card--deleted{% endif %}" style="margin-top:16px;">
 
-      
+  
+
 {# --- Header: Username (X) + time, OCR pill on right --- #}
 <div class="ticket-headwrap">
   <div class="ticket-headrow">
@@ -276,6 +291,10 @@
         <div class="ticket-userline">
           <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
           <span class="ticket-usercount">({{ user_count }})</span>
+
+          {% if is_admin and r.is_deleted %}
+            <span class="pill pill-deleted" title="This ticket is soft-deleted and excluded from public views and analytics.">Deleted</span>
+          {% endif %}
         </div>
       {% else %}
         <div class="ticket-userline">Anonymous</div>
@@ -312,11 +331,28 @@
         <span class="pill-info" title="{{ _tip }}">i</span>
       {% endif %}
     {% endif %}
+
     </div>
   </div>
 
-  <div class="subtle ticket-date" style="margin-top:4px;">
+  <div class="subtle ticket-date" style="margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
     <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
+
+    {% if is_admin %}
+      <span>
+        {% if r.is_deleted %}
+          <form method="post" action="{{ url_for('admin_restore_report', report_id=r.id) }}" style="margin:0;">
+            <input type="hidden" name="next" value="{{ request.full_path if request.full_path.startswith('/') else url_for('home') }}">
+            <button type="submit" class="admin-meta-link">Admin · Restore</button>
+          </form>
+        {% else %}
+          <form method="post" action="{{ url_for('admin_delete_report', report_id=r.id) }}" style="margin:0;" onsubmit="return confirm('Delete this ticket?');">
+            <input type="hidden" name="next" value="{{ request.full_path if request.full_path.startswith('/') else url_for('home') }}">
+            <button type="submit" class="admin-meta-link">Admin · Delete</button>
+          </form>
+        {% endif %}
+      </span>
+    {% endif %}
   </div>
 
 {# --- Static map preview (feed hero) --- #}
@@ -510,17 +546,21 @@
   {% endfor %}
 
   {% if pagination.pages > 1 %}
+    {# Preserve all active query params (including admin deleted mode) across pagination #}
+    {% set q = request.args.to_dict() %}
+    {% set _ = q.pop('page', None) %}
+
     <div class="card ticket-card" style="margin-top:16px;">
       <div class="row" style="justify-content:space-between;gap:12px;">
         <div>
           {% if pagination.has_prev %}
-            <a class="action-link" href="{{ url_for('home', page=pagination.prev_num, hide_anon=(1 if hide_anon else None)) }}">← Newer</a>
+            <a class="action-link" href="{{ url_for('home', page=pagination.prev_num, **q) }}">← Newer</a>
           {% endif %}
         </div>
         <div class="subtle">Page {{ pagination.page }} of {{ pagination.pages }}</div>
         <div>
           {% if pagination.has_next %}
-            <a class="action-link" href="{{ url_for('home', page=pagination.next_num, hide_anon=(1 if hide_anon else None)) }}">Older →</a>
+            <a class="action-link" href="{{ url_for('home', page=pagination.next_num, **q) }}">Older →</a>
           {% endif %}
         </div>
       </div>
@@ -976,3 +1016,5 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endif %}
 
 {% endblock %}
+
+

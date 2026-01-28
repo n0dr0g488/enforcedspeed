@@ -24,7 +24,7 @@ from statistics import median
 from bisect import bisect_right
 from typing import Dict, List
 
-from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
 from sqlalchemy import text, func, tuple_, or_, and_
 from sqlalchemy.orm import joinedload
@@ -217,6 +217,22 @@ def ensure_schema_patches() -> None:
     if not column_exists("users", "reset_req_count"):
         db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_count INTEGER"))
         db.session.commit()
+
+
+    # Soft delete (admin moderation) columns for speed_reports.
+    if not column_exists("speed_reports", "is_deleted"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "deleted_at"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN deleted_at TIMESTAMP"))
+        db.session.commit()
+
+    if not column_exists("speed_reports", "deleted_by"):
+        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN deleted_by INTEGER"))
+        db.session.commit()
+
+
 
 
     # Photo + OCR job tracking columns for speed_reports.
@@ -521,7 +537,7 @@ def create_app() -> Flask:
         u = User.query.filter(func.lower(User.username) == ident_lc).first_or_404()
 
         reports = (
-            SpeedReport.query.filter(SpeedReport.user_id == u.id)
+            SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).filter(SpeedReport.user_id == u.id)
             .order_by(SpeedReport.created_at.desc())
             .limit(50)
             .all()
@@ -550,6 +566,7 @@ def create_app() -> Flask:
                 SpeedReport.user_id.label("user_id"),
             )
             .outerjoin(User, User.id == SpeedReport.user_id)
+            .filter(SpeedReport.is_deleted.is_(False))
             .filter(SpeedReport.ticketed_speed > SpeedReport.posted_speed)
         )
 
@@ -624,6 +641,15 @@ def create_app() -> Flask:
             flash("You must be logged in to hide anonymous posts.", "info")
 
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        is_admin = is_admin_user(current_user)
+        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
+        if not is_admin:
+            deleted_mode = "hide"
+        if deleted_mode not in ("hide", "include", "only"):
+            deleted_mode = "hide"
+        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
+        deleted_only = bool(is_admin and deleted_mode == "only")
 
         page = request.args.get("page", 1, type=int)
         per_page = 20
@@ -724,6 +750,18 @@ def create_app() -> Flask:
 
         # Base query
         q = SpeedReport.query.options(joinedload(SpeedReport.user))
+
+        # Deleted visibility (admin: ?deleted=hide|include|only)
+        if deleted_only:
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif deleted_only:
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif deleted_only:
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif deleted_only:
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif not show_deleted:
+            q = q.filter(SpeedReport.is_deleted.is_(False))
 
         # Hide anonymous (members only)
         if hide_anon:
@@ -863,6 +901,7 @@ def create_app() -> Flask:
                     SpeedReport.road_key,
                     expr.label("overage"),
                 )
+                .filter(SpeedReport.is_deleted.is_(False))
                 .filter(tuple_(SpeedReport.state, SpeedReport.road_key).in_(list(keys_a)))
                 .all()
             )
@@ -878,6 +917,7 @@ def create_app() -> Flask:
                     SpeedReport.posted_speed,
                     expr.label("overage"),
                 )
+                .filter(SpeedReport.is_deleted.is_(False))
                 .filter(tuple_(SpeedReport.state, SpeedReport.posted_speed).in_(list(keys_b)))
                 .all()
             )
@@ -940,6 +980,7 @@ def create_app() -> Flask:
         if user_ids:
             rows = (
                 db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
+                .filter(SpeedReport.is_deleted.is_(False))
                 .filter(SpeedReport.user_id.in_(list(user_ids)))
                 .group_by(SpeedReport.user_id)
                 .all()
@@ -1090,6 +1131,10 @@ def create_app() -> Flask:
             filters_active=filters_active,
             maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
             map_pins=map_pins,
+            is_admin=is_admin,
+            show_deleted=show_deleted,
+            deleted_mode=deleted_mode,
+            deleted_only=deleted_only,
         )
 
 
@@ -1101,6 +1146,15 @@ def create_app() -> Flask:
             flash("You must be logged in to hide anonymous posts.", "info")
 
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        is_admin = is_admin_user(current_user)
+        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
+        if not is_admin:
+            deleted_mode = "hide"
+        if deleted_mode not in ("hide", "include", "only"):
+            deleted_mode = "hide"
+        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
+        deleted_only = bool(is_admin and deleted_mode == "only")
 
         # --- Filter parsing matches /home (so links are interchangeable) ---
         filter_state = (request.args.get("state") or "").strip().upper()
@@ -1203,12 +1257,66 @@ def create_app() -> Flask:
         )
 
 
+    
+    def _admin_email_set() -> set[str]:
+        raw = (os.environ.get("ADMIN_EMAILS") or os.environ.get("ADMIN_EMAIL") or "").strip()
+        if not raw:
+            return set()
+        parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
+        return set(parts)
+
+    def is_admin_user(user) -> bool:
+        try:
+            if not user or not getattr(user, "is_authenticated", False):
+                return False
+            admin_emails = _admin_email_set()
+            if not admin_emails:
+                return False
+            email = (getattr(user, "email", "") or "").strip().lower()
+            return bool(email and email in admin_emails)
+        except Exception:
+            return False
+
+    def _require_admin():
+        if not is_admin_user(current_user):
+            abort(403)
+
+
     def _safe_next_url() -> str:
         """Return a safe relative next url from form data."""
         nxt = (request.form.get("next") or "").strip()
         if nxt.startswith("/") and not nxt.startswith("//"):
             return nxt
         return url_for("home")
+
+
+    
+    @app.post("/admin/report/<int:report_id>/delete")
+    @login_required
+    def admin_delete_report(report_id: int):
+        _require_admin()
+        r = SpeedReport.query.get_or_404(report_id)
+        if not getattr(r, "is_deleted", False):
+            r.is_deleted = True
+            r.deleted_at = datetime.utcnow()
+            r.deleted_by = int(current_user.id)
+            db.session.commit()
+            flash("Ticket soft-deleted.", "info")
+        return redirect(_safe_next_url())
+
+
+    @app.post("/admin/report/<int:report_id>/restore")
+    @login_required
+    def admin_restore_report(report_id: int):
+        _require_admin()
+        r = SpeedReport.query.get_or_404(report_id)
+        if getattr(r, "is_deleted", False):
+            r.is_deleted = False
+            r.deleted_at = None
+            r.deleted_by = None
+            db.session.commit()
+            flash("Ticket restored.", "info")
+        return redirect(_safe_next_url())
 
 
     @app.post("/like/<int:report_id>")
@@ -1327,7 +1435,7 @@ def create_app() -> Flask:
     @app.get("/submit")
     def submit():
         form = SpeedReportForm()
-        ticket_count = SpeedReport.query.count()
+        ticket_count = SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).count()
 
         hide_anon_requested = (request.args.get("hide_anon") == "1")
 
@@ -1335,6 +1443,15 @@ def create_app() -> Flask:
             flash("You must be logged in to hide anonymous posts.", "info")
 
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        is_admin = is_admin_user(current_user)
+        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
+        if not is_admin:
+            deleted_mode = "hide"
+        if deleted_mode not in ("hide", "include", "only"):
+            deleted_mode = "hide"
+        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
+        deleted_only = bool(is_admin and deleted_mode == "only")
 
         strictness = strictness_rows(limit=5, exclude_anonymous=hide_anon)
         most_strict = strictness["most_strict"]
@@ -1362,7 +1479,7 @@ def create_app() -> Flask:
             return render_template(
                 "mvp_home.html",
                 form=form,
-                ticket_count=SpeedReport.query.count(),
+                ticket_count=SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).count(),
                 most_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["most_strict"],
                 least_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["least_strict"],
                 hide_anon=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"),
@@ -1555,6 +1672,15 @@ def create_app() -> Flask:
             flash("You must be logged in to hide anonymous posts.", "info")
 
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        is_admin = is_admin_user(current_user)
+        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
+        if not is_admin:
+            deleted_mode = "hide"
+        if deleted_mode not in ("hide", "include", "only"):
+            deleted_mode = "hide"
+        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
+        deleted_only = bool(is_admin and deleted_mode == "only")
         strictness = strictness_rows(limit=20, exclude_anonymous=hide_anon, state_filter=(request.args.get('state') or '').strip().upper() or None)
         most_strict = strictness["most_strict"]
         least_strict = strictness["least_strict"]
@@ -1589,6 +1715,7 @@ def create_app() -> Flask:
                 SpeedReport.user_id,
             )
             .outerjoin(User, User.id == SpeedReport.user_id)
+            .filter(SpeedReport.is_deleted.is_(False))
             .filter(SpeedReport.state.ilike(f"{state}%"))
             .filter(SpeedReport.road_key == road_key)
             .order_by(SpeedReport.ticketed_speed.desc())
@@ -1775,6 +1902,15 @@ def create_app() -> Flask:
         hide_anon_requested = (request.args.get("hide_anon") == "1")
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
 
+        is_admin = is_admin_user(current_user)
+        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
+        if not is_admin:
+            deleted_mode = "hide"
+        if deleted_mode not in ("hide", "include", "only"):
+            deleted_mode = "hide"
+        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
+        deleted_only = bool(is_admin and deleted_mode == "only")
+
         # --- same filter semantics as /home ---
         filter_state = (request.args.get("state") or "").strip().upper()
         filter_road = (request.args.get("road") or "").strip()
@@ -1797,6 +1933,14 @@ def create_app() -> Flask:
             filter_verify = "verified"
 
         q = SpeedReport.query.options(joinedload(SpeedReport.user))
+
+        # Deleted visibility (admin: ?deleted=hide|include|only)
+        if deleted_only:
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif deleted_only:
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif not show_deleted:
+            q = q.filter(SpeedReport.is_deleted.is_(False))
 
         # Only pinned tickets
         q = q.filter(SpeedReport.lat.isnot(None)).filter(SpeedReport.lng.isnot(None))
@@ -2064,14 +2208,9 @@ def create_app() -> Flask:
 
 
 app = create_app()
-
-
-
 @app.route("/privacy")
 def privacy():
     return render_template("privacy.html", last_updated="2026-01-25", contact_email="support@enforcedspeed.com")
-
-
 @app.route("/terms")
 def terms():
     return render_template("terms.html", last_updated="2026-01-25", contact_email="support@enforcedspeed.com")

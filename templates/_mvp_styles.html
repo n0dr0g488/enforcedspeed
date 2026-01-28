@@ -618,5 +618,29 @@
 
 /* Trademark mark */
 .brand-text .tm,.logo .tm{font-size:0.6em;vertical-align:super;margin-left:2px;}
-</style>
 
+/* Admin soft delete */
+.pill-deleted{background:#eee;color:#333;border:1px solid rgba(0,0,0,0.12);}
+
+  /* Admin meta action link (admin-only) */
+  .admin-meta-link{
+    background:none;
+    border:none;
+    padding:0;
+    margin:0;
+    font:inherit;
+    color:inherit;
+    cursor:pointer;
+    text-decoration:none;
+  }
+  .admin-meta-link:hover{
+    text-decoration:underline;
+  }
+
+
+
+/* Admin soft delete: tint deleted cards (admin-only data state) */
+.card.ticket-card--deleted{
+  background: rgba(220, 38, 38, 0.06);
+}
+</style>

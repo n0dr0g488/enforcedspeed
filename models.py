@@ -127,7 +127,20 @@ class User(UserMixin, db.Model):
     reset_req_window_start = db.Column(db.DateTime, nullable=True)
     reset_req_count = db.Column(db.Integer, nullable=True)
 
-    reports = db.relationship("SpeedReport", backref="user", lazy=True)
+    reports = db.relationship(
+        "SpeedReport",
+        foreign_keys="SpeedReport.user_id",
+        backref=db.backref("user", lazy=True),
+        lazy=True,
+    )
+
+    # Reports this user soft-deleted (admin moderation)
+    deleted_reports = db.relationship(
+        "SpeedReport",
+        foreign_keys="SpeedReport.deleted_by",
+        backref=db.backref("deleted_by_user", lazy=True),
+        lazy=True,
+    )
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -197,6 +210,12 @@ class SpeedReport(db.Model):
 
     # Place ID from Places Autocomplete (routes can return a place_id)
     google_place_id = db.Column(db.String(128), nullable=True)
+
+
+    # Soft delete (admin moderation)
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
 
 
     def __init__(self, **kwargs):

@@ -3,6 +3,30 @@
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
       .wrap { max-width: 720px; margin: 20px auto; padding: 0 16px; }
 
+      /* Global legal notice banner (v179) */
+      .global-legal-notice{
+        max-width: 720px;
+        margin: 0 auto 12px;
+        padding: 0 16px;
+        box-sizing: border-box;
+      }
+      .global-legal-notice__inner{
+        background:#fff;
+        border:1px solid #fecaca;
+        border-radius:0; /* square edges */
+        padding:8px 12px;
+        color:#b91c1c;
+        font-weight:600;
+        font-size:12.5px;
+        line-height:1.25;
+        text-align:center;
+      }
+      /* If the first content wrapper is a centered container, remove its top spacing
+         so the banner feels flush under the header and directly above the first card. */
+      .global-legal-notice + .wrap{ margin-top: 0; }
+      .global-legal-notice + .home-shell{ padding-top: 0; }
+
+
       /* Desktop home layout (Reddit-style rails):
          - Left rail is pinned to the viewport edge.
          - Center feed stays the v108-like width and is truly centered in the viewport.
@@ -489,7 +513,7 @@
 
 
 /* Inline note '(must log in)' next to Hide anonymous label */
-.filter-inline-note{ font-size:11px; line-height:1.15; opacity:0.7; white-space:nowrap; }
+.filter-inline-note{ font-size:11px; line-height:1.15; opacity:0.7; white-space:nowrap; font-weight:400; margin-left:6px; display:inline-block; }
 
 /* Pinned Clear button at bottom of left rail */
 .filterbox-footer{

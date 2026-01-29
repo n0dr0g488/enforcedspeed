@@ -1,0 +1,4 @@
+v179 — Global Legal Notice Banner (All Pages)
+- Added a thin, square-edged legal notice banner directly under the header on all pages.
+- Banner text: LEGAL NOTICE: Posted speed limits are the law. Obey posted speed limits. EnforcedSpeed is informational only.
+- Adjusted top spacing so the banner sits directly above the first content card/container.

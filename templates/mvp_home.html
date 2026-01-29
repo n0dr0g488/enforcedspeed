@@ -3,49 +3,48 @@
 
     <div class="wrap">
       <div class="card">
-
-        <p>Received a speeding ticket? Submit your details to see how you compare.</p>
-
+        
 
 
-        {% if form.errors %}
-          <div class="errors">
-            <strong>Fix these:</strong>
-            <ul>
-              {% for field, errs in form.errors.items() %}
-                {% for err in errs %}
-                  <li>{{ err }}</li>
-                {% endfor %}
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
 
-        <form method="post" action="{{ url_for('submit_ticket') }}" id="ticketForm" enctype="multipart/form-data">
+        
+        <div class="submit-title">Received a speeding ticket? Submit your details to see how you compare.</div>
+        <div class="submit-note">
+          {% if current_user.is_authenticated %}
+            Submissions from logged-in users help improve trust and credibility.
+          {% else %}
+            <a href="{{ url_for('login', next='/submit') }}">Log in</a> or <a href="{{ url_for('register', next='/submit') }}">create an account</a> · Submissions from logged-in users help improve trust and credibility.
+          {% endif %}
+        </div>
+
+<form method="post" action="{{ url_for('submit_ticket') }}" id="ticketForm" enctype="multipart/form-data">
           {{ form.hidden_tag() }}
+          <div class="submit-inline-row">
+            <div class="submit-inline-row__state">
+              <label for="state">{{ form.state.label.text }}</label>
+              {{ form.state(id="state", list="state_list") }}
+              <datalist id="state_list">
+                {% for s in state_options %}
+                  <option value="{{ s }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="submit-inline-row__road">
+              <label for="road_name">{{ form.road_name.label.text }}</label>
+              {{ form.road_name(id="road_name") }}
+            </div>
+            <div class="submit-inline-row__pin">
+              <label style="visibility:hidden;">&nbsp;</label>
+              <button type="button" id="openPinModal" class="btn btn-secondary btn-pin-inline" style="white-space:nowrap;">Refine pin on map</button>
+            </div>
 
-          <label for="state">{{ form.state.label.text }}</label>
-          {{ form.state(id="state", list="state_list") }}
-          <datalist id="state_list">
-            {% for s in state_options %}
-              <option value="{{ s }}"></option>
-            {% endfor %}
-          </datalist>
-
-          <label for="road_name">{{ form.road_name.label.text }}</label>
-          {{ form.road_name(id="road_name") }}
-
-          <div class="subtle" style="margin-top:6px;">
+          </div>
+<div class="subtle" style="margin-top:6px;">
             If Google Maps is enabled, choose the real road from autocomplete.
           </div>
           <div class="subtle" id="roadAutoError" style="margin-top:6px; color:#991b1b; display:none;"></div>
+          {# Nearest exit/city temporarily hidden #}
 
-          <label for="location_hint">{{ form.location_hint.label.text }}</label>
-          {{ form.location_hint(id="location_hint") }}
-
-          <div class="subtle" style="margin-top:6px;">
-            Optional, but helpful: nearest exit, town, landmark.
-          </div>
 
 
           <div class="preview" id="roadPreview" style="display:none;">
@@ -56,10 +55,6 @@
             <div class="subtle" id="bucketHint" style="margin-top:8px;"></div>
             <div class="subtle" id="bucketAmbiguity" style="margin-top:10px;"></div>
           </div>
-
-          <button type="button" id="openPinModal" class="btn" style="margin-top:10px;">
-            Refine pin on map (optional)
-          </button>
           <div class="subtle" id="pinStatus" style="margin-top:6px; display:none;"></div>
 
 <!-- Pin refine modal (Google Maps, optional) -->
@@ -106,7 +101,7 @@
             <div class="subtle" id="photoSelected" style="margin-top:4px;"></div>
           </div>
 
-          {{ form.submit(class_="btn") }}
+          {{ form.submit(class_="btn btn-primary-modern") }}
 
           <div class="subtle right" style="margin-top: 8px;">
             Total tickets submitted: <strong>{{ ticket_count }}</strong>

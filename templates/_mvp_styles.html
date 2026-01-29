@@ -124,7 +124,33 @@
       input::placeholder { color: #9ca3af; }
       .btn { display: inline-block; width: 100%; margin-top: 16px; padding: 12px 14px; border: 0; border-radius: 12px; background: #111827; color: #fff; font-weight: 800; cursor: pointer; font-size: 16px; }
       .btn:hover { opacity: .92; }
-      .errors { margin: 14px 0 0; padding: 12px; border-radius: 12px; background: #fff1f2; border: 1px solid #fecdd3; color: #991b1b; }
+      .btn-secondary { width:auto; background:#f3f4f6; color:#111827; border:1px solid rgba(0,0,0,0.12); font-weight:700; }
+      .btn-secondary:hover { opacity:1; background:#e5e7eb; }
+      .btn-soft { background:#1f2937; }
+      .btn-soft:hover { opacity:.92; }
+      .btn-sm { width:auto; padding:10px 12px; font-size:13px; border-radius:10px; margin-top:0; }
+      .btn-primary-modern{ background:#eaf2ff; border:1px solid #cddbf7; color:#111827; box-shadow:none; font-weight:600; }
+      .btn-primary-modern:hover{ background:#dfeaff; opacity:1; }
+      .btn-pin-inline{ height: 43px; padding: 12px 14px; border-radius: 10px;  font-weight:400;  width:100%; }
+      
+      .submit-inline-row{
+        display:grid;
+        grid-template-columns: 190px 1fr 190px;
+        gap:12px;
+        align-items:end;
+        width:100%;
+      }
+      .submit-inline-row .btn{ margin-top:0; }
+      .submit-inline-row__pin label{ margin:0; }
+      @media (max-width: 640px){
+        .submit-inline-row{ grid-template-columns: 1fr; }
+      }
+.submit-title{ margin: 6px 0 4px; text-align:center; font-size:20px; font-weight:400; color:#111827; }
+      .submit-note{ margin: 0 0 10px; text-align:center; font-size:12px; color: rgba(0,0,0,0.55); line-height:1.35; }
+      .submit-note a{ color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+      .submit-note__user{ font-weight:500; color: rgba(0,0,0,0.70); }
+
+.errors { margin: 14px 0 0; padding: 12px; border-radius: 12px; background: #fff1f2; border: 1px solid #fecdd3; color: #991b1b; }
       .footer { margin-top: 18px; text-align: center; color: #6b7280; font-size: 12px; }
       .subtle { color: #6b7280; font-size: 12px; }
       .right { text-align: right; }
@@ -438,7 +464,7 @@
 
 /* --- Filter rail structure (home) --- */
 .filterbox{ display:block; }
-.filterbox-title{ font-size:14px; font-weight:900; color:#111827; margin:0 0 4px 0; }
+.filterbox-title{ font-size:14px; font-weight:500; color:#111827; margin:0 0 6px 0; text-align:center; }
 .filterbox-sub{ font-size:12px; color:#6b7280; margin:0 0 10px 0; }
 .filterbox-section{
   font-size:11px;
@@ -458,8 +484,12 @@
 .filterbar-item--tight .filterbar-rowline{ margin-top:0; }
 .filterbar-item--tight .filterbar-rowline + .filterbar-rowline{ margin-top:4px; }
 
-/* Very tight helper text for '(Must be logged in)' under Hide anonymous */
+/* Very tight helper text for '(must log in)' under Hide anonymous */
 .filter-helper-tight{ margin-top:1px; font-size:11px; line-height:1.15; }
+
+
+/* Inline note '(must log in)' next to Hide anonymous label */
+.filter-inline-note{ font-size:11px; line-height:1.15; opacity:0.7; white-space:nowrap; }
 
 /* Pinned Clear button at bottom of left rail */
 .filterbox-footer{
@@ -643,4 +673,30 @@
 .card.ticket-card--deleted{
   background: rgba(220, 38, 38, 0.06);
 }
+
+
+/* v170 tweaks */
+.form-row-inline.full-width {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+}
+.form-row-inline.full-width input[type="text"] {
+  flex: 1 1 auto;
+}
+.btn-refine-pin {
+  font-weight: 500;
+}
+
+/* Submit button: light blue modern primary */
+.btn-submit-ticket {
+  background: #e6f0fa;
+  border: 1px solid #c7dbf2;
+  color: #1f2a37;
+  font-weight: 500;
+}
+.btn-submit-ticket:hover {
+  background: #dbe9f8;
+}
+
 </style>

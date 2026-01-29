@@ -8,7 +8,7 @@
       <div class="filters-rail">
         <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
           <div class="filterbox">
-            <div class="filterbox-title">Filter speeding tickets</div>
+            <div class="filterbox-title">Filter Speeding Tickets</div>
             <div class="filterbox-section">Location</div>
 
             <div class="filterbar-row filterbar-row--stack">
@@ -116,16 +116,13 @@
 
               <div class="filterbar-item filterbar-item--tight">
                 <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous</label>
+                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous{% if not current_user.is_authenticated %} <span class="filter-inline-note">(must log in)</span>{% endif %}</label>
                   <label class="switch">
                     <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
                   </label>
                 </div>
-                {% if not current_user.is_authenticated %}
-                  <div class="subtle filter-helper-tight">(Must be logged in)</div>
-                {% endif %}
-                {% if is_admin %}
+{% if is_admin %}
                 <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:8px;">
                   <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
                   <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
@@ -147,11 +144,10 @@
                 </select>
               </div>
 
-              <div class="filterbox-section">Order</div>
+              <div class="filterbox-section">Sort by</div>
 
               <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-sort">Sort by</label>
-                <select id="filter-sort" name="sort" class="filterbar-select" onchange="this.form.submit()">
+                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
                   <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
                   <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
@@ -378,20 +374,17 @@
 <div class="ticket-center">
   <div class="ticket-roadstate">{{ format_road_bucket(r.road_name) }} in {{ state_name }}</div>
 
-  <div class="ticket-overageblue ticket-overagefloat">
-    {% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph
-  </div>
-
   <div class="ticket-speedrow">
     <div class="ticket-speedtext">
       <span class="ticket-speednum">{{ r.ticketed_speed }}</span>
       <span class="ticket-speedin">in a</span>
       <span class="ticket-speedlimit">{{ r.posted_speed }}</span>
+      <span class="ticket-overageblue ticket-overageinline">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
     </div>
   </div>
 
   <div class="ticket-enforcedline">
-    The EnforcedSpeed on <span class="es-bold">{{ format_road_bucket(r.road_name) }} in {{ state_name }}</span> is <span class="es-bold">{{ enforced_speed_mph }} mph</span>. 90% of all submitted tickets occurred at or above this speed.
+    On {{ format_road_bucket(r.road_name) }} in {{ state_name }}, 90% of all submitted tickets occurred at or above {{ enforced_speed_mph }} mph.
   </div>
 </div>
 
@@ -417,7 +410,7 @@
             <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
             <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
             <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
-            <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">(Must be logged in)</span>
+            <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">(must log in)</span>
           {% endif %}
         </div>
 
@@ -604,6 +597,7 @@
     .ticket-speedtext{font-size:18px;font-weight:600;color:#111827;display:flex;align-items:baseline;gap:10px}
   .ticket-speedin{font-weight:600;color:#111827}
   .ticket-overageblue{font-size:18px;font-weight:600;color:#2563eb;white-space:nowrap}
+  .ticket-overageinline{font-size:14px;margin-left:8px;}
   /* Float the +mph BETWEEN road/state and speed line (center-right). */
   .ticket-overagefloat{position:absolute;top:36px;left: calc(70% + 14px);transform:translate(-50%,-50%);}
   /* Add a touch more whitespace above/below the EnforcedSpeed sentence. */

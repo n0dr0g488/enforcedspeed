@@ -30,8 +30,9 @@
         </div>
       {% endif %}
 
-      <form method="post" action="{{ url_for('register') }}">
+      <form method="post" action="{{ url_for('register', next=request.args.get('next')) }}">
         {{ form.hidden_tag() }}
+        <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
 
         <label for="email">{{ form.email.label.text }}</label>
         {{ form.email(id="email", autocomplete="email") }}
@@ -49,7 +50,7 @@
       </form>
 
       <div class="subtle">
-        Already have an account? <a href="{{ url_for('login') }}">Log in</a>.
+        Already have an account? <a href="{{ url_for('login', next=request.args.get('next')) }}">Log in</a>.
         · <a href="{{ url_for('home') }}">Back home</a>
       </div>
     </div>

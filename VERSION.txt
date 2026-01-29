@@ -1,1 +1,1 @@
-EnforcedSpeed_v156_2026-01-28_admin_template_endif_fix
+EnforcedSpeed_v178_2026-01-29_strictness_title_reword

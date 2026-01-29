@@ -1,0 +1,17 @@
+EnforcedSpeed v175 — Strictness filters fix (Rankings page)
+
+Goal
+- Make the Rankings (/strictness) page actually honor the shared filter rail inputs (not just State).
+
+Changes
+- app.py: Updated strictness_rows() to apply the same filter inputs as Home/Map before computing strictness rankings:
+  - Road
+  - Posted speed limit bucket(s)
+  - Overage bucket(s)
+  - Photo submitted / verification status
+  - Date
+  - Hide anonymous (members only)
+  - Admin deleted-mode (hide/include/only)
+
+Notes
+- No visual/layout changes in this ZIP.

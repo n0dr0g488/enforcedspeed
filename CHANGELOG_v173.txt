@@ -1,0 +1,24 @@
+ENFORCEDSPEED v173 — Filter Panel + Map Title + Rankings Title/Filters
+
+Scope (requested):
+1) Filter panel (Home + Map + Rankings):
+   - Title: “Filter Speeding Tickets” (Title Case), unbolded and centered.
+   - Replace “Order” section header with “Sort by”.
+   - Remove the redundant “Sort by” label line to save vertical space (dropdown remains, now aria-labeled).
+
+2) Map page:
+   - Replace “Map” heading with: “EnforcedSpeed's Interactive Map”
+   - Subtitle (centered, small): “Shows speeding tickets with a pinned location.”
+
+3) Rankings (/strictness) page:
+   - Add centered page title: “Most and Least Strict State and Road Combinations”
+   - Keep description line, removing the parenthetical clause.
+   - Add the same left filter panel used on Home/Map (no redesign).
+
+Files changed:
+- templates/_mvp_styles.html
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- app.py
+- VERSION.txt

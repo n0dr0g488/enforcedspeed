@@ -7,7 +7,7 @@
       <div class="filters-rail">
         <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
           <div class="filterbox">
-            <div class="filterbox-title">Filter speeding tickets</div>
+            <div class="filterbox-title">Filter Speeding Tickets</div>
 
             <div class="filterbox-section">Location</div>
 
@@ -110,16 +110,13 @@
 
               <div class="filterbar-item filterbar-item--tight">
                 <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous</label>
+                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous{% if not current_user.is_authenticated %} <span class="filter-inline-note">(must log in)</span>{% endif %}</label>
                   <label class="switch">
                     <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
                   </label>
                 </div>
-                {% if not current_user.is_authenticated %}
-                  <div class="subtle filter-helper-tight">(Must be logged in)</div>
-                {% endif %}
-              </div>
+</div>
 
               <div class="filterbox-section">Date</div>
 
@@ -131,11 +128,10 @@
                 </select>
               </div>
 
-              <div class="filterbox-section">Order</div>
+              <div class="filterbox-section">Sort by</div>
 
               <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-sort">Sort by</label>
-                <select id="filter-sort" name="sort" class="filterbar-select" onchange="this.form.submit()">
+                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
                   <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
                   <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
@@ -155,12 +151,8 @@
 
     <main class="home-center">
       <div class="card ticket-card" style="padding:14px;">
-        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
-          <div>
-            <div class="ticket-title" style="margin:0;">Map</div>
-            <div class="subtle" style="margin-top:2px;">Shows tickets with a pinned location.</div>
-          </div>
-        </div>
+        <div class="submit-title" style="margin:0 0 2px;">EnforcedSpeed&#39;s Interactive Map</div>
+        <div class="submit-note" style="margin:0 0 10px;">Shows speeding tickets with a pinned location.</div>
 
         {% if not maps_api_key %}
           <div class="subtle" style="margin-top:12px;">
@@ -251,5 +243,75 @@
   </script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key|urlencode }}&callback=esInitMap"></script>
 {% endif %}
+
+
+<script>
+  // Multi-select dropdown behavior (speed limit + overage):
+  // - Do NOT submit on each checkbox click (allows multi-select)
+  // - Close on outside click or Done, keeping selections
+  // - Submit when the dropdown closes if selections changed
+  (function(){
+    var form = document.getElementById("mapFilters");
+    if(!form) return;
+
+    function textOf(cb){
+      return cb.getAttribute("data-label") || "";
+    }
+
+    function updateSummary(d){
+      var summary = d.querySelector(".multi-summary");
+      if(!summary) return;
+      var checks = Array.prototype.slice.call(d.querySelectorAll("input[type=checkbox]"));
+      var selected = checks.filter(function(c){ return c.checked; }).map(textOf).filter(Boolean);
+      summary.textContent = selected.length ? selected.join(", ") : "Any";
+    }
+
+    function submitIfDirty(d){
+      if(!d || !d._dirty) return;
+      if(d._submitting) return;
+      d._submitting = true;
+      d._dirty = false;
+      form.submit();
+    }
+
+    var multis = Array.prototype.slice.call(form.querySelectorAll("details[data-multi]"));
+    multis.forEach(function(d){
+      d._dirty = false;
+      d._submitting = false;
+      updateSummary(d);
+
+      d.addEventListener("change", function(e){
+        if(e.target && e.target.matches && e.target.matches("input[type=checkbox]")){
+          d._dirty = true;
+          updateSummary(d);
+        }
+      });
+
+      var done = d.querySelector("[data-multi-done]");
+      if(done){
+        done.addEventListener("click", function(ev){
+          ev.preventDefault();
+          d.open = false;
+          submitIfDirty(d);
+        });
+      }
+
+      d.addEventListener("toggle", function(){
+        if(!d.open){
+          submitIfDirty(d);
+        }
+      });
+    });
+
+    document.addEventListener("click", function(e){
+      multis.forEach(function(d){
+        if(!d.open) return;
+        if(d.contains(e.target)) return;
+        d.open = false;
+        submitIfDirty(d);
+      });
+    });
+  })();
+</script>
 
 {% endblock %}

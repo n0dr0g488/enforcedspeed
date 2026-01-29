@@ -350,7 +350,7 @@ def create_app() -> Flask:
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if current_user.is_authenticated:
-            return redirect(url_for("home"))
+            return redirect(_safe_next_url('home'))
 
         form = RegisterForm()
         if form.validate_on_submit():
@@ -360,7 +360,7 @@ def create_app() -> Flask:
 
             if User.query.filter_by(email=email).first():
                 flash("That email is already registered. Please log in.", "error")
-                return redirect(url_for("login"))
+                return redirect(url_for("login", next=request.args.get('next')))
 
             if User.query.filter(func.lower(User.username) == username.lower()).first():
                 flash("That username is taken. Try another.", "error")
@@ -372,14 +372,14 @@ def create_app() -> Flask:
             db.session.commit()
 
             login_user(user)
-            return redirect(url_for("profile", username=user.username))
+            return redirect(_safe_next_url('profile', username=user.username))
 
         return render_template("register.html", form=form)
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if current_user.is_authenticated:
-            return redirect(url_for("home"))
+            return redirect(_safe_next_url('home'))
 
         form = LoginForm()
         if form.validate_on_submit():
@@ -396,7 +396,7 @@ def create_app() -> Flask:
                 return render_template("login.html", form=form)
 
             login_user(user)
-            return redirect(url_for("home"))
+            return redirect(_safe_next_url('home'))
 
         return render_template("login.html", form=form)
 
@@ -550,31 +550,132 @@ def create_app() -> Flask:
             ticket_count=len(reports),
         )
 
-    def strictness_rows(limit: int, exclude_anonymous: bool, state_filter: str | None = None) -> Dict[str, List[Dict]]:
+    def strictness_rows(
+        limit: int,
+        exclude_anonymous: bool,
+        state_filter: str | None = None,
+        road_filter: str | None = None,
+        speed_limit_list: List[str] | None = None,
+        over_list: List[str] | None = None,
+        photo_only: bool = False,
+        verify: str = "any",
+        date: str = "any",
+        deleted_mode: str = "hide",
+    ) -> Dict[str, List[Dict]]:
         """Return Most Strict and Least Strict rankings.
 
         Strictness is based on the MEDIAN overage (ticketed - posted), considering only tickets where
         ticketed_speed > posted_speed. Lower median overage = more strict.
+
+        IMPORTANT: This function supports the shared filter rail inputs so the strictness page
+        filters behave the same way as the other pages.
         """
+
+        speed_limit_list = speed_limit_list or []
+        over_list = over_list or []
+
+        expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
+
         q = (
             db.session.query(
                 SpeedReport.state.label("state"),
                 SpeedReport.road_key.label("road_key"),
-                (SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("overage"),
+                SpeedReport.road_name.label("road_name"),
+                SpeedReport.posted_speed.label("posted_speed"),
+                SpeedReport.ticketed_speed.label("ticketed_speed"),
+                expr.label("overage"),
                 SpeedReport.created_at.label("created_at"),
-                User.username.label("username"),
+                SpeedReport.photo_key.label("photo_key"),
+                SpeedReport.ocr_status.label("ocr_status"),
+                SpeedReport.verification_status.label("verification_status"),
                 SpeedReport.user_id.label("user_id"),
             )
-            .outerjoin(User, User.id == SpeedReport.user_id)
-            .filter(SpeedReport.is_deleted.is_(False))
             .filter(SpeedReport.ticketed_speed > SpeedReport.posted_speed)
         )
 
+        # Deleted visibility (admin can request include/only; non-admin callers should pass "hide")
+        if deleted_mode == "only":
+            q = q.filter(SpeedReport.is_deleted.is_(True))
+        elif deleted_mode == "include":
+            pass
+        else:
+            q = q.filter(SpeedReport.is_deleted.is_(False))
+
+        # Hide anonymous
+        if exclude_anonymous:
+            q = q.filter(SpeedReport.user_id.isnot(None))
+
+        # State filter (2-letter prefix)
         if state_filter:
             q = q.filter(SpeedReport.state.ilike(f"{state_filter}%"))
 
-        if exclude_anonymous:
-            q = q.filter(SpeedReport.user_id.isnot(None))
+        # Date filter
+        if date not in ("", "any"):
+            try:
+                days = int(date)
+            except Exception:
+                days = 0
+            if days > 0:
+                q = q.filter(SpeedReport.created_at >= (datetime.utcnow() - timedelta(days=days)))
+
+        # Road filter (forgiving: match normalized bucket OR partial raw text)
+        if road_filter:
+            try:
+                road_key = normalize_road(road_filter, (state_filter or ""))
+            except Exception:
+                road_key = ""
+            conds = [SpeedReport.road_name.ilike(f"%{road_filter}%")]
+            if road_key:
+                conds.append(SpeedReport.road_key == road_key)
+            q = q.filter(or_(*conds))
+
+        # Speed limit filter (posted_speed) — multi-select buckets
+        if speed_limit_list:
+            sl_conds = []
+            for v in speed_limit_list:
+                if v == "25-35":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
+                elif v == "40-50":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
+                elif v == "55":
+                    sl_conds.append(SpeedReport.posted_speed == 55)
+                elif v == "65":
+                    sl_conds.append(SpeedReport.posted_speed == 65)
+                elif v == "70+":
+                    sl_conds.append(SpeedReport.posted_speed >= 70)
+            if sl_conds:
+                q = q.filter(or_(*sl_conds))
+
+        # Overage filter (ticketed_speed - posted_speed) — multi-select buckets
+        if over_list:
+            over_conds = []
+            for v in over_list:
+                if v == "5-9":
+                    over_conds.append(and_(expr >= 5, expr <= 9))
+                elif v == "10-14":
+                    over_conds.append(and_(expr >= 10, expr <= 14))
+                elif v == "15-19":
+                    over_conds.append(and_(expr >= 15, expr <= 19))
+                elif v == "20+":
+                    over_conds.append(expr >= 20)
+            if over_conds:
+                q = q.filter(or_(*over_conds))
+
+        # Evidence: photo only
+        if photo_only:
+            q = q.filter(SpeedReport.photo_key.isnot(None))
+
+        # Evidence: verification status (implies photo exists)
+        if verify == "verified":
+            q = q.filter(
+                SpeedReport.photo_key.isnot(None),
+                or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+            )
+        elif verify == "not_verified":
+            q = q.filter(
+                SpeedReport.photo_key.isnot(None),
+                ~or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+            )
 
         rows = q.all()
 
@@ -1282,12 +1383,12 @@ def create_app() -> Flask:
             abort(403)
 
 
-    def _safe_next_url() -> str:
-        """Return a safe relative next url from form data."""
-        nxt = (request.form.get("next") or "").strip()
+    def _safe_next_url(fallback_endpoint: str = "home", **fallback_kwargs) -> str:
+        """Return a safe relative next url from query/form, else fall back to an endpoint."""
+        nxt = (request.args.get("next") or request.form.get("next") or "").strip()
         if nxt.startswith("/") and not nxt.startswith("//"):
             return nxt
-        return url_for("home")
+        return url_for(fallback_endpoint, **fallback_kwargs)
 
 
     
@@ -1679,9 +1780,103 @@ def create_app() -> Flask:
             deleted_mode = "hide"
         if deleted_mode not in ("hide", "include", "only"):
             deleted_mode = "hide"
-        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
-        deleted_only = bool(is_admin and deleted_mode == "only")
-        strictness = strictness_rows(limit=20, exclude_anonymous=hide_anon, state_filter=(request.args.get('state') or '').strip().upper() or None)
+
+        # --- Filters (GET) — used to render the shared filter rail UI ---
+        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_road = (request.args.get("road") or "").strip()
+
+        # Speed limit buckets (posted_speed) — multi-select via repeated speed_limit= values
+        filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
+        filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
+        filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
+
+        # Overage buckets (ticketed_speed - posted_speed) — multi-select via repeated overage= values
+        filter_over_list = [v.strip() for v in request.args.getlist("overage") if (v or "").strip()]
+        legacy_over = (request.args.get("over") or "").strip()
+        if legacy_over and legacy_over not in ("all", ""):
+            filter_over_list = list(dict.fromkeys(filter_over_list + [legacy_over]))
+
+        # Evidence filters (kept for UI consistency; strictness calculation is already limited to ticketed > posted)
+        filter_photo_only = (request.args.get("photo_only") == "1")
+        filter_verify = (request.args.get("verify") or "any").strip()
+
+        # Date filter (created_at)
+        filter_date = (request.args.get("date") or "any").strip()
+
+        # Back-compat: old ?verified_photo=1 means 'verified photos only'
+        if request.args.get("verified_photo") == "1":
+            filter_photo_only = True
+            filter_verify = "verified"
+
+        # Sort (UI only on this page)
+        filter_sort = (request.args.get("sort") or "new").strip()
+
+        # State dropdown options (2-letter codes)
+        state_filter_options = []
+        rows = db.session.query(SpeedReport.state).distinct().all()
+        seen = set()
+        for (sv,) in rows:
+            if not sv:
+                continue
+            code = sv.split(' - ')[0].strip().upper()
+            if len(code) != 2 or not code.isalpha():
+                continue
+            if code in seen:
+                continue
+            seen.add(code)
+            state_filter_options.append({"code": code})
+        state_filter_options.sort(key=lambda d: d["code"])
+
+        speed_limit_buckets = [
+            {"value": "any", "label": "Any"},
+            {"value": "25-35", "label": "25–35 mph"},
+            {"value": "40-50", "label": "40–50 mph"},
+            {"value": "55", "label": "55 mph"},
+            {"value": "65", "label": "65 mph"},
+            {"value": "70+", "label": "70+ mph"},
+        ]
+
+        over_buckets = [
+            {"value": "all", "label": "Any"},
+            {"value": "5-9", "label": "5–9 mph"},
+            {"value": "10-14", "label": "10–14 mph"},
+            {"value": "15-19", "label": "15–19 mph"},
+            {"value": "20+", "label": "20+ mph"},
+        ]
+
+        date_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "7", "label": "Last 7 days"},
+            {"value": "30", "label": "Last 30 days"},
+            {"value": "90", "label": "Last 90 days"},
+            {"value": "365", "label": "Last year"},
+        ]
+
+        filters_active = bool(
+            filter_state
+            or filter_road
+            or bool(filter_speed_limit_list)
+            or bool(filter_over_list)
+            or filter_photo_only
+            or (filter_verify not in ("", "any"))
+            or (filter_date not in ("", "any"))
+            or (filter_sort not in ("", "new"))
+            or hide_anon
+            or (is_admin and deleted_mode != "hide")
+        )
+
+        strictness = strictness_rows(
+            limit=20,
+            exclude_anonymous=hide_anon,
+            state_filter=(filter_state or None),
+            road_filter=(filter_road or None),
+            speed_limit_list=filter_speed_limit_list,
+            over_list=filter_over_list,
+            photo_only=filter_photo_only,
+            verify=filter_verify,
+            date=filter_date,
+            deleted_mode=deleted_mode,
+        )
         most_strict = strictness["most_strict"]
         least_strict = strictness["least_strict"]
 
@@ -1690,9 +1885,25 @@ def create_app() -> Flask:
             most_strict=most_strict,
             least_strict=least_strict,
             hide_anon=hide_anon,
+            # filter rail context
+            filter_state=filter_state,
+            filter_road=filter_road,
+            filter_speed_limit_list=filter_speed_limit_list,
+            filter_over_list=filter_over_list,
+            filter_photo_only=filter_photo_only,
+            filter_verify=filter_verify,
+            filter_date=filter_date,
+            filter_sort=filter_sort,
+            state_filter_options=state_filter_options,
+            speed_limit_buckets=speed_limit_buckets,
+            over_buckets=over_buckets,
+            date_options=date_options,
+            filters_active=filters_active,
+            is_admin=is_admin,
+            deleted_mode=deleted_mode,
         )
 
-    
+
     @app.get("/tickets")
     def bucket_tickets():
         """Show up to 50 tickets for a given (state, road) combo."""

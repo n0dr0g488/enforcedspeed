@@ -1,0 +1,12 @@
+EnforcedSpeed v172 — Submit page row alignment fix (2026-01-29)
+
+Changes
+- Submit (/submit): Reworked the State / Road / Refine-pin inline row to use a grid layout so the Refine button's right edge aligns with the full-width fields below.
+- Submit: Removed the "Logged in as / Not logged in" messaging and replaced with a single centered trust note (login/register links shown only when logged out).
+- Submit: Reduced Refine-pin button prominence slightly.
+- Submit: Updated Submit button to a slightly light-blue tint with a touch heavier weight (still modern/light).
+
+Files touched
+- templates/mvp_home.html
+- templates/_mvp_styles.html
+- VERSION.txt

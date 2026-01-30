@@ -2343,9 +2343,19 @@ def create_app() -> Flask:
             offset = 0
         offset = max(0, offset)
 
+        state = (request.args.get("state") or "").strip().upper()
+        if state and len(state) != 2:
+            # Ignore invalid state filters (backward-compatible)
+            state = ""
+
+        q = SpeedReport.query
+        if state:
+            # State is stored as raw user input (often like "KS" or "KS - Kansas").
+            # Filter by the first 2 letters to support both formats (backward-compatible).
+            q = q.filter(func.upper(func.substr(func.trim(SpeedReport.state), 1, 2)) == state)
+
         reports = (
-            SpeedReport.query
-            .order_by(SpeedReport.created_at.desc())
+            q.order_by(SpeedReport.created_at.desc())
             .offset(offset)
             .limit(limit)
             .all()

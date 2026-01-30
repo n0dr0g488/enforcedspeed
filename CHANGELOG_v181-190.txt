@@ -1,0 +1,42 @@
+EnforcedSpeed — CHANGELOG v181–190
+Consolidated changelog block (per handoff rule).
+
+EnforcedSpeed v181 — Mobile static map API
+- Added /api/staticmap proxy endpoint to serve Google Static Maps images with the API key kept server-side.
+  - Prefers GOOGLE_MAPS_SERVER_KEY for the upstream request; falls back to GOOGLE_MAPS_API_KEY if needed.
+- Updated /api/tickets to include `static_map_url` (absolute URL) per ticket when lat/lng and a maps key are configured.
+- No visual/UI changes.
+
+EnforcedSpeed v182 — /api/tickets state filter (2026-01-30)
+
+Changes
+- /api/tickets: Added optional ?state=XX query param (2-letter). When provided, results are filtered server-side by ticket state.
+- Backward-compatible: invalid state values are ignored (no filtering).
+
+EnforcedSpeed v183 — Local venv bootstrap fix (2026-01-30)
+
+Changes
+- run_local.ps1 / run_worker.ps1: If venv is missing or broken (no venv\Scripts\python.exe / pip.exe), automatically remove and recreate it.
+- When venv is (re)created, dependencies are installed even if requirements.txt is unchanged (prevents ModuleNotFoundError: flask/redis).
+- No production/runtime code changes (only local runner robustness).
+
+EnforcedSpeed v184 — Local venv install hardening (2026-01-30)
+
+Changes
+- run_local.ps1 / run_worker.ps1: Added missing-import detection (forces pip install if flask/redis/rq are absent even when requirements hash matches).
+- run_local.ps1 / run_worker.ps1: Added exit-code checking for pip installs so failed installs cannot be incorrectly cached as 'done'.
+- Added a simple install lock to avoid parallel pip installs when es-up starts app + worker simultaneously.
+
+EnforcedSpeed v185 — PowerShell 5.1 venv install fix (2026-01-30)
+
+Changes
+- run_local.ps1 / run_worker.ps1: Removed non-ASCII punctuation and saved scripts with a Windows PowerShell-friendly encoding.
+- run_local.ps1 / run_worker.ps1: Dependency install decision no longer relies solely on requirements hash; missing imports now force pip install even if hashes are empty/match.
+- Prevents 'Requirements unchanged' skip when flask/redis/rq are not installed.
+
+EnforcedSpeed v186 — State filter matches stored state formats (2026-01-30)
+
+Changes
+- /api/tickets: Improved ?state=XX filtering to match the first 2 letters of the stored `state` field (case-insensitive, trimmed).
+  - Works whether state is stored as "KS" or "KS - Kansas".
+- Backward compatible: response schema unchanged.

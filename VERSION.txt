@@ -1,1 +1,1 @@
-EnforcedSpeed_v180_2026-01-29_filter_inline_note_tweak
+EnforcedSpeed_v181_2026-01-29_mobile_staticmap_api

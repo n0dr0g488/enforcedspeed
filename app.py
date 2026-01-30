@@ -24,7 +24,7 @@ from statistics import median
 from bisect import bisect_right
 from typing import Dict, List
 
-from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
 from sqlalchemy import text, func, tuple_, or_, and_
 from sqlalchemy.orm import joinedload
@@ -308,6 +308,20 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_helpers():
         return {"format_road_bucket": format_road_bucket, "static_map_url": static_map_url}
+
+
+    def get_google_maps_static_maps_key() -> str:
+        """Return a key suitable for Google Static Maps requests.
+
+        Priority:
+          1) GOOGLE_MAPS_SERVER_KEY (server key; preferred for server-side proxying)
+          2) GOOGLE_MAPS_API_KEY (browser key; used by the website's direct <img> loads)
+        """
+        key = (app.config.get("GOOGLE_MAPS_SERVER_KEY") or os.environ.get("GOOGLE_MAPS_SERVER_KEY") or "").strip()
+        if key:
+            return key
+        key = (app.config.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
+        return key
 
     def snap_to_nearest_road(lat: float, lng: float):
         """Snap a single point to the nearest road using Google Roads API.
@@ -2351,6 +2365,11 @@ def create_app() -> Flask:
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "lat": r.lat,
                 "lng": r.lng,
+                "static_map_url": (
+                    url_for("api_staticmap", lat=r.lat, lng=r.lng, zoom=11, w=640, h=340, _external=True)
+                    if (r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())
+                    else None
+                ),
                 "verification_status": r.verification_status,
                 "ocr_status": r.ocr_status,
             })
@@ -2362,6 +2381,66 @@ def create_app() -> Flask:
             "next_offset": offset + len(items),
         })
 
+
+
+    @app.get("/api/staticmap")
+    def api_staticmap():
+        """Proxy a Google Static Maps image (single pin) for mobile clients.
+
+        Keeps the Google Maps API key server-side and avoids relying on HTTP referrer restrictions.
+        Query params:
+          - lat, lng: required floats
+          - zoom: optional int (default 11)
+          - w, h: optional ints (default 640x340)
+        """
+        try:
+            lat = float(request.args.get("lat", ""))
+            lng = float(request.args.get("lng", ""))
+        except Exception:
+            abort(400)
+
+        try:
+            zoom = int(request.args.get("zoom", "11"))
+        except Exception:
+            zoom = 11
+
+        try:
+            w = int(request.args.get("w", "640"))
+            h = int(request.args.get("h", "340"))
+        except Exception:
+            w, h = 640, 340
+
+        zoom = max(1, min(20, zoom))
+        w = max(120, min(1024, w))
+        h = max(120, min(1024, h))
+
+        key = get_google_maps_static_maps_key()
+        if not key:
+            abort(404)
+
+        center = f"{lat:.6f},{lng:.6f}"
+        params = {
+            "center": center,
+            "zoom": str(int(zoom)),
+            "size": f"{int(w)}x{int(h)}",
+            "scale": "2",
+            "maptype": "roadmap",
+            "markers": f"color:red|{center}",
+            "key": key,
+        }
+        upstream = "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params)
+
+        try:
+            req = urllib.request.Request(upstream, headers={"User-Agent": "EnforcedSpeedMobile/1.0"})
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = resp.read()
+                content_type = resp.headers.get("Content-Type") or "image/png"
+        except Exception:
+            abort(502)
+
+        out = Response(data, mimetype=content_type)
+        out.headers["Cache-Control"] = "public, max-age=86400"
+        return out
     @app.get("/search")
     def search():
         q = (request.args.get("q") or "").strip()

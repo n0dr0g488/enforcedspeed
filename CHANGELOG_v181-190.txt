@@ -49,3 +49,17 @@ Changes
   - Accepts road, posted_speed, cited_speed, optional lat/lng.
   - Returns created ticket JSON (including static_map_url when lat/lng present).
 - GET /api/tickets unchanged.
+
+EnforcedSpeed v188 — /api/strictness for native Rankings (2026-01-30)
+
+Changes
+- Added GET /api/strictness to return Most Strict / Least Strict rankings as JSON for the native app.
+  - Supports ?limit= (default 10), optional ?state=XX scoping, optional ?verified_only=1, and ?date=7|30|90|365 (or 7d/30d/90d/365d).
+- No UI changes.
+
+EnforcedSpeed v189 — Fix staticmap indentation + venv lock hardening (2026-01-30)
+
+Changes
+- Fixed an indentation bug that broke app startup (api_staticmap route was mis-indented).
+- run_local.ps1 / run_worker.ps1: Moved install lock to project root and also lock-protected venv creation to prevent parallel venv/ensurepip races when starting app + worker together.
+- No production UI changes.

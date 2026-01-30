@@ -60,42 +60,14 @@ $venvPip = Join-Path $PSScriptRoot "venv\Scripts\pip.exe"
 $venvHealthy = (Test-Path $venvPy) -and (Test-Path $venvPip)
 
 $forceInstall = $false
-
-if (-not $venvHealthy) {
-    if (Test-Path $venvDir) {
-        Write-Host "Found broken venv folder (missing pip/python). Removing and recreating..." -ForegroundColor Yellow
-        try {
-            Remove-Item -Recurse -Force $venvDir -ErrorAction Stop
-        } catch {
-            Write-Host "Could not remove venv. Close any other EnforcedSpeed app/worker windows and try again." -ForegroundColor Red
-            throw
-        }
-    }
-
-    Write-Host "Creating venv..." -ForegroundColor Yellow
-    try {
-        python -m venv $venvDir
-    } catch {
-        Write-Host "venv creation failed. Ensure 'python' is available on PATH, then re-run." -ForegroundColor Red
-        throw
-    }
-
-    $venvHealthy = (Test-Path $venvPy) -and (Test-Path $venvPip)
-    $forceInstall = $true
-}
-
-function Test-PyImport([string]$module) {
-    & $venvPy -c "import $module" 2>$null
-    return ($LASTEXITCODE -eq 0)
-}
-
-$lockFile = Join-Path $PSScriptRoot "venv\.install.lock"
+$lockFile = Join-Path $PSScriptRoot ".install.lock"
 function Acquire-InstallLock() {
+    # Clear stale lock (e.g., crashed install)
     if (Test-Path $lockFile) {
         try {
             $age = (Get-Date) - (Get-Item $lockFile).LastWriteTime
             if ($age.TotalMinutes -gt 10) {
-                Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+                Remove-Item -Force $lockFile -ErrorAction SilentlyContinue
             }
         } catch {}
     }
@@ -103,7 +75,44 @@ function Acquire-InstallLock() {
     New-Item -ItemType File -Path $lockFile -Force | Out-Null
 }
 function Release-InstallLock() {
-    Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+    Remove-Item -Force $lockFile -ErrorAction SilentlyContinue
+}
+
+
+if (-not $venvHealthy) {
+    Acquire-InstallLock
+    try {
+        # Re-check venv health after acquiring lock (es-up can start app + worker simultaneously)
+        $venvHealthy = (Test-Path $venvPy) -and (Test-Path $venvPip)
+        if (-not $venvHealthy) {
+        if (Test-Path $venvDir) {
+            Write-Host "Found broken venv folder (missing pip/python). Removing and recreating..." -ForegroundColor Yellow
+            try {
+                Remove-Item -Recurse -Force $venvDir -ErrorAction Stop
+            } catch {
+                Write-Host "Could not remove venv. Close any other EnforcedSpeed app/worker windows and try again." -ForegroundColor Red
+                throw
+            }
+        }
+
+        Write-Host "Creating venv..." -ForegroundColor Yellow
+        try {
+            python -m venv $venvDir
+        } catch {
+            Write-Host "venv creation failed. Ensure 'python' is available on PATH, then re-run." -ForegroundColor Red
+            throw
+        }
+
+        $venvHealthy = (Test-Path $venvPy) -and (Test-Path $venvPip)
+        $forceInstall = $true
+        }
+    } finally {
+        Release-InstallLock
+    }
+}
+function Test-PyImport([string]$module) {
+    & $venvPy -c "import $module" 2>$null
+    return ($LASTEXITCODE -eq 0)
 }
 
 # ---- Install/update dependencies ----

@@ -2507,6 +2507,61 @@ def create_app() -> Flask:
 
 
 
+    
+    @app.get("/api/strictness")
+    def api_strictness():
+        """Return Most Strict / Least Strict road rankings as JSON for native clients.
+
+        Query params:
+          - limit: optional int (default 10, max 50)
+          - state: optional 2-letter (e.g., GA). Filters to that state when provided.
+          - verified_only: optional "1" to include only verified-photo tickets in calculations.
+          - date: optional ("7","30","90","365") or ("7d","30d","90d","365d") to limit by recency.
+        """
+        try:
+            limit = int(request.args.get("limit", "10"))
+        except Exception:
+            limit = 10
+        limit = max(1, min(limit, 50))
+
+        state = (request.args.get("state") or "").strip().upper()
+        if state and (len(state) != 2 or not state.isalpha()):
+            state = ""
+
+        verified_only = (request.args.get("verified_only") == "1")
+
+        date_raw = (request.args.get("date") or "").strip().lower()
+        date_map = {
+            "7d": "7",
+            "30d": "30",
+            "90d": "90",
+            "365d": "365",
+        }
+        date = date_map.get(date_raw, date_raw)
+        if date == "":
+            date = "any"
+
+        data = strictness_rows(
+            limit=limit,
+            exclude_anonymous=False,
+            state_filter=(state or None),
+            photo_only=False,
+            verify=("verified" if verified_only else "any"),
+            date=date,
+            deleted_mode="hide",
+        )
+
+        return jsonify({
+            "most_strict": data.get("most_strict", []),
+            "least_strict": data.get("least_strict", []),
+            "limit": limit,
+            "state": (state or None),
+            "verified_only": bool(verified_only),
+            "date": (date if date != "any" else None),
+            "generated_at": datetime.utcnow().isoformat(),
+        })
+
+
     @app.get("/api/staticmap")
     def api_staticmap():
         """Proxy a Google Static Maps image (single pin) for mobile clients.

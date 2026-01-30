@@ -2329,6 +2329,120 @@ def create_app() -> Flask:
         # Keep top 5, users first, then states, then roads (current order)
         return jsonify(suggestions[:5])
 
+
+
+    @app.post("/api/tickets")
+    def api_create_ticket():
+        """Create a ticket from mobile clients (JSON).
+
+        v1 scope:
+        • Anonymous create (matches current web submit behavior).
+        • No photo upload yet.
+        • Optional lat/lng (recommended so the app can show maps).
+        """
+        data = request.get_json(silent=True) or {}
+
+        def first(*keys):
+            for k in keys:
+                if k in data and data.get(k) is not None:
+                    return data.get(k)
+            return None
+
+        state_in = str(first('state', 'state_code') or '').strip()
+        road_in = str(first('road', 'road_name') or '').strip()
+
+        posted_in = first('posted_speed', 'postedMph', 'posted_mph', 'posted')
+        cited_in = first('cited_speed', 'ticketed_speed', 'ticketedMph', 'ticketed_mph', 'cited')
+
+        lat_in = first('lat', 'latitude')
+        lng_in = first('lng', 'longitude', 'lon')
+
+        # ---- Validate + normalize ----
+        if not state_in:
+            return jsonify({'error': 'state is required'}), 400
+        if not road_in or len(road_in) < 2:
+            return jsonify({'error': 'road is required'}), 400
+
+        # Accept "GA" or "GA - Georgia" etc. Store the canonical "XX - Name" value.
+        code = state_code_from_value(state_in)
+        if not code:
+            return jsonify({'error': 'state must be a 2-letter code (e.g., GA)'}), 400
+
+        code = code.upper()
+        code_to_label = {s[:2].upper(): s for s in STATE_OPTIONS}
+        state_value = code_to_label.get(code)
+        if not state_value:
+            return jsonify({'error': f'Unsupported state code: {code}'}), 400
+
+        try:
+            posted_speed = int(str(posted_in).strip())
+        except Exception:
+            return jsonify({'error': 'posted_speed must be an integer'}), 400
+
+        try:
+            cited_speed = int(str(cited_in).strip())
+        except Exception:
+            return jsonify({'error': 'cited_speed must be an integer'}), 400
+
+        if posted_speed <= 0 or posted_speed > 120:
+            return jsonify({'error': 'posted_speed must be between 1 and 120'}), 400
+        if cited_speed <= 0 or cited_speed > 200:
+            return jsonify({'error': 'cited_speed must be between 1 and 200'}), 400
+
+        # Optional, but if provided should be plausible.
+        def to_float(v):
+            try:
+                if v is None:
+                    return None
+                s = str(v).strip()
+                if not s:
+                    return None
+                return float(s)
+            except Exception:
+                return None
+
+        lat = to_float(lat_in)
+        lng = to_float(lng_in)
+        if lat is not None and (lat < -90 or lat > 90):
+            return jsonify({'error': 'lat must be between -90 and 90'}), 400
+        if lng is not None and (lng < -180 or lng > 180):
+            return jsonify({'error': 'lng must be between -180 and 180'}), 400
+
+        report = SpeedReport(
+            state=state_value,
+            road_name=road_in,
+            posted_speed=posted_speed,
+            ticketed_speed=cited_speed,
+            notes=None,
+            user_id=(current_user.id if current_user.is_authenticated else None),
+        )
+        report.refresh_road_key()
+
+        if lat is not None and lng is not None:
+            report.lat = lat
+            report.lng = lng
+            report.lat_lng_source = 'mobile_pin'
+
+        db.session.add(report)
+        db.session.commit()
+
+        return jsonify({
+            'id': report.id,
+            'state': report.state,
+            'road': report.road_name,
+            'posted_speed': report.posted_speed,
+            'cited_speed': report.ticketed_speed,
+            'created_at': report.created_at.isoformat() if report.created_at else None,
+            'lat': report.lat,
+            'lng': report.lng,
+            'static_map_url': (
+                url_for('api_staticmap', lat=report.lat, lng=report.lng, zoom=11, w=640, h=340, _external=True)
+                if (report.lat is not None and report.lng is not None and get_google_maps_static_maps_key())
+                else None
+            ),
+        }), 201
+
+
     @app.get("/api/tickets")
     def api_tickets():
         try:

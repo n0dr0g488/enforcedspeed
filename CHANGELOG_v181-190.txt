@@ -40,3 +40,12 @@ Changes
 - /api/tickets: Improved ?state=XX filtering to match the first 2 letters of the stored `state` field (case-insensitive, trimmed).
   - Works whether state is stored as "KS" or "KS - Kansas".
 - Backward compatible: response schema unchanged.
+
+EnforcedSpeed v187 — /api/tickets POST create (2026-01-30)
+
+Changes
+- Added POST /api/tickets for mobile clients to create a new ticket via JSON (no CSRF).
+  - Accepts state as "GA" or "GA - Georgia"; stores canonical "XX - Name".
+  - Accepts road, posted_speed, cited_speed, optional lat/lng.
+  - Returns created ticket JSON (including static_map_url when lat/lng present).
+- GET /api/tickets unchanged.

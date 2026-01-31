@@ -1,4 +1,0 @@
-EnforcedSpeed v180 (2026-01-29)
-- Filter panel: make '(must log in)' note non-bold (font-weight 400) and add a little spacing from 'Hide anonymous' (margin-left).
-- Applies globally wherever the filter rail is used (Home / Map / Rankings).
-- No other visual or functional changes.

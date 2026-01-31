@@ -1,0 +1,6 @@
+ENFORCEDSPEED WEB — CHANGELOG v191–200
+
+v191 — 2026-01-31 — JWT iat timestamp fix (mobile auth unblocks)
+- Fix JWT "iat" generation to use timezone-aware UTC (prevents tokens being rejected as "not yet valid" on non-UTC machines).
+- Add small JWT decode leeway (30s) to tolerate minor clock skew.
+

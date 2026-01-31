@@ -1,3 +1,0 @@
-v178 (2026-01-29)
-- Rankings page title reworded to “Strictness by State and Road”.
-(No other changes.)

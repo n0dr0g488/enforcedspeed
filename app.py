@@ -16,13 +16,17 @@ import io
 import uuid
 import re
 import math
+from functools import wraps
 import json
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from statistics import median
 from bisect import bisect_right
 from typing import Dict, List
+
+import jwt
+from jwt import ExpiredSignatureError, InvalidTokenError
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
@@ -308,6 +312,80 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_helpers():
         return {"format_road_bucket": format_road_bucket, "static_map_url": static_map_url}
+
+
+
+
+    # --- Mobile/API auth (JWT) ---
+    def _jwt_secret() -> str:
+        secret = (app.config.get("SECRET_KEY") or "").strip()
+        # Secret must exist for JWT auth to work; fall back to a fixed string only for dev.
+        return secret or "dev-insecure-secret"
+
+    def _jwt_encode(user: User) -> str:
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(days=30)).timestamp()),
+        }
+        token = jwt.encode(payload, _jwt_secret(), algorithm="HS256")
+        # PyJWT may return bytes in older versions; normalize to str.
+        return token.decode("utf-8") if isinstance(token, (bytes, bytearray)) else str(token)
+
+    def _jwt_decode(token: str) -> dict | None:
+        if not token:
+            return None
+        try:
+            return jwt.decode(token, _jwt_secret(), algorithms=["HS256"], leeway=30)
+        except ExpiredSignatureError:
+            return None
+        except InvalidTokenError:
+            return None
+        except Exception:
+            return None
+
+    def _api_user_from_request() -> User | None:
+        """Return the authenticated user for API routes.
+
+        Supports BOTH:
+          - Web session auth (Flask-Login current_user)
+          - Mobile bearer token auth (Authorization: Bearer <jwt>)
+        """
+        try:
+            if getattr(current_user, "is_authenticated", False):
+                return current_user
+        except Exception:
+            pass
+
+        auth = (request.headers.get("Authorization") or "").strip()
+        if not auth:
+            return None
+        if not auth.lower().startswith("bearer "):
+            return None
+        token = auth.split(" ", 1)[1].strip()
+        data = _jwt_decode(token)
+        if not data:
+            return None
+        sub = data.get("sub")
+        try:
+            uid = int(sub)
+        except Exception:
+            return None
+        return User.query.get(uid)
+
+    def api_login_required(fn):
+        @wraps(fn)
+        def _wrap(*args, **kwargs):
+            u = _api_user_from_request()
+            if not u:
+                return jsonify({"error": "auth_required"}), 401
+            # attach for handlers if desired
+            request._api_user = u  # type: ignore
+            return fn(*args, **kwargs)
+        return _wrap
 
 
     def get_google_maps_static_maps_key() -> str:
@@ -1602,6 +1680,7 @@ def create_app() -> Flask:
                 maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
             )
 
+
         report = SpeedReport(
             state=form.state.data,
             road_name=form.road_name.data,
@@ -2408,13 +2487,15 @@ def create_app() -> Flask:
         if lng is not None and (lng < -180 or lng > 180):
             return jsonify({'error': 'lng must be between -180 and 180'}), 400
 
+        api_u = _api_user_from_request()
+
         report = SpeedReport(
             state=state_value,
             road_name=road_in,
             posted_speed=posted_speed,
             ticketed_speed=cited_speed,
             notes=None,
-            user_id=(current_user.id if current_user.is_authenticated else None),
+            user_id=(api_u.id if api_u else None),
         )
         report.refresh_road_key()
 
@@ -2462,7 +2543,7 @@ def create_app() -> Flask:
             # Ignore invalid state filters (backward-compatible)
             state = ""
 
-        q = SpeedReport.query
+        q = SpeedReport.query.options(joinedload(SpeedReport.user))
         if state:
             # State is stored as raw user input (often like "KS" or "KS - Kansas").
             # Filter by the first 2 letters to support both formats (backward-compatible).
@@ -2474,6 +2555,37 @@ def create_app() -> Flask:
             .limit(limit)
             .all()
         )
+
+        report_ids = [r.id for r in reports]
+        like_counts: Dict[int, int] = {}
+        comment_counts: Dict[int, int] = {}
+        user_liked: set[int] = set()
+
+        if report_ids:
+            rows = (
+                db.session.query(Like.report_id, func.count(Like.id))
+                .filter(Like.report_id.in_(report_ids))
+                .group_by(Like.report_id)
+                .all()
+            )
+            like_counts = {rid: int(c) for rid, c in rows}
+
+            rows = (
+                db.session.query(Comment.report_id, func.count(Comment.id))
+                .filter(Comment.report_id.in_(report_ids))
+                .group_by(Comment.report_id)
+                .all()
+            )
+            comment_counts = {rid: int(c) for rid, c in rows}
+
+            api_u = _api_user_from_request()
+            if api_u:
+                rows = (
+                    db.session.query(Like.report_id)
+                    .filter(Like.user_id == api_u.id, Like.report_id.in_(report_ids))
+                    .all()
+                )
+                user_liked = {rid for (rid,) in rows}
 
         items = []
         for r in reports:
@@ -2496,6 +2608,16 @@ def create_app() -> Flask:
                 ),
                 "verification_status": r.verification_status,
                 "ocr_status": r.ocr_status,
+
+                "username": (r.user.username if r.user else None),
+                "is_anonymous": (False if r.user else True),
+
+                "likes_count": like_counts.get(r.id, 0),
+                "comments_count": comment_counts.get(r.id, 0),
+                "liked_by_me": (r.id in user_liked),
+
+                "photo_submitted": (r.photo_key is not None),
+                "photo_verified": (True if (r.photo_key is not None and (r.ocr_status == "verified" or r.verification_status == "verified")) else False),
             })
 
         return jsonify({
@@ -2620,6 +2742,186 @@ def create_app() -> Flask:
         out = Response(data, mimetype=content_type)
         out.headers["Cache-Control"] = "public, max-age=86400"
         return out
+
+
+    # --- API auth endpoints (JWT) ---
+    def _user_public(u: User) -> dict:
+        return {
+            "id": u.id,
+            "email": u.email,
+            "username": u.username,
+            "created_at": u.created_at.isoformat() if getattr(u, "created_at", None) else None,
+        }
+
+    @app.post("/api/auth/register")
+    def api_auth_register():
+        data = request.get_json(silent=True) or {}
+        email = (data.get("email") or "").strip().lower()
+        username = (data.get("username") or "").strip()
+        password = (data.get("password") or "")
+
+        if not email or "@" not in email:
+            return jsonify({"error": "valid_email_required"}), 400
+        if not username or len(username) < 3 or len(username) > 20:
+            return jsonify({"error": "username_must_be_3_20"}), 400
+        if not password or len(password) < 8:
+            return jsonify({"error": "password_min_8"}), 400
+
+        if User.query.filter_by(email=email).first():
+            return jsonify({"error": "email_taken"}), 409
+        if User.query.filter(func.lower(User.username) == func.lower(username)).first():
+            return jsonify({"error": "username_taken"}), 409
+
+        u = User(email=email, username=username)
+        u.set_password(password)
+        db.session.add(u)
+        db.session.commit()
+
+        token = _jwt_encode(u)
+        return jsonify({"token": token, "user": _user_public(u)}), 201
+
+
+    @app.post("/api/auth/login")
+    def api_auth_login():
+        data = request.get_json(silent=True) or {}
+        identifier = (data.get("identifier") or data.get("email") or data.get("username") or "").strip()
+        password = (data.get("password") or "")
+
+        if not identifier or not password:
+            return jsonify({"error": "identifier_and_password_required"}), 400
+
+        u = None
+        if "@" in identifier:
+            u = User.query.filter_by(email=identifier.lower()).first()
+        if u is None:
+            u = User.query.filter(func.lower(User.username) == func.lower(identifier)).first()
+
+        if (not u) or (not u.check_password(password)):
+            return jsonify({"error": "invalid_credentials"}), 401
+
+        token = _jwt_encode(u)
+        return jsonify({"token": token, "user": _user_public(u)}), 200
+
+
+    @app.get("/api/me")
+    @api_login_required
+    def api_me():
+        u = getattr(request, "_api_user", None)  # type: ignore
+        if not u:
+            return jsonify({"error": "auth_required"}), 401
+
+        ticket_posts = SpeedReport.query.filter(SpeedReport.user_id == u.id).count()
+        likes = Like.query.filter(Like.user_id == u.id).count()
+        comments = Comment.query.filter(Comment.user_id == u.id).count()
+
+        return jsonify({
+            "user": _user_public(u),
+            "stats": {
+                "ticket_posts": int(ticket_posts),
+                "likes": int(likes),
+                "comments": int(comments),
+            },
+        })
+
+
+    @app.post("/api/reports/<int:report_id>/like")
+    @api_login_required
+    def api_toggle_like(report_id: int):
+        u = getattr(request, "_api_user", None)  # type: ignore
+        report = SpeedReport.query.get_or_404(report_id)
+
+        existing = Like.query.filter_by(report_id=report.id, user_id=u.id).first()
+        if existing:
+            db.session.delete(existing)
+            liked = False
+        else:
+            db.session.add(Like(report_id=report.id, user_id=u.id))
+            liked = True
+
+        db.session.commit()
+        likes_count = Like.query.filter_by(report_id=report.id).count()
+
+        return jsonify({
+            "report_id": report.id,
+            "liked": bool(liked),
+            "likes_count": int(likes_count),
+        })
+
+
+    @app.get("/api/reports/<int:report_id>/comments")
+    def api_get_comments(report_id: int):
+        try:
+            limit = int(request.args.get("limit", "50"))
+        except Exception:
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        try:
+            offset = int(request.args.get("offset", "0"))
+        except Exception:
+            offset = 0
+        offset = max(0, offset)
+
+        q = Comment.query.options(joinedload(Comment.user)).filter(Comment.report_id == report_id)
+        rows = q.order_by(Comment.created_at.asc()).offset(offset).limit(limit).all()
+
+        items = []
+        for c in rows:
+            items.append({
+                "id": c.id,
+                "report_id": c.report_id,
+                "body": c.body,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "username": (c.user.username if c.user else None),
+                "user_id": c.user_id,
+            })
+
+        total = Comment.query.filter(Comment.report_id == report_id).count()
+
+        return jsonify({
+            "items": items,
+            "offset": offset,
+            "limit": limit,
+            "total": int(total),
+            "next_offset": offset + len(items),
+        })
+
+
+    @app.post("/api/reports/<int:report_id>/comments")
+    @api_login_required
+    def api_add_comment(report_id: int):
+        u = getattr(request, "_api_user", None)  # type: ignore
+        data = request.get_json(silent=True) or {}
+        body = (data.get("body") or "").strip()
+        if not body:
+            return jsonify({"error": "comment_empty"}), 400
+        if len(body) > 280:
+            return jsonify({"error": "comment_too_long"}), 400
+
+        # Basic rate limit: max 5 comments / 60s / user (same as web)
+        window_start = datetime.utcnow() - timedelta(seconds=60)
+        recent_count = (
+            Comment.query.filter(Comment.user_id == u.id, Comment.created_at >= window_start)
+            .count()
+        )
+        if recent_count >= 5:
+            return jsonify({"error": "rate_limited"}), 429
+
+        SpeedReport.query.get_or_404(report_id)
+
+        c = Comment(report_id=report_id, user_id=u.id, body=body)
+        db.session.add(c)
+        db.session.commit()
+
+        return jsonify({
+            "id": c.id,
+            "report_id": c.report_id,
+            "body": c.body,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "username": u.username,
+        }), 201
+
+
     @app.get("/search")
     def search():
         q = (request.args.get("q") or "").strip()

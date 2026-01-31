@@ -63,3 +63,19 @@ Changes
 - Fixed an indentation bug that broke app startup (api_staticmap route was mis-indented).
 - run_local.ps1 / run_worker.ps1: Moved install lock to project root and also lock-protected venv creation to prevent parallel venv/ensurepip races when starting app + worker together.
 - No production UI changes.
+
+EnforcedSpeed v190 — API JWT auth + mobile-ready likes/comments + feed parity fields (2026-01-30)
+
+Changes
+- Added JWT auth endpoints for native clients:
+  - POST /api/auth/register
+  - POST /api/auth/login
+  - GET /api/me (requires Bearer token)
+- Added native API endpoints:
+  - POST /api/reports/<id>/like (toggle like, requires Bearer token)
+  - GET /api/reports/<id>/comments
+  - POST /api/reports/<id>/comments (requires Bearer token)
+- GET /api/tickets now includes extra fields used by mobile cards:
+  - username, is_anonymous, likes_count, comments_count, liked_by_me, photo_submitted, photo_verified
+- POST /api/tickets now associates created tickets to the JWT user when Authorization header is present.
+- requirements.txt: Added PyJWT.

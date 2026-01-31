@@ -50,7 +50,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Photo uploads (quarantine + async OCR). Keep this tight to control costs.
-    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", str(6 * 1024 * 1024)))
+    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", str(12 * 1024 * 1024)))
 
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,

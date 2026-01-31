@@ -98,8 +98,8 @@ class SpeedReportForm(FlaskForm):
         validators=[
             Optional(),
             # Keep validation aligned with the backend normalizer (which re-encodes to JPEG).
-            # Many phones produce HEIC; we do NOT support that yet.
-            FileAllowed(["jpg", "jpeg", "png"], "Upload a JPG/JPEG or PNG image (HEIC/WebP not supported yet)."),
+            # Many phones produce HEIC/HEIF; we support phone images + PDFs by normalizing to JPEG server-side.
+            FileAllowed(["jpg", "jpeg", "png", "webp", "heic", "heif", "pdf"], "Upload a JPG/JPEG/PNG/WebP/HEIC/HEIF image or a PDF."),
         ],
     )
 

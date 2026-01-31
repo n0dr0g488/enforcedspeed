@@ -38,6 +38,21 @@ from sendgrid.helpers.mail import Mail
 
 from PIL import Image
 
+# Optional: accept iPhone HEIC/HEIF and normalize to JPEG.
+try:
+    import pillow_heif  # type: ignore
+
+    pillow_heif.register_heif_opener()
+except Exception:
+    pillow_heif = None  # type: ignore
+
+# Optional: accept PDF uploads by rendering page 1 to an image.
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None  # type: ignore
+
+
 from config import Config
 from forms import (
     SpeedReportForm,
@@ -1751,22 +1766,43 @@ def create_app() -> Flask:
         db.session.add(report)
         db.session.commit()
 
+        
+        def _normalize_upload_to_jpeg_bytes(raw_bytes: bytes, filename: str | None, content_type: str | None) -> bytes:
+            """Normalize a user upload (image or PDF) into a sanitized JPEG.
+
+            - Strips metadata by re-encoding.
+            - Converts to RGB.
+            - Resizes to max 2000px.
+            - If PDF: renders page 1 to an image first.
+            """
+            fname = (filename or "").lower()
+            ctype = (content_type or "").lower()
+
+            is_pdf = fname.endswith(".pdf") or ("application/pdf" in ctype)
+
+            if is_pdf:
+                if fitz is None:
+                    raise ValueError("pdf_support_missing")
+                doc = fitz.open(stream=raw_bytes, filetype="pdf")
+                if doc.page_count < 1:
+                    raise ValueError("empty_pdf")
+                page = doc.load_page(0)
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                # Render to PNG bytes, then load with Pillow to normalize like images.
+                raw_bytes = pix.tobytes("png")
+
+            im = Image.open(io.BytesIO(raw_bytes))
+            im = im.convert("RGB")
+            im.thumbnail((2000, 2000))
+            out = io.BytesIO()
+            im.save(out, format="JPEG", quality=80, optimize=True)
+            return out.getvalue()
+
         # Optional photo upload -> quarantine in R2 + async OCR verification (fail closed).
         photo_fs = getattr(form, "photo", None)
         file_obj = photo_fs.data if photo_fs is not None else None
         if file_obj and getattr(file_obj, "filename", ""):
             try:
-                # Reject unsupported formats early (common: iPhone .HEIC).
-                fname = (getattr(file_obj, "filename", "") or "").lower()
-                if fname and not any(fname.endswith(ext) for ext in (".jpg", ".jpeg", ".png")):
-                    report.verification_status = "unverified"
-                    report.ocr_status = "not_verified"
-                    report.ocr_error = "unsupported_format"
-                    report.verify_reason = "unsupported_format"
-                    db.session.commit()
-                    flash("Photo upload failed: only JPG/JPEG/PNG are supported right now (iPhone HEIC not yet).", "warning")
-                    return redirect(url_for("result", report_id=report.id))
-
                 # Mark pending first so the feed can show status immediately.
                 report.verification_status = "pending"
                 report.ocr_status = "pending"
@@ -1776,12 +1812,20 @@ def create_app() -> Flask:
 
                 # Load + normalize + strip metadata by re-encoding.
                 raw = file_obj.read()
-                im = Image.open(io.BytesIO(raw))
-                im = im.convert("RGB")
-                im.thumbnail((1600, 1600))
-                out = io.BytesIO()
-                im.save(out, format="JPEG", quality=80, optimize=True)
-                jpg_bytes = out.getvalue()
+                try:
+                    jpg_bytes = _normalize_upload_to_jpeg_bytes(
+                        raw,
+                        getattr(file_obj, "filename", None),
+                        getattr(file_obj, "content_type", None),
+                    )
+                except Exception:
+                    report.verification_status = "unverified"
+                    report.ocr_status = "not_verified"
+                    report.ocr_error = "unsupported_or_unreadable_upload"
+                    report.verify_reason = "unsupported_format"
+                    db.session.commit()
+                    flash("Photo upload failed: please upload a clear image (JPG/PNG/WebP/HEIC) or a PDF.", "warning")
+                    return redirect(url_for("result", report_id=report.id))
 
 
                 # Ensure required R2 env vars exist (local dev often forgets these).
@@ -2423,14 +2467,23 @@ def create_app() -> Flask:
 
     @app.post("/api/tickets")
     def api_create_ticket():
-        """Create a ticket from mobile clients (JSON).
+        """Create a ticket from web/mobile clients.
 
-        v1 scope:
-        • Anonymous create (matches current web submit behavior).
-        • No photo upload yet.
-        • Optional lat/lng (recommended so the app can show maps).
+        Accepts:
+        • application/json (no file)
+        • multipart/form-data (fields + optional photo/PDF)
+
+        Anonymous create is allowed for now (matches current web submit behavior).
         """
-        data = request.get_json(silent=True) or {}
+        ctype = (request.content_type or "").lower()
+        is_multipart = "multipart/form-data" in ctype
+        file_obj = None
+
+        if is_multipart:
+            data = dict(request.form or {})
+            file_obj = request.files.get("photo")
+        else:
+            data = request.get_json(silent=True) or {}
 
         def first(*keys):
             for k in keys:
@@ -2450,8 +2503,6 @@ def create_app() -> Flask:
         # ---- Validate + normalize ----
         if not state_in:
             return jsonify({'error': 'state is required'}), 400
-        if not road_in or len(road_in) < 2:
-            return jsonify({'error': 'road is required'}), 400
 
         # Accept "GA" or "GA - Georgia" etc. Store the canonical "XX - Name" value.
         code = state_code_from_value(state_in)
@@ -2498,6 +2549,12 @@ def create_app() -> Flask:
         if lng is not None and (lng < -180 or lng > 180):
             return jsonify({'error': 'lng must be between -180 and 180'}), 400
 
+        # Road is preferred, but allow pin-only submissions (road OR lat/lng required).
+        if not road_in or len(road_in) < 2:
+            if lat is None or lng is None:
+                return jsonify({'error': 'road is required unless a map pin (lat/lng) is provided'}), 400
+            road_in = "Map pin"
+
         api_u = _api_user_from_request()
 
         report = SpeedReport(
@@ -2511,12 +2568,104 @@ def create_app() -> Flask:
         report.refresh_road_key()
 
         if lat is not None and lng is not None:
+            report.raw_lat = lat
+            report.raw_lng = lng
             report.lat = lat
             report.lng = lng
-            report.lat_lng_source = 'mobile_pin'
+            report.lat_lng_source = 'user_pin'
 
         db.session.add(report)
         db.session.commit()
+
+        # Optional file upload (image/PDF) -> quarantine in R2 + async OCR verification.
+        if file_obj and getattr(file_obj, "filename", ""):
+            try:
+                def _normalize_upload_to_jpeg_bytes_api(raw_bytes: bytes, filename: str | None, content_type: str | None) -> bytes:
+                    fname = (filename or "").lower()
+                    ctype2 = (content_type or "").lower()
+                    is_pdf = fname.endswith(".pdf") or ("application/pdf" in ctype2)
+
+                    if is_pdf:
+                        if fitz is None:
+                            raise ValueError("pdf_support_missing")
+                        doc = fitz.open(stream=raw_bytes, filetype="pdf")
+                        if doc.page_count < 1:
+                            raise ValueError("empty_pdf")
+                        page = doc.load_page(0)
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+                        raw_bytes = pix.tobytes("png")
+
+                    im = Image.open(io.BytesIO(raw_bytes))
+                    im = im.convert("RGB")
+                    im.thumbnail((2000, 2000))
+                    out = io.BytesIO()
+                    im.save(out, format="JPEG", quality=80, optimize=True)
+                    return out.getvalue()
+
+                # Mark pending first so the feed can show status immediately.
+                report.verification_status = "pending"
+                report.ocr_status = "pending"
+                report.ocr_error = None
+                report.verify_reason = None
+                db.session.commit()
+
+                raw = file_obj.read()
+                try:
+                    jpg_bytes = _normalize_upload_to_jpeg_bytes_api(raw, getattr(file_obj, "filename", None), getattr(file_obj, "content_type", None))
+                except Exception:
+                    report.verification_status = "unverified"
+                    report.ocr_status = "not_verified"
+                    report.ocr_error = "unsupported_or_unreadable_upload"
+                    report.verify_reason = "unsupported_format"
+                    db.session.commit()
+                    jpg_bytes = None
+
+                if jpg_bytes:
+                    missing = [k for k in ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY") if not (os.environ.get(k) or "").strip()]
+                    if missing:
+                        report.verification_status = "unverified"
+                        report.ocr_status = "not_verified"
+                        report.ocr_error = "missing_r2_env: " + ",".join(missing)
+                        report.verify_reason = "upload_failed"
+                        db.session.commit()
+                    else:
+                        bucket = os.environ.get("R2_QUARANTINE_BUCKET", "enforcedspeed-ticket-quarantine").strip() or "enforcedspeed-ticket-quarantine"
+                        prefix = os.environ.get("R2_PREFIX", "tickets/").strip()
+                        if prefix and not prefix.endswith("/"):
+                            prefix = prefix + "/"
+                        key = f"{prefix}{report.id}/{uuid.uuid4().hex}.jpg"
+
+                        ok = put_bytes(bucket=bucket, key=key, data=jpg_bytes, content_type="image/jpeg")
+                        if not ok:
+                            report.verification_status = "unverified"
+                            report.ocr_status = "not_verified"
+                            report.ocr_error = "upload_failed"
+                            report.verify_reason = "upload_failed"
+                            db.session.commit()
+                        else:
+                            report.photo_key = key
+                            report.photo_uploaded_at = datetime.utcnow()
+
+                            q = get_queue()
+                            job = q.enqueue(
+                                "ocr_verify.verify_ticket_from_r2",
+                                report.id,
+                                bucket,
+                                key,
+                                job_timeout=120,
+                            )
+                            report.ocr_job_id = job.id
+                            db.session.commit()
+            except Exception:
+                try:
+                    app.logger.exception("API photo upload/OCR enqueue failed for report_id=%s", report.id)
+                except Exception:
+                    pass
+                report.verification_status = "unverified"
+                report.ocr_status = "not_verified"
+                report.ocr_error = "upload_failed"
+                report.verify_reason = "upload_failed"
+                db.session.commit()
 
         return jsonify({
             'id': report.id,
@@ -2527,6 +2676,9 @@ def create_app() -> Flask:
             'created_at': report.created_at.isoformat() if report.created_at else None,
             'lat': report.lat,
             'lng': report.lng,
+            'photo_submitted': bool(report.photo_key),
+            'verification_status': getattr(report, 'verification_status', None),
+            'ocr_status': getattr(report, 'ocr_status', None),
             'static_map_url': (
                 url_for('api_staticmap', lat=report.lat, lng=report.lng, zoom=11, w=640, h=340, _external=True)
                 if (report.lat is not None and report.lng is not None and get_google_maps_static_maps_key())
@@ -2535,126 +2687,6 @@ def create_app() -> Flask:
         }), 201
 
 
-    @app.get("/api/tickets")
-    def api_tickets():
-        try:
-            limit = int(request.args.get("limit", "50"))
-        except Exception:
-            limit = 50
-        limit = max(1, min(limit, 200))
-
-        try:
-            offset = int(request.args.get("offset", "0"))
-        except Exception:
-            offset = 0
-        offset = max(0, offset)
-
-        state = (request.args.get("state") or "").strip().upper()
-        if state and len(state) != 2:
-            # Ignore invalid state filters (backward-compatible)
-            state = ""
-
-        q = SpeedReport.query.options(joinedload(SpeedReport.user))
-        if state:
-            # State is stored as raw user input (often like "KS" or "KS - Kansas").
-            # Filter by the first 2 letters to support both formats (backward-compatible).
-            q = q.filter(func.upper(func.substr(func.trim(SpeedReport.state), 1, 2)) == state)
-
-        reports = (
-            q.order_by(SpeedReport.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
-
-        report_ids = [r.id for r in reports]
-        like_counts: Dict[int, int] = {}
-        comment_counts: Dict[int, int] = {}
-        user_liked: set[int] = set()
-        user_ticket_posts_counts: Dict[int, int] = {}
-
-        if report_ids:
-            rows = (
-                db.session.query(Like.report_id, func.count(Like.id))
-                .filter(Like.report_id.in_(report_ids))
-                .group_by(Like.report_id)
-                .all()
-            )
-            like_counts = {rid: int(c) for rid, c in rows}
-
-            rows = (
-                db.session.query(Comment.report_id, func.count(Comment.id))
-                .filter(Comment.report_id.in_(report_ids))
-                .group_by(Comment.report_id)
-                .all()
-            )
-            comment_counts = {rid: int(c) for rid, c in rows}
-
-            # Ticket post counts per user (for feed display: username (N))
-            user_ids = [uid for uid in {r.user_id for r in reports} if uid]
-            if user_ids:
-                rows = (
-                    db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
-                    .filter(SpeedReport.user_id.in_(user_ids))
-                    .group_by(SpeedReport.user_id)
-                    .all()
-                )
-                user_ticket_posts_counts = {int(uid): int(c) for uid, c in rows}
-
-            api_u = _api_user_from_request()
-            if api_u:
-                rows = (
-                    db.session.query(Like.report_id)
-                    .filter(Like.user_id == api_u.id, Like.report_id.in_(report_ids))
-                    .all()
-                )
-                user_liked = {rid for (rid,) in rows}
-
-        items = []
-        for r in reports:
-            items.append({
-                "id": r.id,
-                "state": r.state,
-                "road": r.road_name,
-                "posted_speed": r.posted_speed,
-                "cited_speed": r.ticketed_speed,
-                "overage": (r.ticketed_speed - r.posted_speed)
-                    if (r.ticketed_speed is not None and r.posted_speed is not None)
-                    else None,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "lat": r.lat,
-                "lng": r.lng,
-                "static_map_url": (
-                    url_for("api_staticmap", lat=r.lat, lng=r.lng, zoom=11, w=640, h=340, _external=True)
-                    if (r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())
-                    else None
-                ),
-                "verification_status": r.verification_status,
-                "ocr_status": r.ocr_status,
-
-                "username": (r.user.username if r.user else None),
-                "user_id": (r.user.id if r.user else None),
-                "user_ticket_posts_count": user_ticket_posts_counts.get(r.user_id, 0) if r.user_id else 0,
-                "is_anonymous": (False if r.user else True),
-
-                "likes_count": like_counts.get(r.id, 0),
-                "comments_count": comment_counts.get(r.id, 0),
-                "liked_by_me": (r.id in user_liked),
-
-                "photo_submitted": (r.photo_key is not None),
-                "photo_verified": (True if (r.photo_key is not None and (r.ocr_status == "verified" or r.verification_status == "verified")) else False),
-            })
-
-        return jsonify({
-            "items": items,
-            "offset": offset,
-            "limit": limit,
-            "next_offset": offset + len(items),
-        })
-
-
-
-    
     @app.get("/api/strictness")
     def api_strictness():
         """Return Most Strict / Least Strict road rankings as JSON for native clients.

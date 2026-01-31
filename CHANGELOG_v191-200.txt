@@ -1,5 +1,11 @@
 ENFORCEDSPEED WEB — CHANGELOG v191–200
 
+v193 — 2026-01-31 — Multipart photo/PDF uploads + phone formats
+- /api/tickets now accepts multipart/form-data with an optional photo or PDF upload and enqueues OCR verification.
+- Allow pin-only submissions (lat/lng without road) by storing road as "Map pin".
+- Raise default MAX_CONTENT_LENGTH to 12 MB.
+- Expand accepted upload formats (WebP/HEIC/HEIF/PDF) and normalize everything to a 2000px max JPEG.
+
 v192 — 2026-01-31 — Mobile comments + public profiles API parity
 - Add /api/tickets/<id>/comments (GET/POST) aliases for existing /api/reports/<id>/comments endpoints.
 - Add /api/tickets/<id>/like alias for /api/reports/<id>/like.

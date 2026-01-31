@@ -2465,6 +2465,123 @@ def create_app() -> Flask:
 
 
 
+    @app.get("/api/tickets")
+    def api_tickets():
+        try:
+            limit = int(request.args.get("limit", "50"))
+        except Exception:
+            limit = 50
+        limit = max(1, min(limit, 200))
+
+        try:
+            offset = int(request.args.get("offset", "0"))
+        except Exception:
+            offset = 0
+        offset = max(0, offset)
+
+        state = (request.args.get("state") or "").strip().upper()
+        if state and len(state) != 2:
+            # Ignore invalid state filters (backward-compatible)
+            state = ""
+
+        q = SpeedReport.query.options(joinedload(SpeedReport.user))
+        if state:
+            # State is stored as raw user input (often like "KS" or "KS - Kansas").
+            # Filter by the first 2 letters to support both formats (backward-compatible).
+            q = q.filter(func.upper(func.substr(func.trim(SpeedReport.state), 1, 2)) == state)
+
+        reports = (
+            q.order_by(SpeedReport.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        report_ids = [r.id for r in reports]
+        like_counts: Dict[int, int] = {}
+        comment_counts: Dict[int, int] = {}
+        user_liked: set[int] = set()
+        user_ticket_posts_counts: Dict[int, int] = {}
+
+        if report_ids:
+            rows = (
+                db.session.query(Like.report_id, func.count(Like.id))
+                .filter(Like.report_id.in_(report_ids))
+                .group_by(Like.report_id)
+                .all()
+            )
+            like_counts = {rid: int(c) for rid, c in rows}
+
+            rows = (
+                db.session.query(Comment.report_id, func.count(Comment.id))
+                .filter(Comment.report_id.in_(report_ids))
+                .group_by(Comment.report_id)
+                .all()
+            )
+            comment_counts = {rid: int(c) for rid, c in rows}
+
+            # Ticket post counts per user (for feed display: username (N))
+            user_ids = [uid for uid in {r.user_id for r in reports} if uid]
+            if user_ids:
+                rows = (
+                    db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
+                    .filter(SpeedReport.user_id.in_(user_ids))
+                    .group_by(SpeedReport.user_id)
+                    .all()
+                )
+                user_ticket_posts_counts = {int(uid): int(c) for uid, c in rows}
+
+            api_u = _api_user_from_request()
+            if api_u:
+                rows = (
+                    db.session.query(Like.report_id)
+                    .filter(Like.user_id == api_u.id, Like.report_id.in_(report_ids))
+                    .all()
+                )
+                user_liked = {rid for (rid,) in rows}
+
+        items = []
+        for r in reports:
+            items.append({
+                "id": r.id,
+                "state": r.state,
+                "road": r.road_name,
+                "posted_speed": r.posted_speed,
+                "cited_speed": r.ticketed_speed,
+                "overage": (r.ticketed_speed - r.posted_speed)
+                    if (r.ticketed_speed is not None and r.posted_speed is not None)
+                    else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "lat": r.lat,
+                "lng": r.lng,
+                "static_map_url": (
+                    url_for("api_staticmap", lat=r.lat, lng=r.lng, zoom=11, w=640, h=340, _external=True)
+                    if (r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())
+                    else None
+                ),
+                "verification_status": r.verification_status,
+                "ocr_status": r.ocr_status,
+
+                "username": (r.user.username if r.user else None),
+                "user_id": (r.user.id if r.user else None),
+                "user_ticket_posts_count": user_ticket_posts_counts.get(r.user_id, 0) if r.user_id else 0,
+                "is_anonymous": (False if r.user else True),
+
+                "likes_count": like_counts.get(r.id, 0),
+                "comments_count": comment_counts.get(r.id, 0),
+                "liked_by_me": (r.id in user_liked),
+
+                "photo_submitted": (r.photo_key is not None),
+                "photo_verified": (True if (r.photo_key is not None and (r.ocr_status == "verified" or r.verification_status == "verified")) else False),
+            })
+
+        return jsonify({
+            "items": items,
+            "offset": offset,
+            "limit": limit,
+            "next_offset": offset + len(items),
+        })
+
     @app.post("/api/tickets")
     def api_create_ticket():
         """Create a ticket from web/mobile clients.

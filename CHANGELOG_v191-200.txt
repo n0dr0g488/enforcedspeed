@@ -1,5 +1,14 @@
 ENFORCEDSPEED WEB — CHANGELOG v191–200
 
+
+v195 — 2026-01-31 — Fix app.py route indentation (restore local run)
+- Fix IndentationError caused by misindented @app.post("/api/tickets") inside create_app (aligns decorator with other API routes).
+- No runtime behavior change beyond allowing the server to start cleanly.
+
+v194 — 2026-01-31 — Restore GET /api/tickets for mobile feed
+- Fix regression where /api/tickets allowed POST only (405 on GET), causing mobile to fall back to sample feed.
+- GET /api/tickets is now available again alongside POST /api/tickets (multipart create).
+
 v193 — 2026-01-31 — Multipart photo/PDF uploads + phone formats
 - /api/tickets now accepts multipart/form-data with an optional photo or PDF upload and enqueues OCR verification.
 - Allow pin-only submissions (lat/lng without road) by storing road as "Map pin".

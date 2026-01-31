@@ -1203,6 +1203,17 @@ def create_app() -> Flask:
                 )
                 user_liked = {rid for (rid,) in rows}
 
+                # Ticket post counts per user (for feed display: username (N))
+                user_ids = [uid for uid in {r.user_id for r in reports} if uid]
+                if user_ids:
+                    rows = (
+                        db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
+                        .filter(SpeedReport.user_id.in_(user_ids))
+                        .group_by(SpeedReport.user_id)
+                        .all()
+                    )
+                    user_ticket_posts_counts = {int(uid): int(c) for uid, c in rows}
+
         # Comments: show oldest -> newest so threads read naturally.
         # IMPORTANT: legacy data may contain invalid/cyclic parent pointers from before true nesting.
         # If we build threads naively, a cycle can hang template rendering (browser spins forever).
@@ -2560,6 +2571,7 @@ def create_app() -> Flask:
         like_counts: Dict[int, int] = {}
         comment_counts: Dict[int, int] = {}
         user_liked: set[int] = set()
+        user_ticket_posts_counts: Dict[int, int] = {}
 
         if report_ids:
             rows = (
@@ -2577,6 +2589,17 @@ def create_app() -> Flask:
                 .all()
             )
             comment_counts = {rid: int(c) for rid, c in rows}
+
+            # Ticket post counts per user (for feed display: username (N))
+            user_ids = [uid for uid in {r.user_id for r in reports} if uid]
+            if user_ids:
+                rows = (
+                    db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
+                    .filter(SpeedReport.user_id.in_(user_ids))
+                    .group_by(SpeedReport.user_id)
+                    .all()
+                )
+                user_ticket_posts_counts = {int(uid): int(c) for uid, c in rows}
 
             api_u = _api_user_from_request()
             if api_u:
@@ -2610,6 +2633,8 @@ def create_app() -> Flask:
                 "ocr_status": r.ocr_status,
 
                 "username": (r.user.username if r.user else None),
+                "user_id": (r.user.id if r.user else None),
+                "user_ticket_posts_count": user_ticket_posts_counts.get(r.user_id, 0) if r.user_id else 0,
                 "is_anonymous": (False if r.user else True),
 
                 "likes_count": like_counts.get(r.id, 0),
@@ -2920,6 +2945,45 @@ def create_app() -> Flask:
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "username": u.username,
         }), 201
+
+
+    # --- Ticket alias routes (mobile naming parity) ---
+    # Keep /api/reports/* for backward compatibility; mobile uses /api/tickets/* going forward.
+
+    @app.get("/api/tickets/<int:report_id>/comments")
+    def api_get_ticket_comments(report_id: int):
+        return api_get_comments(report_id)
+
+    @app.post("/api/tickets/<int:report_id>/comments")
+    @api_login_required
+    def api_add_ticket_comment(report_id: int):
+        return api_add_comment(report_id)
+
+    @app.post("/api/tickets/<int:report_id>/like")
+    @api_login_required
+    def api_toggle_ticket_like(report_id: int):
+        return api_toggle_like(report_id)
+
+    @app.get("/api/users/<int:user_id>")
+    def api_user_public_profile(user_id: int):
+        u = User.query.get_or_404(user_id)
+
+        ticket_posts = SpeedReport.query.filter(SpeedReport.user_id == u.id).count()
+        likes = Like.query.filter(Like.user_id == u.id).count()
+        comments = Comment.query.filter(Comment.user_id == u.id).count()
+
+        return jsonify({
+            "user": {
+                "id": u.id,
+                "username": u.username,
+                "created_at": u.created_at.isoformat() if getattr(u, "created_at", None) else None,
+            },
+            "stats": {
+                "ticket_posts": int(ticket_posts),
+                "likes": int(likes),
+                "comments": int(comments),
+            },
+        })
 
 
     @app.get("/search")

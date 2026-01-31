@@ -1,6 +1,11 @@
 ENFORCEDSPEED WEB — CHANGELOG v191–200
 
+v192 — 2026-01-31 — Mobile comments + public profiles API parity
+- Add /api/tickets/<id>/comments (GET/POST) aliases for existing /api/reports/<id>/comments endpoints.
+- Add /api/tickets/<id>/like alias for /api/reports/<id>/like.
+- Add /api/users/<id> public profile endpoint (username + joined + stats).
+- Extend /api/tickets feed items with user_id and user_ticket_posts_count for mobile ticket cards.
+
 v191 — 2026-01-31 — JWT iat timestamp fix (mobile auth unblocks)
 - Fix JWT "iat" generation to use timezone-aware UTC (prevents tokens being rejected as "not yet valid" on non-UTC machines).
 - Add small JWT decode leeway (30s) to tolerate minor clock skew.
-

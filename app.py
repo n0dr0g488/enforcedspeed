@@ -2485,6 +2485,9 @@ def create_app() -> Flask:
             state = ""
 
         q = SpeedReport.query.options(joinedload(SpeedReport.user))
+
+        # Hide soft-deleted tickets from public API feeds
+        q = q.filter(SpeedReport.is_deleted.is_(False))
         if state:
             # State is stored as raw user input (often like "KS" or "KS - Kansas").
             # Filter by the first 2 letters to support both formats (backward-compatible).
@@ -2526,6 +2529,7 @@ def create_app() -> Flask:
                 rows = (
                     db.session.query(SpeedReport.user_id, func.count(SpeedReport.id))
                     .filter(SpeedReport.user_id.in_(user_ids))
+                    .filter(SpeedReport.is_deleted.is_(False))
                     .group_by(SpeedReport.user_id)
                     .all()
                 )
@@ -2984,7 +2988,7 @@ def create_app() -> Flask:
         if not u:
             return jsonify({"error": "auth_required"}), 401
 
-        ticket_posts = SpeedReport.query.filter(SpeedReport.user_id == u.id).count()
+        ticket_posts = SpeedReport.query.filter(SpeedReport.user_id == u.id, SpeedReport.is_deleted.is_(False)).count()
         likes = Like.query.filter(Like.user_id == u.id).count()
         comments = Comment.query.filter(Comment.user_id == u.id).count()
 
@@ -3003,6 +3007,9 @@ def create_app() -> Flask:
     def api_toggle_like(report_id: int):
         u = getattr(request, "_api_user", None)  # type: ignore
         report = SpeedReport.query.get_or_404(report_id)
+        if getattr(report, "is_deleted", False):
+            abort(404)
+
 
         existing = Like.query.filter_by(report_id=report.id, user_id=u.id).first()
         if existing:
@@ -3035,6 +3042,10 @@ def create_app() -> Flask:
         except Exception:
             offset = 0
         offset = max(0, offset)
+
+        report = SpeedReport.query.get_or_404(report_id)
+        if getattr(report, "is_deleted", False):
+            abort(404)
 
         q = Comment.query.options(joinedload(Comment.user)).filter(Comment.report_id == report_id)
         rows = q.order_by(Comment.created_at.asc()).offset(offset).limit(limit).all()
@@ -3081,7 +3092,9 @@ def create_app() -> Flask:
         if recent_count >= 5:
             return jsonify({"error": "rate_limited"}), 429
 
-        SpeedReport.query.get_or_404(report_id)
+        report = SpeedReport.query.get_or_404(report_id)
+        if getattr(report, "is_deleted", False):
+            abort(404)
 
         c = Comment(report_id=report_id, user_id=u.id, body=body)
         db.session.add(c)
@@ -3117,7 +3130,7 @@ def create_app() -> Flask:
     def api_user_public_profile(user_id: int):
         u = User.query.get_or_404(user_id)
 
-        ticket_posts = SpeedReport.query.filter(SpeedReport.user_id == u.id).count()
+        ticket_posts = SpeedReport.query.filter(SpeedReport.user_id == u.id, SpeedReport.is_deleted.is_(False)).count()
         likes = Like.query.filter(Like.user_id == u.id).count()
         comments = Comment.query.filter(Comment.user_id == u.id).count()
 

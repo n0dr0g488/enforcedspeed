@@ -104,7 +104,7 @@
                 </div>
 
                 <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo verified</label>
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Auto-Extracted</label>
                   <label class="switch">
                     <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
@@ -151,8 +151,8 @@
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
                   <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
                   <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
-                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Most strict</option>
-                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Least strict</option>
+                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Lower median overage</option>
+                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Higher median overage</option>
                 </select>
               </div>
 
@@ -312,10 +312,10 @@
         <span class="pill pill-ocr pill-ocr-pending">Photo OCR Processing</span>
         <span class="pill-info" title="OCR is processing this photo now.">i</span>
       {% elif r.ocr_status == 'verified' or r.verification_status == 'verified' %}
-        <span class="pill pill-ocr pill-ocr-verified">Verified (Automated) ✓</span>
+        <span class="pill pill-ocr pill-ocr-verified">Auto-Extracted ✓</span>
         <span class="pill-info" title="OCR completed and key fields were validated automatically.">i</span>
       {% else %}
-        <span class="pill pill-ocr pill-ocr-unverified">Not Verified</span>
+        <span class="pill pill-ocr pill-ocr-unverified">Not Auto-Extracted</span>
         {# Subtle reassurance: OCR did run. Tooltip text varies based on what we observed internally. #}
         {% set _vr = (r.verify_reason or '') %}
         {% set _err = (r.ocr_error or '') %}
@@ -384,7 +384,7 @@
   </div>
 
   <div class="ticket-enforcedline">
-    On {{ format_road_bucket(r.road_name) }} in {{ state_name }}, 90% of all submitted tickets occurred at or above {{ enforced_speed_mph }} mph.
+    This location, 90% of submitted tickets occur ≥ {{ enforced_speed_mph }} mph.
   </div>
 </div>
 

@@ -103,7 +103,7 @@
                 </div>
 
                 <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo verified</label>
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Auto-Extracted</label>
                   <label class="switch">
                     <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
@@ -150,8 +150,8 @@
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
                   <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
                   <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
-                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Most strict</option>
-                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Least strict</option>
+                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Lower median overage</option>
+                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Higher median overage</option>
                 </select>
               </div>
 
@@ -175,12 +175,12 @@
 
   <main class="home-center">
     <div class="card" style="padding:14px;">
-      <div class="submit-title" style="margin:0 0 2px;">Strictness by State and Road</div>
+      <div class="submit-title" style="margin:0 0 2px;">Median Overage Rankings</div>
       <div class="submit-note" style="margin:0 0 12px;">Rankings based on median ticketed speed over posted speed.</div>
 
       <div class="blocks">
           <div class="block">
-            <strong>Most Strict</strong>
+            <strong>Lower Median Overage</strong>
             <ol>
               {% for i in range(20) %}
                 {% if i < most_strict|length %}
@@ -199,7 +199,7 @@
           </div>
 
           <div class="block">
-            <strong>Least Strict</strong>
+            <strong>Higher Median Overage</strong>
             <ol>
               {% for i in range(20) %}
                 {% if i < least_strict|length %}

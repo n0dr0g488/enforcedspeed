@@ -940,8 +940,8 @@ def create_app() -> Flask:
 
         verify_options = [
             {"value": "any", "label": "Any"},
-            {"value": "verified", "label": "Verified (Automated)"},
-            {"value": "not_verified", "label": "Not verified"},
+            {"value": "verified", "label": "Auto-Extracted"},
+            {"value": "not_verified", "label": "Not auto-extracted"},
         ]
 
         filters_active = bool(
@@ -1440,8 +1440,8 @@ def create_app() -> Flask:
 
         verify_options = [
             {"value": "any", "label": "Any"},
-            {"value": "verified", "label": "Verified (Automated)"},
-            {"value": "not_verified", "label": "Not verified"},
+            {"value": "verified", "label": "Auto-Extracted"},
+            {"value": "not_verified", "label": "Not auto-extracted"},
         ]
 
         filters_active = bool(
@@ -2500,6 +2500,45 @@ def create_app() -> Flask:
             .all()
         )
 
+        # Compute per-page EnforcedSpeed threshold (P90 overage) per (state, road_key).
+        # This keeps mobile/web parity for the "90% occur ≥ X mph" sentence.
+        a_p90 = {}
+        if reports:
+            keys = {(r.state, r.road_key) for r in reports if getattr(r, 'state', None) and getattr(r, 'road_key', None)}
+            if keys:
+                expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
+                rows = (
+                    db.session.query(
+                        SpeedReport.state,
+                        SpeedReport.road_key,
+                        expr.label('overage'),
+                    )
+                    .filter(SpeedReport.is_deleted.is_(False))
+                    .filter(tuple_(SpeedReport.state, SpeedReport.road_key).in_(list(keys)))
+                    .all()
+                )
+                a_dist = {}
+                for st, rk, overage in rows:
+                    if st is None or rk is None or overage is None:
+                        continue
+                    a_dist.setdefault((st, rk), []).append(float(overage))
+                for vals in a_dist.values():
+                    vals.sort()
+
+                def _pctl(sorted_vals, p):
+                    """Return smallest v such that at least p of distribution is at or above v."""
+                    if not sorted_vals:
+                        return 0.0
+                    n = len(sorted_vals)
+                    k = int(math.floor((1.0 - p) * n)) + 1
+                    if k < 1:
+                        k = 1
+                    if k > n:
+                        k = n
+                    return float(sorted_vals[k - 1])
+
+                a_p90 = {k: _pctl(vals, 0.90) for k, vals in a_dist.items()}
+
         report_ids = [r.id for r in reports]
         like_counts: Dict[int, int] = {}
         comment_counts: Dict[int, int] = {}
@@ -2555,6 +2594,12 @@ def create_app() -> Flask:
                 "overage": (r.ticketed_speed - r.posted_speed)
                     if (r.ticketed_speed is not None and r.posted_speed is not None)
                     else None,
+                "percentile": 90,
+                "enforced_speed_mph": (
+                    int(round((r.posted_speed or 0) + a_p90.get((r.state, r.road_key), float((r.ticketed_speed - r.posted_speed) if (r.ticketed_speed is not None and r.posted_speed is not None) else 0))))
+                    if (r.ticketed_speed is not None and r.posted_speed is not None)
+                    else None
+                ),
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "lat": r.lat,
                 "lng": r.lng,

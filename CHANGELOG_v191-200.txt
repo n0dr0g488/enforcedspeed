@@ -1,5 +1,12 @@
 ENFORCEDSPEED WEB — CHANGELOG v191–200
 
+v197 — 2026-01-31 — Bundle A: rankings language + Auto-Extracted badges + feed sentence
+- Replace strictness wording in UI with median overage language (Rankings page + sort labels).
+- Rename OCR status pill from 'Verified' to 'Auto-Extracted' (web UI parity).
+- Make 'Photo Submitted' pill match Auto-Extracted styling (blue + white).
+- Update feed sentence to: 'This location, 90% of submitted tickets occur ≥ X mph.'
+- /api/tickets now includes enforced_speed_mph (P90 threshold) + percentile=90 for mobile sentence parity.
+
 
 v196 — 2026-01-31 — API hides soft-deleted tickets (mobile parity)
 - /api/tickets now excludes soft-deleted tickets (is_deleted=true) by default.

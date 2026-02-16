@@ -366,3 +366,6 @@ Changes:
 Test:
 1) Submit Ticket -> select county -> Set location -> place pin -> after saving pin, the county preview static map should render without the g.co/staticmaperror banner.
 2) Home feed ticket thumbnails should render and keep the custom pin icons.
+
+v345 (2026-02-16)
+- Emergency hotfix: web boot no longer blocks on ensure_states_schema (was timing out and killing gunicorn on Render).

@@ -822,6 +822,14 @@ document.addEventListener('DOMContentLoaded', function(){
         function init(){
           if(!(window.google && window.google.maps)) return;
 
+          // Custom marker icon for the mini-map (use the hi-res pin, scaled down for crispness).
+          const pinIconUrl = "{{ url_for('static', filename='img/pins/pin_inside_deepred.png') }}";
+          const pinIcon = {
+            url: pinIconUrl,
+            scaledSize: new google.maps.Size(28, 28),
+            anchor: new google.maps.Point(14, 28)
+          };
+
           // Center on the average pin (simple, stable).
           let avgLat = 0, avgLng = 0;
           pins.forEach(p => { avgLat += p.lat; avgLng += p.lng; });
@@ -841,7 +849,7 @@ document.addEventListener('DOMContentLoaded', function(){
           pins.forEach(p => {
             const pos = { lat: p.lat, lng: p.lng };
             bounds.extend(pos);
-            const m = new google.maps.Marker({ position: pos, map: map });
+            const m = new google.maps.Marker({ position: pos, map: map, icon: pinIcon });
             m.addListener('click', function(){
               // Keep it simple: go to the bucket list (stable route).
               if(p.url){ window.location.href = p.url; }

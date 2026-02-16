@@ -32,3 +32,6 @@ v346 (2026-02-16)
 ## v348 (2026-02-16)
 - Added a smaller Static Maps pin asset (pin_inside_deepred_static.png, 32x32) to match perceived marker size on scale=2 static maps.
 - Updated Static Maps marker icon URL to use the new static-sized pin, keeping interactive map marker sizing unchanged.
+
+## v349 (2026-02-16)
+- Home page right-rail “Ticket mini-map”: use the EnforcedSpeed custom pin icon (scaled down for crispness) instead of Google default markers.

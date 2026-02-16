@@ -1,13 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-  /* Right-rail cards: two stacked containers (mini-map card + stats card), flush aligned */
-  .rail-card{border:1px solid #e5e7eb;border-radius:12px;background:#fff;overflow:hidden;}
-  .rail-card + .rail-card{margin-top:10px;}
-  .rail-card-head{padding:14px 14px 12px;}
-  .rail-section{padding:14px 14px 12px;border-top:1px solid #e5e7eb;}
+  /* Right rail: match left filter rail (flush to edge, sharp corners) */
+  .home-right{background:#fff;border-left:1px solid #e5e7eb;border-radius:0;box-shadow:none;}
+  /* Two stacked blocks (mini-map + stats) but flush; divider between them */
+  .rail-card{border:0;border-radius:0;background:transparent;overflow:hidden;}
+  .rail-card + .rail-card{margin-top:0;border-top:1px solid #e5e7eb;}
+  .rail-card-head{padding:14px 14px 12px;background:#fff;}
+  .rail-section{padding:14px 14px 12px;border-top:1px solid #e5e7eb;background:#fff;}
   .rail-section:first-of-type{border-top:0;}
-  /* Follow UI will be added later. */
+
 </style>
 
 

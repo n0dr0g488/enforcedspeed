@@ -38,3 +38,6 @@ Git commands
 - git add -A
 - git commit -m "v356: Fix Trending Counties (always 5 rows) + remove stars"
 - git push origin main
+
+v357 — Home right-rail styling
+- Make right rail flush + sharp edges like left filter rail; keep mini-map block separate from trending/follow block with divider.

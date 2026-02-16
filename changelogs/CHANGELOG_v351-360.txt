@@ -19,3 +19,6 @@ v356 (2026-02-16)
 - FIX: Trending Counties now always renders 5 rows (fills from top overall counties when recent/trending data is sparse).
 - UI: Remove star/follow controls from the right-rail lists for now (we'll add follow UX later).
 - FIX: Repair right-rail Trending/Follow HTML structure so all rows render correctly.
+
+v357 (2026-02-16)
+- Right rail panels now flush + sharp-edged to match left filter rail; keep mini-map and trending/follow blocks separate with divider.

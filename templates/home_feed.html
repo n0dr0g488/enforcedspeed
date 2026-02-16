@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-  .sidecard{background:#fff;border:0;border-left:1px solid #e5e7eb;border-top:1px solid #e5e7eb;border-radius:0;box-shadow:none;padding:14px 14px 12px;}
+  /* Right-rail sections: keep flush, straight edges like the mini-map rail */
+  .rail-section{padding:14px 14px 12px;border-top:1px solid #e5e7eb;}
+  .rail-section:first-of-type{border-top:0;padding-top:0;}
   .follow-star{border:0;background:transparent;padding:0 2px;font-size:16px;line-height:1;color:#111827;cursor:pointer;}
-  .follow-star:hover{transform:translateY(-1px);} 
+  .follow-star:hover{transform:translateY(-1px);}
 </style>
 
 
@@ -778,6 +780,7 @@ document.addEventListener('DOMContentLoaded', function(){
     {# Right rail: mini-map of the current feed page (only tickets with lat/lng). #}
     <aside class="home-right" aria-label="Ticket map">
       <div class="maps-rail">
+        <div class="rail-section">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
           <div style="display:flex; flex-direction:column; line-height:1.1;">
             <div style="font-weight:600;">Recent tickets</div>
@@ -795,9 +798,10 @@ document.addEventListener('DOMContentLoaded', function(){
         {% else %}
           <div class="subtle" style="margin-top:10px;">No pinned tickets on this page yet.</div>
         {% endif %}
-      </div>
-    
-<div class="sidecard">
+      
+        </div>
+
+<div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
       <div style="font-weight:600;">Trending Counties</div>
@@ -828,7 +832,7 @@ document.addEventListener('DOMContentLoaded', function(){
                       </button>
                     {% endif %}
                     <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
-              {{ c.county_name }}, {{ c.st }}
+              {{ c.label }}, {{ c.st }}
             </a>
 
             <div style="display:flex; align-items:center; gap:18px; font-size:12px; font-variant-numeric:tabular-nums;">
@@ -845,7 +849,7 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </div>
 
-<div class="sidecard">
+<div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
       <div style="font-weight:600;">Counties you follow</div>
@@ -878,7 +882,7 @@ document.addEventListener('DOMContentLoaded', function(){
                       </button>
                     {% endif %}
                     <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
-              {{ c.county_name }}, {{ c.st }}
+              {{ c.label }}, {{ c.st }}
             </a>
 
             <div style="display:flex; align-items:center; gap:18px; font-size:12px; font-variant-numeric:tabular-nums;">
@@ -895,6 +899,8 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </div>
 
+    
+      </div>
     </aside>
 
     {% if map_pins and map_pins|length > 0 and maps_api_key %}

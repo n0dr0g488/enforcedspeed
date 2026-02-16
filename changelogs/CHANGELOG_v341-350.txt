@@ -41,3 +41,7 @@ v346 (2026-02-16)
 - Home right rail: rename “Ticket mini-map” to “Recent tickets”.
 - Added two new right-rail cards: “Trending Counties” (acceleration scoring) and “Counties you follow” (watchlist).
 - Implemented county follow/unfollow via lightweight API endpoints and a new user_follow_counties table; trending list includes a star toggle and followed list renders followed counties with 7d/30d/1y counts.
+
+
+v353 (2026-02-16)
+- Fix right-rail layout: make Recent/Trending/Follow cards flush inside maps rail; fix Trending county label rendering.

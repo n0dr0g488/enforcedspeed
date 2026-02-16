@@ -387,3 +387,7 @@ Test:
 1) Home page loads; right rail shows “Recent tickets”, “Trending Counties”, and “Counties you follow”.
 2) If logged in: click ☆ on a trending county -> page reloads -> it appears in “Counties you follow”. Click ★ in followed list -> unfollows.
 3) Verify cards remain visually compact on a smaller monitor.
+
+
+v353 (2026-02-16)
+- Fix home right-rail layout regression (flush sections inside rail) and correct trending label rendering.

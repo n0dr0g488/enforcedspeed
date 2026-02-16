@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+  .sidecard{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px 14px 12px;}
+  .follow-star{border:0;background:transparent;padding:0 2px;font-size:16px;line-height:1;color:#111827;cursor:pointer;}
+  .follow-star:hover{transform:translateY(-1px);} 
+</style>
+
 
 <div class="home-shell">
 
@@ -774,7 +780,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="maps-rail">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
           <div style="display:flex; flex-direction:column; line-height:1.1;">
-            <div style="font-weight:600;">Ticket mini-map</div>
+            <div style="font-weight:600;">Recent tickets</div>
             <div style="font-size:12px; color:#6b7280; margin-top:2px;">Last 20 tickets</div>
           </div>
           <a class="subtle" href="{{ url_for('map_view') }}" style="text-decoration:none;">Open full map</a>
@@ -790,6 +796,108 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="subtle" style="margin-top:10px;">No pinned tickets on this page yet.</div>
         {% endif %}
       </div>
+    
+<div class="sidecard" style="margin-top:14px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
+    <div style="display:flex; flex-direction:column; line-height:1.1;">
+      <div style="font-weight:600;">Trending Counties</div>
+      <div style="font-size:12px; color:#6b7280; margin-top:2px;">Acceleration (7d vs monthly baseline)</div>
+    </div>
+  </div>
+
+  <div style="margin-top:10px;">
+    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:18px; padding:0 2px;">
+      <span style="width:36px; text-align:right;">7d</span>
+      <span style="width:44px; text-align:right;">30d</span>
+      <span style="width:44px; text-align:right;">1y</span>
+    </div>
+
+    {% if trending_counties and trending_counties|length > 0 %}
+      <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
+        {% for c in trending_counties %}
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            {% set is_following = (followed_geoids and (c.geoid in followed_geoids)) %}
+                  <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    {% if current_user.is_authenticated %}
+                      <button type="button"
+                              class="follow-star"
+                              data-geoid="{{ c.geoid }}"
+                              data-following="{{ '1' if is_following else '0' }}"
+                              onclick="toggleFollowCounty(this)"
+                              title="{{ 'Unfollow' if is_following else 'Follow' }}">
+                        {{ '★' if is_following else '☆' }}
+                      </button>
+                    {% endif %}
+                    <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
+              {{ c.county_name }}, {{ c.st }}
+            </a>
+
+            <div style="display:flex; align-items:center; gap:18px; font-size:12px; font-variant-numeric:tabular-nums;">
+              <span style="width:36px; text-align:right;">{{ c.c7 }}</span>
+              <span style="width:44px; text-align:right;">{{ c.c30 }}</span>
+              <span style="width:44px; text-align:right;">{{ c.c365 }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="subtle" style="margin-top:8px;">Not enough data yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="sidecard" style="margin-top:14px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
+    <div style="display:flex; flex-direction:column; line-height:1.1;">
+      <div style="font-weight:600;">Counties you follow</div>
+      <div style="font-size:12px; color:#6b7280; margin-top:2px;">Quick watchlist</div>
+    </div>
+  </div>
+
+  <div style="margin-top:10px;">
+    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:18px; padding:0 2px;">
+      <span style="width:36px; text-align:right;">7d</span>
+      <span style="width:44px; text-align:right;">30d</span>
+      <span style="width:44px; text-align:right;">1y</span>
+    </div>
+
+    {% if not current_user.is_authenticated %}
+      <div class="subtle" style="margin-top:8px;">Log in to follow counties.</div>
+    {% elif followed_counties and followed_counties|length > 0 %}
+      <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
+        {% for c in followed_counties %}
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            {% set is_following = (followed_geoids and (c.geoid in followed_geoids)) %}
+                  <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    {% if current_user.is_authenticated %}
+                      <button type="button"
+                              class="follow-star"
+                              data-geoid="{{ c.geoid }}"
+                              data-following="{{ '1' if is_following else '0' }}"
+                              onclick="toggleFollowCounty(this)"
+                              title="{{ 'Unfollow' if is_following else 'Follow' }}">
+                        {{ '★' if is_following else '☆' }}
+                      </button>
+                    {% endif %}
+                    <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
+              {{ c.county_name }}, {{ c.st }}
+            </a>
+
+            <div style="display:flex; align-items:center; gap:18px; font-size:12px; font-variant-numeric:tabular-nums;">
+              <span style="width:36px; text-align:right;">{{ c.c7 }}</span>
+              <span style="width:44px; text-align:right;">{{ c.c30 }}</span>
+              <span style="width:44px; text-align:right;">{{ c.c365 }}</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="subtle" style="margin-top:8px;">You haven’t followed any counties yet.</div>
+      <div class="subtle" style="margin-top:6px;">Follow counties from the map to see them here.</div>
+    {% endif %}
+  </div>
+</div>
+
     </aside>
 
     {% if map_pins and map_pins|length > 0 and maps_api_key %}
@@ -1093,5 +1201,30 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 {% endif %}
 
+
+<script>
+  async function toggleFollowCounty(btn){
+    try{
+      const geoid = btn.getAttribute('data-geoid');
+      const following = btn.getAttribute('data-following') === '1';
+      const url = following ? '/api/unfollow_county' : '/api/follow_county';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({geoid})
+      });
+      if(!res.ok){
+        console.error('follow toggle failed', await res.text());
+        return;
+      }
+      // Easiest + most consistent: refresh the page so both cards update.
+      window.location.reload();
+    }catch(e){
+      console.error(e);
+    }
+  }
+</script>
 {% endblock %}
+
 

@@ -369,3 +369,21 @@ Test:
 
 v345 (2026-02-16)
 - Emergency hotfix: web boot no longer blocks on ensure_states_schema (was timing out and killing gunicorn on Render).
+
+v350 (2026-02-16)
+Goal:
+- Home right rail enhancements: rename mini-map and add two compact side cards (Trending Counties + Counties you follow) without blowing up layout height.
+Changes:
+- home_feed.html: “Ticket mini-map” -> “Recent tickets”.
+- Added “Trending Counties” card using acceleration logic (7d vs monthly baseline) with compact 7d/30d/1y columns.
+- Added “Counties you follow” watchlist card.
+- Added follow/unfollow star toggle on Trending list (and unfollow stars in Followed list) wired to new API endpoints.
+Backend:
+- models.py: added FollowedCounty model (user_follow_counties table).
+- app.py: added trending + follow helpers, /api/follow_county, /api/unfollow_county, /api/followed_counties.
+Notes:
+- Table creation is handled by existing ensure_schema/db.create_all (no heavy startup init).
+Test:
+1) Home page loads; right rail shows “Recent tickets”, “Trending Counties”, and “Counties you follow”.
+2) If logged in: click ☆ on a trending county -> page reloads -> it appears in “Counties you follow”. Click ★ in followed list -> unfollows.
+3) Verify cards remain visually compact on a smaller monitor.

@@ -266,3 +266,21 @@ class Comment(db.Model):
 
     user = db.relationship("User", lazy=True)
 
+
+
+class FollowedCounty(db.Model):
+    __tablename__ = "user_follow_counties"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    county_geoid = db.Column(db.String(10), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "county_geoid", name="uq_follow_user_county"),
+    )
+
+    user = db.relationship("User", backref=db.backref("followed_counties", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f"<FollowedCounty user={self.user_id} geoid={self.county_geoid}>"

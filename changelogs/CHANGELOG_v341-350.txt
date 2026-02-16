@@ -25,3 +25,6 @@ v345 (2026-02-16)
 v346 (2026-02-16)
 - Fix Submit Ticket pin-preview Static Maps error by using a safe marker fallback (no custom icon) in /api/county_staticmap proxy requests when a pin is present.
 - Keep custom pin icons for non-proxy (browser-fetched) static map URLs (e.g., home feed), avoiding g.co/staticmaperror caused by Google failing to fetch icon URLs.
+
+## v347 (2026-02-16)
+- Updated map pin PNG assets to higher-resolution crisp versions (brand red + lighter center) for a more professional look.

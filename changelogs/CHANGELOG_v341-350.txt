@@ -1,0 +1,8 @@
+EnforcedSpeed — Web Changelog (v341–v350)
+
+v341 (2026-02-15) — Fix Submit Ticket post-pin Static Maps preview (g.co/staticmaperror)
+- Static Maps custom marker icon URLs are now built from a deterministic PUBLIC_BASE_URL (env/config) when available.
+- Added a Render-safe fallback: if host resolves to an onrender.com hostname, the icon URL defaults to https://enforcedspeed.com.
+- Static Maps query encoding now preserves ':' and '/' characters (safe=':/') to avoid edge-case parsing issues for icon: URLs.
+- Applied the same public-base icon logic to both /api/county_staticmap (submit preview) and /api/staticmap (mobile proxy).
+

@@ -649,9 +649,33 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     zoom_int = int(math.floor(z_star))
 
     def _public_base_url() -> str:
-        """Return a public-facing base URL (scheme+host) that works behind Render proxies."""
+        """Return a public-facing base URL (scheme+host) suitable for Google fetching assets.
+
+        Render + proxies can produce internal hosts in some request contexts. For Static Maps custom
+        marker icons, Google must be able to reach the icon URL from the public internet.
+
+        Priority:
+          1) PUBLIC_BASE_URL (env/config)
+          2) forwarded proto/host
+          3) if we're on an onrender.com host, fall back to enforcedspeed.com
+        """
+        try:
+            from flask import current_app
+            cfg = (current_app.config.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+        except Exception:
+            cfg = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+
+        if cfg and cfg.startswith("http"):
+            return cfg
+
         proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
         host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
+
+        # If we're on Render's default hostname, prefer the canonical custom domain.
+        # (Google fetching a marker icon from an internal/onrender host is unreliable.)
+        if host.endswith("onrender.com") or ".onrender.com" in host:
+            host = "enforcedspeed.com"
+
         # Google Static Maps requires icon URLs to be publicly reachable; force https.
         if proto == "http":
             proto = "https"
@@ -683,7 +707,8 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         center = f"{pin_lat:.6f},{pin_lng:.6f}"
         params['markers'] = f"icon:{icon_url}|{center}"
 
-    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True)
+    # Keep ':' and '/' readable in URLs (helps avoid edge-case parsing issues for icon: URLs)
+    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/')
 
 def us_static_map_url(*, width: int = 640, height: int = 640) -> str:
     """Static map URL of the United States (default preview before a county is selected)."""
@@ -4614,11 +4639,24 @@ GROUP BY UPPER(TRIM(stusps));
 
         center = f"{lat:.6f},{lng:.6f}"
 
-        proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
-        host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
-        if proto == "http":
-            proto = "https"
-        base_url = f"{proto}://{host}"
+        # Use the same public base URL logic as county_static_map_url so Google can fetch icons.
+        try:
+            from flask import current_app
+            cfg_base = (current_app.config.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+        except Exception:
+            cfg_base = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+
+        if cfg_base and cfg_base.startswith("http"):
+            base_url = cfg_base
+        else:
+            proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
+            host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
+            if host.endswith("onrender.com") or ".onrender.com" in host:
+                host = "enforcedspeed.com"
+            if proto == "http":
+                proto = "https"
+            base_url = f"{proto}://{host}"
+
         icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
 
         params = {
@@ -4630,7 +4668,7 @@ GROUP BY UPPER(TRIM(stusps));
             "markers": f"icon:{icon_url}|{center}",
             "key": key,
         }
-        upstream = "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params)
+        upstream = "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params, safe=':/')
 
         try:
             req = urllib.request.Request(upstream, headers={"User-Agent": "EnforcedSpeedMobile/1.0"})

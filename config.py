@@ -68,3 +68,8 @@ class Config:
     # Server key for Roads API calls (keep private; do not expose to clients).
     # Recommended restrictions: API restriction (Roads API) and server-side usage controls.
     GOOGLE_MAPS_SERVER_KEY = os.environ.get("GOOGLE_MAPS_SERVER_KEY", "").strip()
+
+    # Public base URL (scheme + host) used to build externally reachable asset URLs.
+    # Google Static Maps custom marker icons must be fetchable by Google from the public internet.
+    # Example: https://enforcedspeed.com
+    PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")

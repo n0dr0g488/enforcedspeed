@@ -682,7 +682,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         return f"{proto}://{host}"
 
     base_url = _public_base_url()
-    icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
+    icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
 
     params = {
         'size': f"{int(width)}x{int(height)}",
@@ -4663,7 +4663,7 @@ GROUP BY UPPER(TRIM(stusps));
                 proto = "https"
             base_url = f"{proto}://{host}"
 
-        icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
+        icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
 
         params = {
             "center": center,

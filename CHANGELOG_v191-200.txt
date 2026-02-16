@@ -1,0 +1,43 @@
+ENFORCEDSPEED WEB — CHANGELOG v191–200
+
+v198 — 2026-01-31 — API: road autocomplete + place details (mobile submit parity)
+- Add /api/road_autocomplete: server-side proxy for Google Places Autocomplete (road-ish suggestions; optional state bounds bias).
+- Add /api/place_details: server-side proxy for Place Details (returns lat/lng + state code for selected prediction).
+- Uses GOOGLE_MAPS_SERVER_KEY (preferred) or GOOGLE_MAPS_API_KEY (fallback); returns 501 if no key configured.
+
+v197 — 2026-01-31 — Bundle A: rankings language + Auto-Extracted badges + feed sentence
+- Replace strictness wording in UI with median overage language (Rankings page + sort labels).
+- Rename OCR status pill from 'Verified' to 'Auto-Extracted' (web UI parity).
+- Make 'Photo Submitted' pill match Auto-Extracted styling (blue + white).
+- Update feed sentence to: 'This location, 90% of submitted tickets occur ≥ X mph.'
+- /api/tickets now includes enforced_speed_mph (P90 threshold) + percentile=90 for mobile sentence parity.
+
+
+v196 — 2026-01-31 — API hides soft-deleted tickets (mobile parity)
+- /api/tickets now excludes soft-deleted tickets (is_deleted=true) by default.
+- Comment + like endpoints now return 404 for soft-deleted tickets (/api/tickets/* and legacy /api/reports/* aliases).
+- Profile stats counts now exclude soft-deleted tickets (ticket_posts) for /api/me and /api/users/<id>.
+
+v195 — 2026-01-31 — Fix app.py route indentation (restore local run)
+- Fix IndentationError caused by misindented @app.post("/api/tickets") inside create_app (aligns decorator with other API routes).
+- No runtime behavior change beyond allowing the server to start cleanly.
+
+v194 — 2026-01-31 — Restore GET /api/tickets for mobile feed
+- Fix regression where /api/tickets allowed POST only (405 on GET), causing mobile to fall back to sample feed.
+- GET /api/tickets is now available again alongside POST /api/tickets (multipart create).
+
+v193 — 2026-01-31 — Multipart photo/PDF uploads + phone formats
+- /api/tickets now accepts multipart/form-data with an optional photo or PDF upload and enqueues OCR verification.
+- Allow pin-only submissions (lat/lng without road) by storing road as "Map pin".
+- Raise default MAX_CONTENT_LENGTH to 12 MB.
+- Expand accepted upload formats (WebP/HEIC/HEIF/PDF) and normalize everything to a 2000px max JPEG.
+
+v192 — 2026-01-31 — Mobile comments + public profiles API parity
+- Add /api/tickets/<id>/comments (GET/POST) aliases for existing /api/reports/<id>/comments endpoints.
+- Add /api/tickets/<id>/like alias for /api/reports/<id>/like.
+- Add /api/users/<id> public profile endpoint (username + joined + stats).
+- Extend /api/tickets feed items with user_id and user_ticket_posts_count for mobile ticket cards.
+
+v191 — 2026-01-31 — JWT iat timestamp fix (mobile auth unblocks)
+- Fix JWT "iat" generation to use timezone-aware UTC (prevents tokens being rejected as "not yet valid" on non-UTC machines).
+- Add small JWT decode leeway (30s) to tolerate minor clock skew.

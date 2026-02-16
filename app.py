@@ -709,7 +709,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         params['markers'] = f"icon:{encoded_icon}|{center}"
 
     # Keep ':' and '/' readable in URLs (helps avoid edge-case parsing issues for icon: URLs)
-    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/,%')
+    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/,%|')
 
 def us_static_map_url(*, width: int = 640, height: int = 640) -> str:
     """Static map URL of the United States (default preview before a county is selected)."""
@@ -5149,7 +5149,7 @@ GROUP BY UPPER(TRIM(stusps));
     with app.app_context():
         try:
             ensure_counties_schema()
-            # ensure_states_schema()  # Disabled at boot (can be expensive); built lazily when needed.
+            ensure_states_schema()
         except Exception as e:
             # Keep app running even if counties are unavailable; submit page will degrade gracefully.
             print(f"[COUNTY INIT ERROR] failed to ensure counties schema: {e}")

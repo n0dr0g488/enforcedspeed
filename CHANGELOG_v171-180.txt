@@ -1,0 +1,136 @@
+EnforcedSpeed — CHANGELOG v171–180
+Consolidated changelog block (per handoff rule).
+Note: v171 is not present in this ZIP history.
+
+EnforcedSpeed v172 — Submit page row alignment fix (2026-01-29)
+
+Changes
+- Submit (/submit): Reworked the State / Road / Refine-pin inline row to use a grid layout so the Refine button's right edge aligns with the full-width fields below.
+- Submit: Removed the "Logged in as / Not logged in" messaging and replaced with a single centered trust note (login/register links shown only when logged out).
+- Submit: Reduced Refine-pin button prominence slightly.
+- Submit: Updated Submit button to a slightly light-blue tint with a touch heavier weight (still modern/light).
+
+Files touched
+- templates/mvp_home.html
+- templates/_mvp_styles.html
+- VERSION.txt
+
+
+ENFORCEDSPEED v173 — Filter Panel + Map Title + Rankings Title/Filters
+
+Scope (requested):
+1) Filter panel (Home + Map + Rankings):
+   - Title: “Filter Speeding Tickets” (Title Case), unbolded and centered.
+   - Replace “Order” section header with “Sort by”.
+   - Remove the redundant “Sort by” label line to save vertical space (dropdown remains, now aria-labeled).
+
+2) Map page:
+   - Replace “Map” heading with: “EnforcedSpeed's Interactive Map”
+   - Subtitle (centered, small): “Shows speeding tickets with a pinned location.”
+
+3) Rankings (/strictness) page:
+   - Add centered page title: “Most and Least Strict State and Road Combinations”
+   - Keep description line, removing the parenthetical clause.
+   - Add the same left filter panel used on Home/Map (no redesign).
+
+Files changed:
+- templates/_mvp_styles.html
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- app.py
+- VERSION.txt
+
+
+ENFORCEDSPEED v174 — App launch hotfix (IndentationError)
+
+Base: v173 (Filter panel + Map/Rankings titles)
+
+Fix
+- app.py: Restored correct indentation for the /tickets route decorator inside create_app().
+  This fixes the startup crash:
+    IndentationError: unexpected indent (def bucket_tickets)
+
+Notes
+- No visual/UI changes intended vs v173.
+- ZIP packaged with a single unique top-level root folder name matching the version.
+
+
+EnforcedSpeed v175 — Strictness filters fix (Rankings page)
+
+Goal
+- Make the Rankings (/strictness) page actually honor the shared filter rail inputs (not just State).
+
+Changes
+- app.py: Updated strictness_rows() to apply the same filter inputs as Home/Map before computing strictness rankings:
+  - Road
+  - Posted speed limit bucket(s)
+  - Overage bucket(s)
+  - Photo submitted / verification status
+  - Date
+  - Hide anonymous (members only)
+  - Admin deleted-mode (hide/include/only)
+
+Notes
+- No visual/layout changes in this ZIP.
+
+
+ENFORCEDSPEED v176 — Multi-select “Done” button fix (Map + Rankings)
+
+Problem
+- On /strictness (and /map), the multi-select dropdowns for “Posted speed limit” / “Overage” opened, but the “Done” button did not apply/close like it does on the Home feed.
+
+Root cause
+- The multi-select behavior JavaScript existed only on the Home feed page (bound to #feedFilters), so Map and Rankings had no handler for the “Done” button or auto-submit-on-close.
+
+Fix
+- templates/strictness.html: Added the same multi-select JS (bound to #strictnessFilters).
+- templates/map_page.html: Added the same multi-select JS (bound to #mapFilters).
+
+Notes
+- No visual changes intended.
+- ZIP packaged with a single unique top-level root folder matching the version name.
+
+
+ENFORCEDSPEED v177 — 2026-01-29 — Filter panel compact note + ticket card copy/overage cleanup
+
+Built from: EnforcedSpeed_v176_2026-01-29_multiselect_done_fix.zip (inspected directly; no guessing)
+
+Changes
+1) Filter panels (Home / Map / Rankings):
+   - Move “(Must be logged in)” inline with “Hide anonymous” and change to “(must log in)”.
+   - No change to admin deleted/show controls.
+
+2) Ticket card EnforcedSpeed sentence:
+   - Shortened copy and removed bolding.
+   - New format: “On <ROAD> in <STATE>, 90% of all submitted tickets occurred at or above <X> mph.”
+
+3) Ticket card overage display:
+   - Move overage inline after “<ticketed> in a <posted>” as “(+X mph)” in the same blue color.
+
+Files touched
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- templates/_mvp_styles.html
+- VERSION.txt
+
+Notes
+- ZIP packaged with unique top-level root folder: EnforcedSpeed_v177_2026-01-29_filter_note_ticket_card_cleanup
+
+
+v178 (2026-01-29)
+- Rankings page title reworded to “Strictness by State and Road”.
+(No other changes.)
+
+
+v179 — Global Legal Notice Banner (All Pages)
+- Added a thin, square-edged legal notice banner directly under the header on all pages.
+- Banner text: LEGAL NOTICE: Posted speed limits are the law. Obey posted speed limits. EnforcedSpeed is informational only.
+- Adjusted top spacing so the banner sits directly above the first content card/container.
+
+
+EnforcedSpeed v180 (2026-01-29)
+- Filter panel: make '(must log in)' note non-bold (font-weight 400) and add a little spacing from 'Hide anonymous' (margin-left).
+- Applies globally wherever the filter rail is used (Home / Map / Rankings).
+- No other visual or functional changes.

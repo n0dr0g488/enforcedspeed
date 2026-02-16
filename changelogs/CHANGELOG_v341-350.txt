@@ -14,10 +14,3 @@ v343 (2026-02-16) — Encode Static Maps custom marker icon URL (fix g.co/static
 - Properly URL-encode the icon URL inside the markers=icon:... parameter to satisfy Google Static Maps parsing.
 - Adjusted urlencode safe characters to prevent double-encoding of '%' in pre-encoded icon URLs.
 
-v344 (2026-02-16)
-- Fix Static Maps query encoding regression: keep % safe for pre-encoded icon URL but re-encode pipes (prevents broken Static Maps requests and restores county preview framing behavior).
-- Home feed static maps: always center on county (do not center on pin) to match expected framing.
-
-v345 (2026-02-16)
-- Fix Render boot hang by disabling expensive states schema init at app startup; states table remains lazy/optional.
-- Keep static maps marker icon URL encoding fix for submit pin preview.

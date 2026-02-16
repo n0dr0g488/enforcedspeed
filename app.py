@@ -2934,7 +2934,7 @@ GROUP BY UPPER(TRIM(stusps));
             trending_counties = []
             followed_counties = []
             followed_geoids = set()
-return render_template(
+        return render_template(
 
             "home_feed.html",
             reports=reports,

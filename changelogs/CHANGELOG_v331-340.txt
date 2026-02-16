@@ -26,3 +26,8 @@ v338 (2026-02-15)
 - Hotfix: fixed indentation error in county_static_map_url (static map params block) that prevented app from launching.
 
 [v339] 2026-02-15 Fix static map proxy indentation errors (api_staticmap) + remove undefined icon_url in static_map_url.
+
+[v340] 2026-02-15 — Fix Static Maps custom pin icons behind Render proxy
+- Static Maps endpoints (/api/staticmap and /api/county_staticmap) now build public icon URLs using X-Forwarded-Proto/Host (and force https), preventing Google Static Maps from rejecting the icon URL.
+- Added ProxyFix (x_proto/x_host) + PREFERRED_URL_SCHEME=https so external URLs are correct behind Render.
+- Fixes the "Map error: g.co/staticmaperror" that appeared after setting a pin (when the request included markers=icon:...).

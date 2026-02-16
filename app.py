@@ -648,8 +648,16 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
 
     zoom_int = int(math.floor(z_star))
 
+    def _public_base_url() -> str:
+        """Return a public-facing base URL (scheme+host) that works behind Render proxies."""
+        proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
+        host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
+        # Google Static Maps requires icon URLs to be publicly reachable; force https.
+        if proto == "http":
+            proto = "https"
+        return f"{proto}://{host}"
 
-    base_url = request.url_root.rstrip('/')
+    base_url = _public_base_url()
     icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
 
     params = {
@@ -908,6 +916,13 @@ def ensure_schema():
         print(f"[SCHEMA INIT ERROR] failed to ensure schema: {e}")
 def create_app() -> Flask:
     app = Flask(__name__)
+    # Ensure correct scheme/host when behind Render's proxy (affects external URLs).
+    try:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+        app.config["PREFERRED_URL_SCHEME"] = "https"
+    except Exception:
+        pass
     app.config.from_object(Config)
     db.init_app(app)
 
@@ -4598,7 +4613,12 @@ GROUP BY UPPER(TRIM(stusps));
             abort(404)
 
         center = f"{lat:.6f},{lng:.6f}"
-        base_url = request.url_root.rstrip('/')
+
+        proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
+        host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
+        if proto == "http":
+            proto = "https"
+        base_url = f"{proto}://{host}"
         icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
 
         params = {

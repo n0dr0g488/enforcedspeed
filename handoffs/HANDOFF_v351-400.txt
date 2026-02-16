@@ -1,0 +1,40 @@
+EnforcedSpeed — Handoff Notes (v351–v400)
+
+v356 (2026-02-16)
+Goal
+- Fix the right-rail “Trending Counties” so it always populates with 5 counties and renders correctly.
+- Remove the star/follow UI from the right rail (follow UX will be added later).
+
+What changed
+1) Trending Counties now always shows 5 rows
+- The backend already builds a “chosen” list from recent/trending data.
+- New fallback: if there are still <5 unique counties, we fill the remaining slots using the top counties overall (by total report count, then most recent report), excluding duplicates.
+
+2) Template fix (this was the main visible bug)
+- The Trending/Follow list HTML had broken nesting/closing tags, causing only 1 row to appear.
+- Rebuilt both lists as simple “name left / counts right” flex rows.
+
+3) Stars removed from right rail
+- Removed the star buttons + follow toggle JS from the right-rail panel.
+- Follow feature will be implemented later in a dedicated pass.
+
+Files touched
+- app.py
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v351-360.txt
+- handoffs/HANDOFF_v351-400.txt
+
+Local run (standard)
+- Use your normal startup: es-up (preferred) or es-app.
+
+Deploy (Render)
+- Going live = git add/commit/push to GitHub.
+- Check BOTH Render services:
+  - Web service logs (gunicorn)
+  - Worker service logs (RQ) (must be running for OCR jobs)
+
+Git commands
+- git add -A
+- git commit -m "v356: Fix Trending Counties (always 5 rows) + remove stars"
+- git push origin main

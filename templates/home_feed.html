@@ -7,8 +7,7 @@
   .rail-card-head{padding:14px 14px 12px;}
   .rail-section{padding:14px 14px 12px;border-top:1px solid #e5e7eb;}
   .rail-section:first-of-type{border-top:0;}
-  .follow-star{border:0;background:transparent;padding:0 2px;font-size:16px;line-height:1;color:#111827;cursor:pointer;}
-  .follow-star:hover{transform:translateY(-1px);}
+  /* Follow UI will be added later. */
 </style>
 
 
@@ -822,19 +821,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
         {% for c in trending_counties %}
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            {% set is_following = (followed_geoids and (c.geoid in followed_geoids)) %}
-                  <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    {% if current_user.is_authenticated %}
-                      <button type="button"
-                              class="follow-star"
-                              data-geoid="{{ c.geoid }}"
-                              data-following="{{ '1' if is_following else '0' }}"
-                              onclick="toggleFollowCounty(this)"
-                              title="{{ 'Unfollow' if is_following else 'Follow' }}">
-                        {{ '★' if is_following else '☆' }}
-                      </button>
-                    {% endif %}
-                    <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
+            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
               {{ c.label }}, {{ c.st }}
             </a>
 
@@ -847,7 +834,7 @@ document.addEventListener('DOMContentLoaded', function(){
         {% endfor %}
       </div>
     {% else %}
-
+      <div class="subtle" style="padding:6px 2px 2px;">Not enough data yet.</div>
     {% endif %}
   </div>
 
@@ -873,19 +860,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
         {% for c in followed_counties %}
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            {% set is_following = (followed_geoids and (c.geoid in followed_geoids)) %}
-                  <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    {% if current_user.is_authenticated %}
-                      <button type="button"
-                              class="follow-star"
-                              data-geoid="{{ c.geoid }}"
-                              data-following="{{ '1' if is_following else '0' }}"
-                              onclick="toggleFollowCounty(this)"
-                              title="{{ 'Unfollow' if is_following else 'Follow' }}">
-                        {{ '★' if is_following else '☆' }}
-                      </button>
-                    {% endif %}
-                    <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
+            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
               {{ c.label }}, {{ c.st }}
             </a>
 
@@ -1206,30 +1181,5 @@ document.addEventListener('DOMContentLoaded', function(){
   })();
 </script>
 {% endif %}
-
-
-<script>
-  async function toggleFollowCounty(btn){
-    try{
-      const geoid = btn.getAttribute('data-geoid');
-      const following = btn.getAttribute('data-following') === '1';
-      const url = following ? '/api/unfollow_county' : '/api/follow_county';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        credentials: 'same-origin',
-        body: JSON.stringify({geoid})
-      });
-      if(!res.ok){
-        console.error('follow toggle failed', await res.text());
-        return;
-      }
-      // Easiest + most consistent: refresh the page so both cards update.
-      window.location.reload();
-    }catch(e){
-      console.error(e);
-    }
-  }
-</script>
 {% endblock %}
 

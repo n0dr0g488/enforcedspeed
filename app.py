@@ -2875,8 +2875,8 @@ GROUP BY UPPER(TRIM(stusps));
                     chosen.append((geoid, c7, c30, c365))
                     chosen_geoids.add(geoid)
 
-            
-            # Fallback 2: if we *still* don't have enough, fill with top counties overall (so the panel never looks empty).
+            # Fallback 2: if we *still* don't have enough, fill with top counties overall
+            # (so the panel never looks empty).
             if len(chosen) < 5:
                 top_rows = (
                     db.session.query(
@@ -2894,13 +2894,14 @@ GROUP BY UPPER(TRIM(stusps));
                 for r2 in top_rows:
                     if len(chosen) >= 5:
                         break
-                    geoid = str(r2.geoid) if r2.geoid is not None else ""
-                    if not geoid or geoid in chosen_geoids:
+                    geoid2 = str(r2.geoid) if r2.geoid is not None else ""
+                    if not geoid2 or geoid2 in chosen_geoids:
                         continue
-                    c7, c30, c365 = agg_counts.get(geoid, (0, 0, 0))
-                    chosen.append((geoid, c7, c30, c365))
-                    chosen_geoids.add(geoid)
-# Attach labels for display.
+                    c7b, c30b, c365b = agg_counts.get(geoid2, (0, 0, 0))
+                    chosen.append((geoid2, c7b, c30b, c365b))
+                    chosen_geoids.add(geoid2)
+
+            # Attach labels for display.
             for geoid, c7, c30, c365 in chosen:
                 label = geoid
                 st = ""

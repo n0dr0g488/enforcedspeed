@@ -1,12 +1,21 @@
-CHANGELOG v351–360
+EnforcedSpeed — Changelog (v351–v360)
 
-v354 (2026-02-16)
-- Home right-rail layout: split into two stacked cards again (Recent tickets mini-map card + Trending/Followed card)
-- Mini-map restored to full-bleed inside its own card, matching the prior look while keeping the new cards below
+v351 (2026-02-16)
+- Right rail: refine Trending Counties + Counties you follow cards (layout/copy cleanup).
+
+v352 (2026-02-16)
+- Fix deploy: correct indentation error that broke gunicorn import.
 
 v353 (2026-02-16)
-- Attempted right-rail layout adjustments for new cards (superseded by v354)
+- Fix right-rail layout regression.
+
+v354 (2026-02-16)
+- Split right rail into two panels: Recent tickets mini-map (top) + Trending/Follow cards (bottom).
 
 v355 (2026-02-16)
-- Right-rail cards: make panels sharp-edged (no rounded corners) and tighten Recent tickets header spacing
-- Trending Counties: add robust fallback so the list populates even with sparse trend data (top overall counties)
+- Right rail: sharper panel styling + trending fallback data population.
+
+v356 (2026-02-16)
+- FIX: Trending Counties now always renders 5 rows (fills from top overall counties when recent/trending data is sparse).
+- UI: Remove star/follow controls from the right-rail lists for now (we'll add follow UX later).
+- FIX: Repair right-rail Trending/Follow HTML structure so all rows render correctly.

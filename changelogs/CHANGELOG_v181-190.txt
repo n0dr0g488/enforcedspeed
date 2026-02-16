@@ -1,0 +1,85 @@
+EnforcedSpeed — CHANGELOG v181–190
+Consolidated changelog block (per handoff rule).
+
+EnforcedSpeed v181 — Mobile static map API
+- Added /api/staticmap proxy endpoint to serve Google Static Maps images with the API key kept server-side.
+  - Prefers GOOGLE_MAPS_SERVER_KEY for the upstream request; falls back to GOOGLE_MAPS_API_KEY if needed.
+- Updated /api/tickets to include `static_map_url` (absolute URL) per ticket when lat/lng and a maps key are configured.
+- No visual/UI changes.
+
+EnforcedSpeed v182 — /api/tickets state filter (2026-01-30)
+
+Changes
+- /api/tickets: Added optional ?state=XX query param (2-letter). When provided, results are filtered server-side by ticket state.
+- Backward-compatible: invalid state values are ignored (no filtering).
+
+EnforcedSpeed v183 — Local venv bootstrap fix (2026-01-30)
+
+Changes
+- run_local.ps1 / run_worker.ps1: If venv is missing or broken (no venv\Scripts\python.exe / pip.exe), automatically remove and recreate it.
+- When venv is (re)created, dependencies are installed even if requirements.txt is unchanged (prevents ModuleNotFoundError: flask/redis).
+- No production/runtime code changes (only local runner robustness).
+
+EnforcedSpeed v184 — Local venv install hardening (2026-01-30)
+
+Changes
+- run_local.ps1 / run_worker.ps1: Added missing-import detection (forces pip install if flask/redis/rq are absent even when requirements hash matches).
+- run_local.ps1 / run_worker.ps1: Added exit-code checking for pip installs so failed installs cannot be incorrectly cached as 'done'.
+- Added a simple install lock to avoid parallel pip installs when es-up starts app + worker simultaneously.
+
+EnforcedSpeed v185 — PowerShell 5.1 venv install fix (2026-01-30)
+
+Changes
+- run_local.ps1 / run_worker.ps1: Removed non-ASCII punctuation and saved scripts with a Windows PowerShell-friendly encoding.
+- run_local.ps1 / run_worker.ps1: Dependency install decision no longer relies solely on requirements hash; missing imports now force pip install even if hashes are empty/match.
+- Prevents 'Requirements unchanged' skip when flask/redis/rq are not installed.
+
+EnforcedSpeed v186 — State filter matches stored state formats (2026-01-30)
+
+Changes
+- /api/tickets: Improved ?state=XX filtering to match the first 2 letters of the stored `state` field (case-insensitive, trimmed).
+  - Works whether state is stored as "KS" or "KS - Kansas".
+- Backward compatible: response schema unchanged.
+
+EnforcedSpeed v187 — /api/tickets POST create (2026-01-30)
+
+Changes
+- Added POST /api/tickets for mobile clients to create a new ticket via JSON (no CSRF).
+  - Accepts state as "GA" or "GA - Georgia"; stores canonical "XX - Name".
+  - Accepts road, posted_speed, cited_speed, optional lat/lng.
+  - Returns created ticket JSON (including static_map_url when lat/lng present).
+- GET /api/tickets unchanged.
+
+EnforcedSpeed v188 — /api/strictness for native Rankings (2026-01-30)
+
+Changes
+- Added GET /api/strictness to return Most Strict / Least Strict rankings as JSON for the native app.
+  - Supports ?limit= (default 10), optional ?state=XX scoping, optional ?verified_only=1, and ?date=7|30|90|365 (or 7d/30d/90d/365d).
+- No UI changes.
+
+EnforcedSpeed v189 — Fix staticmap indentation + venv lock hardening (2026-01-30)
+
+Changes
+- Fixed an indentation bug that broke app startup (api_staticmap route was mis-indented).
+- run_local.ps1 / run_worker.ps1: Moved install lock to project root and also lock-protected venv creation to prevent parallel venv/ensurepip races when starting app + worker together.
+- No production UI changes.
+
+EnforcedSpeed v190 — API JWT auth + mobile-ready likes/comments + feed parity fields (2026-01-30)
+
+Changes
+- Added JWT auth endpoints for native clients:
+  - POST /api/auth/register
+  - POST /api/auth/login
+  - GET /api/me (requires Bearer token)
+- Added native API endpoints:
+  - POST /api/reports/<id>/like (toggle like, requires Bearer token)
+  - GET /api/reports/<id>/comments
+  - POST /api/reports/<id>/comments (requires Bearer token)
+- GET /api/tickets now includes extra fields used by mobile cards:
+  - username, is_anonymous, likes_count, comments_count, liked_by_me, photo_submitted, photo_verified
+- POST /api/tickets now associates created tickets to the JWT user when Authorization header is present.
+- requirements.txt: Added PyJWT.
+
+
+v223 (2026-02-05)
+- County import: fix GDAL docker image reference (use ghcr.io/osgeo/gdal:alpine-small-latest).

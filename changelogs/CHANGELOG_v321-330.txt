@@ -1,0 +1,37 @@
+CHANGELOG v321–330
+
+v321 — 2026-02-15 — Register polish (tooltips, phone mask, button sizing)
+- Register: “Password” label → “New password”; “Desired Username” → “Desired username”
+- Register: working info tooltips for Mobile number, Birthday (18+), and New password requirements
+- Register: Create Account button reduced to ~half width and centered; added a bit more spacing before the “Already have an account?” line
+- Register: US-style phone formatting while typing; phone is normalized to digits only on submit (server already stores digits only)
+
+v322 — 2026-02-15 — Register consistency pass (standard button, username cap, info icon style)
+- Register: Create Account button now uses the site-standard .es-btn styling (matches Submit a Ticket buttons) while staying ~half width and centered.
+- Register: removed the username example placeholder; enforced a 12-character cap (HTML maxlength + WTForms validator).
+- Register: centered the “Already have an account?” line beneath the button and increased whitespace between button + links.
+- Register: info “i” icons now match the homepage style (white background + subtle border + grey icon color).
+
+v323 — 2026-02-15 — Register: remove phone collection (Phase 1)
+- Removed Mobile number field from Create Account (UI + WTForms + register route)
+- Kept DB column available for future use (no migrations)
+- Email verification intentionally deferred
+
+
+v324 — 2026-02-15 — Register: disable submit until username + DOB valid
+- Create Account button disabled until username is confirmed available AND birthday validates 18+
+- Added inline birthday validation status ("Looks good" / 18+ message)
+- If username availability check is unavailable, registration stays blocked (strict gating; try again)
+
+v325 — 2026-02-15 — Login: standard button + spacing
+- Log In button now uses the site-standard .es-btn styling (matches Submit a Ticket buttons)
+- Increased spacing between the Log In button and the "New here?" links; centered the links block
+
+v326 — 2026-02-15 — Login: button spacing + half width
+- Login: added clear vertical spacing between the password field and the Log In button (no more “touching”)
+- Login: Log In button is now ~half width and centered (keeps the standard .es-btn styling)
+
+v327 — 2026-02-15 — Home: clickable state → interactive map state highlight
+- Home feed: state label is now clickable (like county) and links to the interactive map filtered to that state.
+- Interactive map: supports state outline + shaded fill when opened with ?state=XX (cached state polygons built once from county geometries).
+- PostGIS: added additive `states` table derived from counties (one-time union at boot when empty; guarded by advisory lock so it won't run per click).

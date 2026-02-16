@@ -1,0 +1,121 @@
+EnforcedSpeed v271 (2026-02-07) — Statistics page + county→map focus + home-only notice
+
+Changes:
+- Renamed “Rankings” nav label to “Statistics” (route remains /strictness; added /statistics alias).
+- Statistics page now shows *County Statistics* (median overage grouped by county) with clean one-line rows.
+  - Displays full state name + county name.
+  - County name links to Map view with that county filter pre-applied.
+- Map page: when a county is selected (county_geoid in query string), the map loads the county boundary (if geom is available) and zooms to it; pins remain filtered to that county.
+- Global notice now appears only on the Home page and no longer shows “LEGAL NOTICE:” prefix.
+
+Files changed:
+- templates/base.html
+- templates/strictness.html
+- templates/map_page.html
+- app.py
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+
+EnforcedSpeed v272 (2026-02-07) — Square, full-bleed maps + tighter county zoom + merge notice into Home “Important”
+
+Changes:
+- Feed card static map previews are now **full-bleed** (flush to the ticket card edges) and **square**.
+- Map page interactive map is now **full-bleed** inside its card and uses a **square** aspect ratio for a cleaner, consistent look.
+- County boundary focus on the map now zooms **one level closer** after fitBounds for a tighter county view.
+- Removed the separate “Posted speed limits are the law…” banner from the top of the site.
+- Home page “Important” disclaimer now begins with: “Posted speed limits…” (per requested wording).
+
+Files changed:
+- templates/base.html
+- templates/home_feed.html
+- templates/map_page.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+
+EnforcedSpeed v273 (2026-02-07) — Square maps (kept) + reverted non-flush container padding
+
+Changes:
+- Feed card static map preview remains **square**, but is no longer full-bleed; it sits inside the ticket card padding again (restored border + rounded corners).
+- Map page interactive map remains **square**, but is no longer full-bleed; it sits inside the card padding again (restored border-radius/clip on the map canvas).
+
+Files changed:
+- templates/home_feed.html
+- templates/map_page.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+
+EnforcedSpeed v274 (2026-02-08) — Feed map preview truly square (removed fixed height)
+
+Changes:
+- Fixed feed ticket static map preview not rendering as square: removed the global fixed height (320px) on .ticket-staticmap-wrap so aspect-ratio 1/1 can take effect.
+- Added explicit height/max-height reset in home_feed.html to ensure square sizing wins.
+
+Files changed:
+- templates/_mvp_styles.html
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+
+EnforcedSpeed v275 (2026-02-08) — Square *container* (frame), map fits inside (no cropping)
+
+Changes:
+- Kept the feed static map frame square, but changed the map image behavior to **fit inside the square container** (no forced square crop).
+- Static map requests now use a rectangular size (640x480) and the image uses object-fit: contain, so the *container* is square while the map scales to fit within it.
+
+Files changed:
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+EnforcedSpeed v276 (2026-02-08) — Square *media block* (map + actions), map becomes shorter (FB-style)
+
+Changes:
+- The **square frame is now the entire media block** (map + action row), not the map element alone.
+  - This makes the map **less tall** inside the square (FB-style), instead of forcing a square map.
+- Map area uses a **4:3** static map image (640x480) and fills the top region; action row and (optional) caption sit in the bottom region.
+- When a map exists, the caption is shown in the media footer and clamped to 2 lines; the old caption block below is suppressed to avoid duplication.
+
+Files changed:
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+
+EnforcedSpeed v277 (2026-02-08) — Make the *media block* stay perfectly square (map shrinks, footer clamped)
+
+Changes:
+- Fixed the feed “square media block” not actually staying square: content in the footer could force the container to grow taller than wide.
+- Switched .ticket-media-square layout from CSS grid to a strict flex-column with aspect-ratio: 1/1, so the map region automatically shrinks to accommodate the footer.
+- Clamped the media footer height (overflow hidden) so the square never expands.
+
+Files changed:
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+v278 (2026-02-08) — Feed: square map frame only; Like/Comment below
+Summary:
+- Made the *map preview frame* square (FB-style), while keeping Like/Comment and caption below the map (outside the square).
+- Map image now uses object-fit: contain inside the square frame so the map can be less tall (letterboxed) instead of forcing a tall square map.
+- Removed the previous .ticket-media-square/.ticket-media-footer structure that was pulling actions into the media block and breaking the intended square measurement.
+
+Files changed:
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+v279 (2026-02-08) — Feed: square map frame actually fills (remove gray gap)
+Summary:
+- The square *map frame* is kept, but the static map image is now requested as a square (640×640) so it fills the square frame cleanly (no big gray letterbox gap).
+- Like/Comment remains below the map (outside the map frame).
+
+Files changed:
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+

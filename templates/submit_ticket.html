@@ -1,0 +1,780 @@
+{% extends "base.html" %}
+
+{% block title %}Submit a Ticket | EnforcedSpeed{% endblock %}
+
+{% block content %}
+<div class="wrap" style="max-width: 720px;">
+  <div class="card" style="margin-top: 14px;">
+    <div class="card-body">
+
+      <div style="margin-bottom:14px; text-align:center;">
+        <h1 style="margin:0;">Submit a Ticket</h1>
+        <div class="subtle" style="margin-top:6px; font-size:14px;">Received a speeding ticket? Post to see how you compare.</div>
+      </div>
+<form method="POST" enctype="multipart/form-data" novalidate>
+        {{ form.csrf_token }}
+
+        <input type="hidden" id="stHidden" name="state" value="{{ form.state.data or "" }}">
+        <input type="hidden" id="countyGeoid" name="county_geoid" value="{{ form.county_geoid.data or '' }}">
+        <input type="hidden" id="latHidden" name="lat" value="{{ form.lat.data or '' }}">
+        <input type="hidden" id="lngHidden" name="lng" value="{{ form.lng.data or '' }}">
+
+        <style>
+  .submit-grid{display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); gap:12px; margin-top:14px;}
+  .sg-span-12{grid-column:span 12;}
+  .sg-span-9{grid-column:span 9;}
+  .sg-span-6{grid-column:span 6;}
+  .sg-span-3{grid-column:span 3;}
+
+  .es-label{display:block; font-weight:600; margin-bottom:6px;}
+  .es-label-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;}
+  .es-label-left{display:flex; align-items:center; gap:8px; min-width:0;}
+  .es-label-right{display:flex; align-items:center; gap:8px; flex-shrink:0;}
+  .es-muted{color:#6b7280; font-size:.9rem;}
+  .submit-status{color:#6b7280; font-size:.9rem; line-height:1.2;}
+  .submit-statusline{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:2px;}
+  .submit-statusline .submit-status{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .submit-statusline .pill{flex:0 0 auto;}
+
+
+  .submit-divider-text{display:flex; align-items:center; gap:10px; margin:6px 0 2px;}
+  .submit-divider-text::before,.submit-divider-text::after{content:""; flex:1; height:1px; background:#eef2f7; border-radius:999px;}
+  .submit-divider-text span{color:#9ca3af; font-size:12px; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap;}
+  @media (max-width: 640px){
+    .sg-span-6,.sg-span-3,.sg-span-9{grid-column:span 12;}
+  }
+</style>
+
+<div class="submit-grid">
+
+  <div class="sg-span-6">
+    <label class="es-label">State</label>
+    <div style="position:relative;">
+      <input
+        id="stateInput"
+        name="state_query"
+        value=""
+        placeholder="Type state (e.g., VA or Virginia)"
+        style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;"
+        autocomplete="off"
+      >
+      <div id="stateDropdown" style="position:relative;"></div>
+    </div>
+  </div>
+
+  <div class="sg-span-6">
+    <label class="es-label">County</label>
+    <input id="countyInput" name="county_query" value="{{ form.county_query.data or '' }}" placeholder="Start typing (e.g., Clay)" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;" autocomplete="off">
+    <div id="countyDropdown" style="position:relative;"></div>
+  </div>
+
+  <div class="sg-span-6">
+    <label class="es-label">Road</label>
+    <input name="road_name" value="{{ form.road_name.data or '' }}" placeholder="Example: I-70 EB, US-69, Main St" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;" maxlength="200">
+  </div>
+
+  <div class="sg-span-3">
+    <label class="es-label">Posted speed</label>
+    <input name="posted_speed" value="{{ form.posted_speed.data or '' }}" inputmode="numeric" placeholder="e.g. 55 mph" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;">
+  </div>
+
+  <div class="sg-span-3">
+    <label class="es-label">Ticketed speed</label>
+    <input name="ticketed_speed" value="{{ form.ticketed_speed.data or '' }}" inputmode="numeric" placeholder="e.g. 68 mph" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;">
+  </div>
+
+  <div class="sg-span-12 submit-divider-text"><span>Optional items below</span></div>
+
+  <div class="sg-span-6">
+    <div class="es-label-row">
+      <div class="es-label-left">
+        <div style="font-weight:600;">Map pin</div>
+      </div>
+      <div class="es-label-right">
+        <button type="button" id="togglePin" class="es-btn">Set location</button>
+        <button type="button" id="clearPin" class="es-btn es-btn--danger" style="display:none;">Clear</button>
+      </div>
+    </div>
+    <div id="pinStatus" class="submit-statusline">
+      <span id="pinStatusText" class="submit-status">No pin set</span>
+      <span id="pinPill" class="pill pill-photo pill-pin" style="display:none;">Pin ✓</span>
+    </div>
+  </div>
+
+  <div class="sg-span-6">
+    <div class="es-label-row">
+      <div class="es-label-left">
+        <div style="font-weight:600;">Ticket Photo</div>
+      </div>
+      <div class="es-label-right">
+        <button type="button" id="photoBtn" class="es-btn">Choose file</button>
+      </div>
+    </div>
+    <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none;">
+    <div id="photoName" class="submit-statusline">
+      <span id="photoNameText" class="submit-status">No file chosen</span>
+      <span id="photoPill" class="pill pill-photo pill-photo-ok" style="display:none;">Photo ✓</span>
+    </div>
+  </div>
+
+  <div class="sg-span-12" id="pinBox" style="margin-top:2px;">
+    <div id="pinPreview">
+      <img id="pinPreviewImg" alt="County preview" src="/api/county_staticmap?w=640&h=640" style="width:100%; max-width:720px; border-radius:12px; border:1px solid #e5e7eb;" />
+    </div>
+  </div>
+
+  <div class="sg-span-9" id="captionBox">
+    <label class="es-label">Caption</label>
+    <input type="text" name="caption" maxlength="500" value="{{ form.caption.data or '' }}" placeholder="What do you think about this ticket?" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px; box-sizing:border-box; max-width:100%; display:block;">
+  </div>
+
+  <div class="sg-span-3" style="display:flex; align-items:flex-end; justify-content:flex-end;">
+    <button type="submit" class="es-btn" style="width:100%; height:44px; margin-top:0; font-weight:600;">Submit</button>
+  </div>
+
+</div>
+      </form>
+
+      {% if errors and errors|length %}
+        <div style="margin-top:12px; padding:12px; border:1px solid #fecaca; background:#fff1f2; border-radius:12px; color:#991b1b;">
+          <div style="font-weight:600; margin-bottom:6px;">Fix these:</div>
+          <ul style="margin:0; padding-left:18px;">
+            {% for e in errors %}
+              <li>{{ e }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <!-- Pin Picker Modal -->
+      <div id="pinModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); padding:24px;">
+        <div style="max-width:900px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 25px 60px rgba(0,0,0,.25);">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #e5e7eb;">
+            <div>
+              <div style="font-weight:800; font-size:1.05rem;">Place a pin</div>
+              <div id="pinCountyLabel" style="margin-top:2px; color:#6b7280; font-size:.9rem;"></div>
+            </div>
+            <button type="button" id="pinClose" style="border:1px solid #e5e7eb; background:#fff; border-radius:12px; padding:8px 10px; font-weight:600;">✕</button>
+          </div>
+          <div style="padding:14px 16px;">
+            <div id="pinError" style="display:none; margin-bottom:10px; padding:10px 12px; border:1px solid #fecaca; background:#fff1f2; border-radius:12px; color:#991b1b;"></div>
+            <div style="margin-bottom:10px; color:#6b7280; font-size:.95rem;">Click anywhere in the county to set your pin. You can adjust it before saving.</div>
+            <div id="pinMap" style="height:460px; width:100%; border-radius:16px; border:1px solid #e5e7eb;"></div>
+          </div>
+          <div style="display:flex; gap:10px; justify-content:flex-end; padding:14px 16px; border-top:1px solid #e5e7eb; background:#fafafa;">
+            <button type="button" id="pinCancel" style="border:1px solid #e5e7eb; background:#fff; border-radius:12px; padding:10px 12px; font-weight:600;">Cancel</button>
+            <button type="button" id="pinUse" style="border:1px solid #d1d5db; background:#111827; color:#fff; border-radius:12px; padding:10px 12px; font-weight:800;">Use this pin</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const defaultSt = {{ (default_st or '')|tojson }};
+  const statePairs = {{ states|tojson }}; // [["AL","Alabama"], ...]
+  const mapsApiKey = {{ (maps_api_key or '')|tojson }};
+
+  const stHidden = document.getElementById('stHidden');
+  const stateInput = document.getElementById('stateInput');
+  const stateDropdownHost = document.getElementById('stateDropdown');
+
+  const countyInput = document.getElementById('countyInput');
+  const countyHelp = document.getElementById('countyHelp');
+  const countyGeoid = document.getElementById('countyGeoid');
+  const countyDropdownHost = document.getElementById('countyDropdown');
+
+  function toCode(s){ return (s||'').trim().toUpperCase(); }
+  function toNorm(s){ return (s||'').trim().toLowerCase(); }
+
+  const states = (statePairs || []).map(p => ({ code: toCode(p[0]), name: (p[1]||'').trim() }));
+  const stateByCode = Object.fromEntries(states.map(s => [s.code, s.name]));
+
+  function clearStateDropdown(){ stateDropdownHost.innerHTML = ''; }
+  function clearCountyDropdown(){ countyDropdownHost.innerHTML = ''; }
+
+  function setState(code, opts){
+    const o = opts || {};
+    const clearCounty = (o.clearCounty !== false);
+
+    const st = toCode(code);
+    if(!st || !stateByCode[st]) return;
+
+    stHidden.value = st;
+    stateInput.value = `${st} — ${stateByCode[st]}`;
+
+    if(clearCounty){
+      countyInput.value = '';
+      countyGeoid.value = '';
+      clearCountyDropdown();
+
+      // Changing state invalidates any existing pin and clears the preview.
+      clearPinAll();
+      syncPinStatus();
+    }
+  }
+
+  function findStateFromFreeText(text){
+    const raw = (text||'').trim();
+    if(!raw) return null;
+
+    const up = toCode(raw);
+    if(up.length === 2 && stateByCode[up]) return up;
+
+    // Allow formats like "VA - Virginia" or "Virginia (VA)"
+    const m = raw.match(/\b([A-Za-z]{2})\b/);
+    if(m){
+      const cand = toCode(m[1]);
+      if(stateByCode[cand]) return cand;
+    }
+
+    const n = toNorm(raw);
+    // exact name match
+    for(const s of states){
+      if(toNorm(s.name) === n) return s.code;
+    }
+    // startswith name match
+    for(const s of states){
+      if(toNorm(s.name).startsWith(n)) return s.code;
+    }
+    return null;
+  }
+
+  function matchStates(q){
+    const raw = (q||'').trim();
+    if(!raw) return states;
+
+    const up = toCode(raw);
+    const n = toNorm(raw);
+
+    let out = [];
+
+    // Prefer code matches first
+    if(up.length <= 2){
+      out = states.filter(s => s.code.startsWith(up));
+    }
+
+    // Then name matches
+    const nameMatches = states.filter(s => toNorm(s.name).includes(n));
+
+    // De-dupe while preserving order
+    const seen = new Set();
+    const merged = [...out, ...nameMatches].filter(s => {
+      const key = s.code;
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return merged;
+  }
+
+  let lastStateItems = [];
+  function renderStateDropdown(items){
+    clearStateDropdown();
+    lastStateItems = items || [];
+    if(!lastStateItems.length) return;
+
+    const box = document.createElement('div');
+    box.style.position='absolute';
+    box.style.zIndex='60';
+    box.style.width='100%';
+    box.style.marginTop='4px';
+    box.style.border='1px solid #e5e7eb';
+    box.style.borderRadius='12px';
+    box.style.background='#fff';
+    box.style.boxShadow='0 12px 30px rgba(0,0,0,.08)';
+    box.style.overflow='hidden';
+
+    lastStateItems.slice(0, 15).forEach(it => {
+      const row = document.createElement('button');
+      row.type='button';
+      row.style.display='block';
+      row.style.width='100%';
+      row.style.textAlign='left';
+      row.style.padding='10px 12px';
+      row.style.border='0';
+      row.style.background='transparent';
+      row.style.cursor='pointer';
+      row.innerHTML = `<div style="font-weight:800;">${it.code}</div><div style="color:#6b7280; font-size:.9rem;">${it.name}</div>`;
+      row.addEventListener('click', () => {
+        setState(it.code, {clearCounty:true});
+        clearStateDropdown();
+        countyInput.focus();
+      });
+      row.addEventListener('mouseenter', () => row.style.background = '#f9fafb');
+      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+      box.appendChild(row);
+    });
+
+    stateDropdownHost.appendChild(box);
+  }
+
+  stateInput.addEventListener('focus', () => {
+    // Show top suggestions on focus
+    renderStateDropdown(matchStates(''));
+  });
+
+  stateInput.addEventListener('input', () => {
+    const q = stateInput.value;
+    renderStateDropdown(matchStates(q));
+  });
+
+  stateInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      // If dropdown has items, pick the first
+      if(lastStateItems && lastStateItems.length){
+        setState(lastStateItems[0].code, {clearCounty:true});
+        clearStateDropdown();
+        return;
+      }
+      // Otherwise try to interpret what they typed
+      const st = findStateFromFreeText(stateInput.value);
+      if(st){
+        setState(st, {clearCounty:true});
+        clearStateDropdown();
+      }
+      return;
+    }
+    if(e.key === 'Escape'){
+      clearStateDropdown();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#stateDropdown') || e.target === stateInput) return;
+    clearStateDropdown();
+  });
+
+  // --- County autocomplete ---
+  let abortCtl = null;
+  let lastCountyItems = [];
+
+  async function fetchCounties(q){
+    if (abortCtl) abortCtl.abort();
+    abortCtl = new AbortController();
+    const st = (stHidden.value || '').trim();
+    if(!st){
+      if(countyHelp) countyHelp.textContent = 'Select a state first (required).';
+      return [];
+    }
+    const url = `/api/counties?st=${encodeURIComponent(st)}&q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, {signal: abortCtl.signal});
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (!data || !data.ok) return [];
+    return data.counties || [];
+  }
+
+  function renderCountyDropdown(items){
+    clearCountyDropdown();
+    lastCountyItems = items || [];
+    if (!lastCountyItems.length) return;
+
+    const box = document.createElement('div');
+    box.style.position='absolute';
+    box.style.zIndex='50';
+    box.style.width='100%';
+    box.style.marginTop='4px';
+    box.style.border='1px solid #e5e7eb';
+    box.style.borderRadius='12px';
+    box.style.background='#fff';
+    box.style.boxShadow='0 12px 30px rgba(0,0,0,.08)';
+    box.style.overflow='hidden';
+
+    lastCountyItems.slice(0, 20).forEach(it => {
+      const row = document.createElement('button');
+      row.type='button';
+      row.style.display='block';
+      row.style.width='100%';
+      row.style.textAlign='left';
+      row.style.padding='10px 12px';
+      row.style.border='0';
+      row.style.background='transparent';
+      row.style.cursor='pointer';
+      row.innerHTML = `<div style="font-weight:600;">${it.namelsad}</div><div style="color:#6b7280; font-size:.9rem;">${it.stusps} • ${it.state_name}</div>`;
+      row.addEventListener('click', () => {
+        countyInput.value = `${it.namelsad}, ${it.stusps}`;
+        countyGeoid.value = it.geoid;
+        // County change invalidates any existing pin and refreshes the preview.
+        clearPinAll();
+        clearCountyDropdown();
+      });
+      row.addEventListener('mouseenter', () => row.style.background = '#f9fafb');
+      row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+      box.appendChild(row);
+    });
+
+    countyDropdownHost.appendChild(box);
+  }
+
+  let lastQ = '';
+  countyInput.addEventListener('input', async () => {
+    const q = countyInput.value.trim();
+    countyGeoid.value = '';
+    syncPinStatus();
+    if (q.length < 2) { clearCountyDropdown(); return; }
+    if (q === lastQ) return;
+    lastQ = q;
+    try {
+      const items = await fetchCounties(q);
+      renderCountyDropdown(items);
+    } catch (err) {
+      // ignore abort
+    }
+  });
+
+  countyInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      // Prevent accidental form submit. If we have suggestions, pick the first.
+      e.preventDefault();
+      if(lastCountyItems && lastCountyItems.length){
+        const it = lastCountyItems[0];
+        countyInput.value = `${it.namelsad}, ${it.stusps}`;
+        countyGeoid.value = it.geoid;
+        // County change invalidates any existing pin and refreshes the preview.
+        clearPinAll();
+        clearCountyDropdown();
+      }
+      return;
+    }
+    if(e.key === 'Escape'){
+      clearCountyDropdown();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#countyDropdown') || e.target === countyInput) return;
+    clearCountyDropdown();
+  });
+
+  // --- Pin picker (modal map) ---
+  const togglePin = document.getElementById('togglePin');
+  const pinBox = document.getElementById('pinBox');
+  const pinStatus = document.getElementById('pinStatus');
+  const pinStatusText = document.getElementById('pinStatusText');
+  const pinPill = document.getElementById('pinPill');
+  const pinPreview = document.getElementById('pinPreview');
+  const pinPreviewImg = document.getElementById('pinPreviewImg');
+  const clearPinBtn = document.getElementById('clearPin');
+  const latHidden = document.getElementById('latHidden');
+  const lngHidden = document.getElementById('lngHidden');
+
+  // --- Photo chooser (custom button) ---
+  const photoBtn = document.getElementById('photoBtn');
+  const photoInput = document.getElementById('photoInput');
+  const photoName = document.getElementById('photoName');
+  const photoNameText = document.getElementById('photoNameText');
+  const photoPill = document.getElementById('photoPill');
+  if (photoBtn && photoInput) {
+    photoBtn.addEventListener('click', () => {
+      try { photoInput.click(); } catch(e) {}
+    });
+    photoInput.addEventListener('change', () => {
+      const f = (photoInput.files && photoInput.files[0]) ? photoInput.files[0] : null;
+      const nameEl = photoNameText || photoName;
+      if (nameEl) nameEl.textContent = f ? f.name : 'No file chosen';
+      if (photoPill) photoPill.style.display = f ? 'inline-block' : 'none';
+    });
+  }
+
+  const pinModal = document.getElementById('pinModal');
+  const pinMapEl = document.getElementById('pinMap');
+  const pinCloseBtn = document.getElementById('pinClose');
+  const pinCancelBtn = document.getElementById('pinCancel');
+  const pinUseBtn = document.getElementById('pinUse');
+  const pinError = document.getElementById('pinError');
+  const pinCountyLabel = document.getElementById('pinCountyLabel');
+
+  let pinMap = null;
+  let pinMarker = null;
+  let pendingLatLng = null;
+
+  function showPinError(msg){
+    if(!pinError) return;
+    pinError.textContent = msg || 'Something went wrong.';
+    pinError.style.display = 'block';
+  }
+
+  function clearPinError(){
+    if(!pinError) return;
+    pinError.textContent = '';
+    pinError.style.display = 'none';
+  }
+
+  function setPin(lat, lng){
+    latHidden.value = (lat != null ? String(lat) : '').trim();
+    lngHidden.value = (lng != null ? String(lng) : '').trim();
+    syncPinStatus();
+  }
+
+  function clearPinAll(){
+    latHidden.value = '';
+    lngHidden.value = '';
+    syncPinStatus();
+  }
+
+  function syncPinStatus(){
+    const geoid = (countyGeoid.value || '').trim();
+    const lat = (latHidden.value||'').trim();
+    const lng = (lngHidden.value||'').trim();
+
+    // Preview: show once a county is selected. If a pin is set, include it and center on it.
+    if (geoid) {
+      if (pinBox) pinBox.style.display = 'block';
+      if (pinPreview && pinPreviewImg) {
+        pinPreview.style.display = 'block';
+        const w = 640;
+        const h = 640;
+        let src = `/api/county_staticmap?geoid=${encodeURIComponent(geoid)}&w=${w}&h=${h}`;
+        if (lat && lng) {
+          src = `/api/county_staticmap?geoid=${encodeURIComponent(geoid)}&pin_lat=${encodeURIComponent(lat)}&pin_lng=${encodeURIComponent(lng)}&center_on_pin=1&w=${w}&h=${h}`;
+        }
+        pinPreviewImg.src = src;
+      }
+    } else {
+      if (pinBox) pinBox.style.display = 'block';
+      if (pinPreview && pinPreviewImg) {
+        pinPreview.style.display = 'block';
+        const w = 640;
+        const h = 640;
+        pinPreviewImg.src = `/api/county_staticmap?w=${w}&h=${h}`;
+      }
+    }
+
+    // Status + clear button
+    if (lat && lng) {
+      const statusEl = pinStatusText || pinStatus;
+      if (statusEl) statusEl.textContent = `Pin set: ${lat}, ${lng}`;
+      if (clearPinBtn) clearPinBtn.style.display = 'inline-block';
+    } else {
+      const statusEl = pinStatusText || pinStatus;
+      if (statusEl) statusEl.textContent = 'No pin set';
+      if (clearPinBtn) clearPinBtn.style.display = 'none';
+    }
+
+    // Pin pill (only after pin set)
+    if (pinPill) pinPill.style.display = (lat && lng) ? 'inline-block' : 'none';
+  }
+
+  if (clearPinBtn) {
+    clearPinBtn.addEventListener('click', () => {
+      clearPinAll();
+    });
+  }
+
+  function loadMaps(cb){
+    if (window.google && window.google.maps) {
+      cb();
+      return;
+    }
+    if (!mapsApiKey) {
+      showPinError('Google Maps key is not configured.');
+      return;
+    }
+
+    // singleton loader for this page
+    if (window.__esSubmitMapsLoading) {
+      (window.__esSubmitMapsCbs = window.__esSubmitMapsCbs || []).push(cb);
+      return;
+    }
+    window.__esSubmitMapsLoading = true;
+    window.__esSubmitMapsCbs = [cb];
+    window.__esSubmitMapsInit = () => {
+      const cbs = window.__esSubmitMapsCbs || [];
+      window.__esSubmitMapsCbs = [];
+      cbs.forEach(fn => { try { fn(); } catch(e){} });
+    };
+    const s = document.createElement('script');
+    s.async = true;
+    s.defer = true;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsApiKey)}&libraries=geometry&callback=__esSubmitMapsInit`;
+    document.head.appendChild(s);
+  }
+
+  function openModal(){
+    clearPinError();
+
+    const geoid = (countyGeoid.value || '').trim();
+    if(!geoid){
+      showPinError('Select a county first (pick one from the dropdown).');
+      pinModal.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      return;
+    }
+
+    pinModal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+
+    loadMaps(async () => {
+      try {
+        await ensurePinMap(geoid);
+      } catch (e) {
+        showPinError(e && e.message ? e.message : 'Unable to load county boundary.');
+      }
+    });
+  }
+
+  function closeModal(){
+    pinModal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  if (pinCloseBtn) pinCloseBtn.addEventListener('click', closeModal);
+  if (pinCancelBtn) pinCancelBtn.addEventListener('click', closeModal);
+  pinModal.addEventListener('click', (e) => {
+    if (e.target === pinModal) closeModal();
+  });
+
+  togglePin.addEventListener('click', () => {
+    openModal();
+  });
+
+  async function fetchCountyGeom(geoid){
+    const r = await fetch(`/api/county_geom/${encodeURIComponent(geoid)}`);
+    const data = await r.json();
+    if (!data || !data.ok || !data.geojson) {
+      throw new Error('County boundary unavailable.');
+    }
+    return data;
+  }
+
+  function processPoints(geometry, callback, thisArg) {
+    if (!geometry) return;
+    if (geometry instanceof google.maps.LatLng) {
+      callback.call(thisArg, geometry);
+    } else if (geometry instanceof google.maps.Data.Point) {
+      callback.call(thisArg, geometry.get());
+    } else {
+      geometry.getArray().forEach(function(g) {
+        processPoints(g, callback, thisArg);
+      });
+    }
+  }
+
+  async function ensurePinMap(geoid){
+    if (!pinMap) {
+      pinMap = new google.maps.Map(pinMapEl, {
+        center: {lat: 39.5, lng: -98.35},
+        zoom: 4,
+        mapTypeId: 'roadmap',
+        streetViewControl: false,
+        fullscreenControl: false,
+        mapTypeControl: false,
+        // Allow mouse-wheel zoom without holding Ctrl (desktop UX).
+        gestureHandling: 'greedy',
+        scrollwheel: true,
+      });
+
+      function placeOrMoveMarker(latLng){
+        if (!latLng) return;
+        pendingLatLng = latLng;
+        if (!pinMarker) {
+          pinMarker = new google.maps.Marker({ position: pendingLatLng, map: pinMap, draggable: true });
+          pinMarker.addListener('dragend', (ev) => {
+            if (ev && ev.latLng) pendingLatLng = ev.latLng;
+          });
+        } else {
+          pinMarker.setDraggable(true);
+          pinMarker.setPosition(pendingLatLng);
+        }
+      }
+
+      pinMap.data.setStyle({
+        strokeColor: '#111827',
+        strokeWeight: 2,
+        fillColor: '#111827',
+        fillOpacity: 0.10,
+        // Let clicks fall through to the map (we also handle data-layer clicks explicitly).
+        clickable: false,
+      });
+
+      // Click anywhere on the map to place/move the pin.
+      pinMap.addListener('click', (e) => {
+        if (!e || !e.latLng) return;
+        placeOrMoveMarker(e.latLng);
+      });
+
+      // Also handle clicks on the county boundary layer.
+      pinMap.data.addListener('click', (e) => {
+        if (!e || !e.latLng) return;
+        placeOrMoveMarker(e.latLng);
+      });
+    }
+
+    clearPinError();
+    pinCountyLabel.textContent = countyInput.value || `County GEOID ${geoid}`;
+
+    const data = await fetchCountyGeom(geoid);
+    // Clear old boundary
+    pinMap.data.forEach((f) => pinMap.data.remove(f));
+    pinMap.data.addGeoJson(data.geojson);
+
+    // Fit to bounds
+    const bounds = new google.maps.LatLngBounds();
+    pinMap.data.forEach(function(feature){
+      processPoints(feature.getGeometry(), bounds.extend, bounds);
+    });
+    if (!bounds.isEmpty()) {
+      pinMap.fitBounds(bounds, 24);
+    } else if (data.centroid && data.centroid.lat != null && data.centroid.lng != null) {
+      pinMap.setCenter({lat: data.centroid.lat, lng: data.centroid.lng});
+      pinMap.setZoom(11);
+    }
+
+    // Seed marker from existing hidden pin or centroid
+    const curLat = parseFloat((latHidden.value||'').trim());
+    const curLng = parseFloat((lngHidden.value||'').trim());
+    if (Number.isFinite(curLat) && Number.isFinite(curLng)) {
+      pendingLatLng = new google.maps.LatLng(curLat, curLng);
+    } else if (data.centroid && data.centroid.lat != null && data.centroid.lng != null) {
+      pendingLatLng = new google.maps.LatLng(data.centroid.lat, data.centroid.lng);
+    } else {
+      pendingLatLng = null;
+    }
+
+    if (pendingLatLng) {
+      if (!pinMarker) {
+        pinMarker = new google.maps.Marker({ position: pendingLatLng, map: pinMap, draggable: true });
+        pinMarker.addListener('dragend', (ev) => {
+          if (ev && ev.latLng) pendingLatLng = ev.latLng;
+        });
+      } else {
+        pinMarker.setDraggable(true);
+        pinMarker.setPosition(pendingLatLng);
+      }
+    }
+
+    // Label
+    try {
+      const f = (data.geojson.features && data.geojson.features[0]) || null;
+      const p = (f && f.properties) || {};
+      const countyName = p.namelsad || p.name || '';
+      const stusps = p.stusps || '';
+      pinCountyLabel.textContent = (countyName ? `${countyName}${stusps ? ', ' + stusps : ''}` : (countyInput.value || `County GEOID ${geoid}`));
+    } catch(e) {}
+  }
+
+  pinUseBtn.addEventListener('click', () => {
+    if (!pendingLatLng) {
+      showPinError('Click on the map to place the pin.');
+      return;
+    }
+    setPin(pendingLatLng.lat().toFixed(6), pendingLatLng.lng().toFixed(6));
+    closeModal();
+  });
+
+  // init
+  const initialSt = toCode(stHidden.value || defaultSt);
+  if(stateByCode[initialSt]){
+    setState(initialSt, {clearCounty:false});
+  }else{
+    setState(defaultSt, {clearCounty:false});
+  }
+  syncPinStatus();
+})();
+</script>
+{% endblock %}

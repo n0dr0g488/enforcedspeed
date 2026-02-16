@@ -1,0 +1,28 @@
+EnforcedSpeed — Web Changelog (v331–v340)
+
+v334 (2026-02-15)
+- Interactive map: switched pins to classic teardrop SVG icons (consistent sizing/anchor) with thicker outline.
+- Map focus coloring:
+  - Selected ticket pin: Deep Red (#dc2626)
+  - Other pins inside focused county/state: Rose (#fb7185)
+  - Pins outside the focused county/state: Warm Gray (#a1a1aa)
+- Home feed: state + county links now pass focus_* params (focus without forcing a filter) and include ticket_id for selected pin.
+- Map pins API: supports viewport bounds + returns inside_focus + selected_id for client coloring.
+
+[v335] 2026-02-15 — Hotfix: fix NameError on home page
+- Fixed a stray reference to `viewport_mode` in the home feed query logic that caused a startup crash (NameError).
+- Removed accidental viewport-only filtering code from the home feed; viewport logic remains confined to /api/map_pins.
+
+
+[v336] 2026-02-15 — Map pin center dot: switch from white to charcoal
+- Pin SVG inner circle now uses a charcoal center (fill #111827 at 22% opacity) for a cleaner look across Deep Red / Rose / Warm Gray.
+
+
+v337 (2026-02-15) — Static map pin consistency + updated colors
+- Added hosted pin PNG assets (selected yellow, inside deep red, outside warm gray) and used them for interactive map markers.
+- Static Maps proxy endpoints now use the same hosted pin icon (production-visible; local dev uses localhost and may not render custom icon).
+- Slightly darkened pin outline and increased pin size slightly for readability.
+v338 (2026-02-15)
+- Hotfix: fixed indentation error in county_static_map_url (static map params block) that prevented app from launching.
+
+[v339] 2026-02-15 Fix static map proxy indentation errors (api_staticmap) + remove undefined icon_url in static_map_url.

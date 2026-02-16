@@ -1,0 +1,34 @@
+CHANGELOG v201–v210
+
+v205 (2026-02-01)
+- API: Added /api/tickets/<id>/insights endpoint returning the same percentile stats as the web thank-you page (for mobile post-submit insights).
+- API: /api/tickets create now captures location_hint (city/town) when provided.
+- API: /api/road_autocomplete now defaults to strict-bounds when state bounds are available.
+
+v206 (2026-02-01)
+- UI: Fix Step 1 city/town autocomplete dropdown anchoring by wrapping the city input + suggestion list in a relative container.
+- UI: Add max-height + scroll to the shared autocomplete dropdown styling.
+
+v207 (2026-02-01)
+- UI: Step 2 adds a Yes/No toggle for "Was this ticket on an interstate/highway?" and passes the preference to /api/confirm_location.
+- API: /api/confirm_location can now bias snapping toward highways using a small, cost-controlled jitter search (default 50m) when prefer_highway=true.
+- UI: Pin map now starts slightly more zoomed-out for easier road selection; Step 3 label clarified as optional.
+
+
+v208 (2026-02-01)
+- API: prefer_highway snapping now uses a much wider primary jitter ring (1500m) with smaller fallback rings to better land on interstates/highways when users drop a rough pin.
+- UI: Step 1 grid alignment tweaked so the State field top-aligns with the City/Town field (no more bottom alignment drift).
+- UI: Added breathing room above the Step 1 "Next: confirm location" button.
+
+v209 (2026-02-01)
+- API: prefer_highway max search radius increased to 2500m and can reject non-highway results when user answers Yes.
+- NOTE: v209 zip had a boot issue in app.py (do not use).
+
+v210 (2026-02-01)
+- FIX: Resolve v209 boot issue (app.py now launches cleanly).
+- API: prefer_highway snapping now batches Roads API lookups for jitter candidates (fewer calls), reverse-geocodes a small budgeted set, and enforces a minimum highway score.
+- API: When prefer_highway=true and no highway/interstate is found within 2500m, /api/confirm_location returns 400 no_highway_found (user must move the pin or choose No).
+
+
+v223 (2026-02-05)
+- County import: fix GDAL docker image reference (use ghcr.io/osgeo/gdal:alpine-small-latest).

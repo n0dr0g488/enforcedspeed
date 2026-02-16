@@ -1,0 +1,355 @@
+============================
+ENFORCEDSPEED — HANDOFF (Web)
+Bundled: v301–v350
+============================
+
+v301 — 2026-02-14 — Submit polish + changelog tidy
+Source ZIP: EnforcedSpeed_v300_2026-02-14_submit_align_bundle_logs.zip
+Changes:
+- Submit: removed Pin ✓ / Photo ✓ pills (temporary, per request).
+- Submit: "Photo" label renamed to "Ticket Photo".
+- Submit: caption now has placeholder text: "What do you think about this ticket?"
+- Changelogs moved to /changelogs to de-clutter root (kept 10-version block convention + new CHANGELOG_v301-310.txt).
+Test:
+- Open /submit: confirm no pills, label shows "Ticket Photo", caption placeholder appears when empty.
+- Confirm app runs normally; no code-path changes beyond template/CSS hygiene.
+
+
+
+v302 — 2026-02-14 — Submit consistency + conditional pills
+Source ZIP: EnforcedSpeed_v301_2026-02-14_changelogs_tidy_ticket_photo_no_pills.zip
+Changes:
+- Submit: Caption field now uses input-style control so placeholder matches other fields.
+- Submit: status text (No pin set / No file chosen) uses a shared style for consistent typography.
+- Submit: Pin ✓ and Photo ✓ pills restored under their buttons, but only appear after a pin is set or a photo file is selected.
+Files changed:
+- templates/submit_ticket.html
+- changelogs/CHANGELOG_v301-310.txt
+- handoffs/HANDOFF_v301-350.txt
+- VERSION.txt
+Test steps:
+1) Open /submit. Confirm Caption placeholder matches other input placeholders.
+2) Confirm no pills show initially.
+3) Click Set location, place a pin, Use this pin — Pin ✓ appears under Set location.
+4) Choose a photo file — Photo ✓ appears under Choose file; clearing file hides it.
+5) Confirm No pin set and No file chosen styling matches.
+
+
+
+v303 — 2026-02-14 — Submit inline pills on status line
+Source ZIP: EnforcedSpeed_v302_2026-02-14_submit_consistency_conditional_pills.zip
+Changes:
+- Submit: move earned Pin ✓ and Photo ✓ pills onto the same line as their respective status text ("Pin set…" / filename), eliminating the extra blank row.
+- Pills remain conditional (only show after pin set / photo selected).
+Files changed:
+- templates/submit_ticket.html
+- changelogs/CHANGELOG_v301-310.txt
+- handoffs/HANDOFF_v301-350.txt
+- VERSION.txt
+Test steps:
+1) Open /submit — confirm no pills show initially.
+2) Set a pin — confirm "Pin set: …" and Pin ✓ appear on the same line.
+3) Choose a photo — confirm filename and Photo ✓ appear on the same line.
+
+
+
+v304 — 2026-02-14 — Unify Map/Stats headers
+Goal:
+- Make Map and Statistics page headers match the Submit page header styling exactly (centered title, same subtitle styling).
+Changes:
+- Map: replace submit-title/submit-note header with Submit-style centered H1 + subtle subtitle.
+- Statistics: replace submit-title/submit-note header with Submit-style centered H1 + subtle subtitle.
+- Statistics: shorten subtitle to "Based on median ticketed speed over posted speed".
+Files changed:
+- templates/map_page.html
+- templates/strictness.html
+- changelogs/CHANGELOG_v301-310.txt
+- handoffs/HANDOFF_v301-350.txt
+- VERSION.txt
+Test steps:
+1) Open Map page — title/subtitle should match Submit page typography (size/weight/centering).
+2) Open Statistics page — title/subtitle should match Submit page typography.
+3) Confirm Statistics subtitle text is the shortened version.
+
+
+v305 — 2026-02-14 — Filter rail cleanup + Map pin label
+Source ZIP: EnforcedSpeed_v304_2026-02-14_map_stats_header_unify.zip
+Changes:
+- Submit: label "Pin" → "Map pin".
+- Filters (Home/Map/Stats): removed section headers (Location/Evidence/Visibility).
+- Filters (Home/Map/Stats): removed Hide anonymous toggle.
+- Filters (Home/Map/Stats): removed Photo submitted filter; Auto-Extracted renamed to Photo ✓ (verify=verified).
+- Filters: Date + Sort by now use standard labels (consistent typography).
+Files changed:
+- templates/submit_ticket.html
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- templates/_mvp_styles.html
+- changelogs/CHANGELOG_v301-310.txt
+- handoffs/HANDOFF_v301-350.txt
+- VERSION.txt
+Test steps:
+1) Submit page: confirm label reads "Map pin".
+2) Home/Map/Statistics filter rails: confirm section headers are gone (no Location/Evidence/Visibility blocks).
+3) Confirm Hide anonymous toggle is removed everywhere.
+4) Confirm only one photo filter exists: "Photo ✓"; toggling it filters to OCR-validated tickets (verify=verified).
+5) Confirm Date and Sort by show as normal labels above their dropdowns (not section headers).
+
+
+v306 — 2026-02-14 — Filter panel: Photo ✓ + Map pin toggles + reorder
+Source ZIP: EnforcedSpeed_v305_2026-02-14_filterpanel_cleanup_photo_verified_map_pin.zip
+Goal:
+- Reorder filters so Photo ✓ is immediately under County, add a Map pin toggle, fix bold “Any”, and move admin Deleted to the bottom.
+Changes:
+- Filters (Home/Map/Stats): Photo ✓ toggle moved directly under County.
+- Filters (Home/Map/Stats): new Map pin toggle (?pin=1) filters to tickets with a user-placed pin (location_source in user_pin/user_pin_snapped).
+- Filters: Deleted (admin) moved to the bottom of the panel on all pages; added to Map panel as well.
+- Backend: /, /strictness, /map, and /api/map_pins now parse/apply the pin filter and treat non-hide deleted modes as an active filter (Clear enables).
+- Styles: .multi-summary font-weight lowered so “Any” isn’t bold.
+Files changed:
+- app.py
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- templates/_mvp_styles.html
+- changelogs/CHANGELOG_v301-310.txt
+- handoffs/HANDOFF_v301-350.txt
+- VERSION.txt
+Test steps:
+1) Home feed: confirm Photo ✓ is under County; toggle Photo ✓ filters to OCR-verified tickets.
+2) Home feed: toggle Map pin — confirm only tickets with Pin ✓ remain.
+3) Map page: confirm Photo ✓ + Map pin toggles exist and affect pins; Deleted (admin) appears at bottom for admins.
+4) Statistics: confirm Photo ✓ + Map pin toggles exist; results update accordingly.
+5) Typography: confirm Posted speed limit / Overage “Any” is not bold.
+
+
+
+v307 — 2026-02-14 — Filter panel: Map pin ✓ label + font consistency
+Source ZIP: EnforcedSpeed_v306_2026-02-14_filterpanel_pin_toggle_reorder.zip
+Goal:
+- Add the same green ✓ styling used by Photo ✓ to the Map pin label, and fix filter control font-size mismatch (multi-select summaries vs Date/Sort by dropdowns).
+Changes:
+- Filters (Home/Map/Stats): Map pin label now renders as “Map pin ✓” using <span class="filter-check">✓</span>.
+- Styles: .multi-summary font-size bumped to 14px to match .filterbar-select so Posted speed limit / Overage match Date / Sort by.
+Files changed:
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- templates/_mvp_styles.html
+- changelogs/CHANGELOG_v301-310.txt
+- handoffs/HANDOFF_v301-350.txt
+- VERSION.txt
+Test steps:
+1) Home/Map/Statistics: confirm Map pin ✓ shows green check and Photo ✓ unchanged.
+2) Filter rail typography: Posted speed limit / Overage / Date / Sort by all appear the same size/weight; “Any” is not bold.
+3) Functional: toggling Map pin filters feed/map/stats to pinned tickets; Photo ✓ filters to OCR-verified tickets (verify=verified).
+4) Admin: Deleted (admin) selector appears only for admins and remains the last filter.
+
+v308 (2026-02-14) — Fix remaining filter-rail font mismatch: set select + multi-summary controls to the same font-size so Posted/Overage match Date/Sort.
+v309 — Fix remaining filter rail font-size mismatch by applying unified typography rules for .filters-rail select + .multi-summary (no layout changes). Source: v308.
+
+
+v310 — 2026-02-14
+- Filter rail: fix remaining font mismatch (State/Date/Sort vs Posted/Overage) by standardizing select + multi-select summary typography to 15px in the rail.
+
+
+v311 (2026-02-14) — Filter rail: switched Posted speed limit + Overage from custom multi-select summaries to native <select> dropdowns (3 buckets + Any) across Home/Map/Statistics so the fonts match State/Date/Sort without CSS hacks. Backend filter logic updated to support new bucket values (lte35, 40-55, gte60; 1-10, 11-20, 21+), preserving prior legacy buckets for compatibility.
+
+v312 — Fix v311 startup crash (SyntaxError) + overage Any filter
+- Fix app.py unmatched bracket causing startup crash in v311.
+- Normalize overage dropdown 'Any' value ('all') so it doesn't apply filtering.
+v316 — 2026-02-15 — Legal policy updates + Cookie Policy link
+Source ZIP: EnforcedSpeed_v312_2026-02-14_filterrail_dropdown_controls_fix.zip
+Goals:
+- Update /privacy and /terms to match final legal text provided (DOCX).
+- Add /cookies page and add “Cookie Policy” link next to Privacy/Terms in the footer (same font/spacing).
+Changes:
+- templates/privacy.html replaced with final Privacy Policy text.
+- templates/terms.html replaced with final Terms of Service text.
+- templates/cookies.html added (new Cookie Policy page).
+- app.py: add /cookies route (and simplify privacy/terms routes to render templates).
+- templates/home_feed.html + templates/strictness.html: add Cookie Policy link in footer next to Privacy/Terms.
+Notes:
+- v313–v315 attempted “county autocomplete without state” and regressed county search. Do not base future work on v313–v315. v312 is the last known-good baseline.
+Test steps:
+1) Visit /privacy, /terms, /cookies and verify text matches provided documents.
+2) Home + Statistics footer: confirm links show “Privacy · Terms · Cookie Policy” with same styling.
+3) Regression: filter rail dropdowns (Posted speed/Overage) + Map pin ✓ + Photo ✓ unchanged.
+
+
+v317 — 2026-02-15 — Home welcome blurb update
+Source ZIP: EnforcedSpeed_v316_2026-02-15_legal_policies_cookie_link.zip
+Goals:
+- Update the Home welcome text under “Welcome to EnforcedSpeed.” to the shorter combined disclaimer text.
+- Remove the separate “Important:” sentence/line.
+Changes:
+- templates/home_feed.html: replace home-intro-body copy and remove home-intro-disclaimer block.
+Test steps:
+1) Home: confirm “Welcome to EnforcedSpeed.” title unchanged.
+2) Home: confirm only the new single paragraph appears (no “Important:” lead-in).
+
+
+v318 — 2026-02-15 — Filter rail sort label cleanup (Highest/Lowest overage)
+Source ZIP: EnforcedSpeed_v317_2026-02-15_home_welcome_blurb_update.zip
+Goals:
+- Remove confusing “median overage” wording from ticket-level Sort by dropdown (Home/Map).
+- Keep “median” terminology for county-level views (Statistics strictness page).
+
+Changes:
+- templates/home_feed.html + templates/map_page.html: rename “Most over” → “Highest overage” and replace the old strictness-labeled options with “Lowest overage” (value=least_over). Removed the extra median-based option.
+- app.py: back-compat mapping for older sort values (most_strict → least_over, least_strict → most_over) so old URLs don’t break.
+
+Test steps:
+1) Home filter rail → Sort by: confirm options are Newest, Oldest, Highest overage, Lowest overage.
+2) Map filter rail → same.
+3) Statistics strictness page: still uses median overage wording (unchanged).
+
+v319 — Register page upgrades (DOB 18+, phone, username availability)
+- BASELINE: v318. Keep v312 note: v313–v315 regressed county autocomplete; do not use those versions.
+- Updated register page: Desired Username + live availability check (/api/username_available).
+- Added Birthday dropdowns (18+ required) + Mobile number field (digits-only stored; blocks duplicates).
+- Password/Confirm on same row; added consent line linking Terms/Privacy/Cookie Policy.
+- Files touched: templates/register.html, templates/_mvp_styles.html, forms.py, models.py, app.py, VERSION.txt, changelogs/CHANGELOG_v311-320.txt, handoffs/HANDOFF_v301-350.txt.
+
+v321 — 2026-02-15 — Register polish (tooltips, phone mask, button sizing)
+- Register: Implemented working info tooltips (Mobile number, Birthday 18+, New password requirements) that work on hover and tap.
+- Register: “Password” → “New password”; “Desired Username” → “Desired username”.
+- Register: Create Account button is ~half width and centered; added a bit more whitespace before the “Already have an account?” line.
+- Register: Phone input auto-formats as (XXX) XXX-XXXX while typing; normalized to digits-only on submit (server persists digits-only).
+Notes:
+- ZIP-first, no-drift: based on v319 only.
+- Going live = git add/commit/push to GitHub → Render deploy.
+- County-based system remains unchanged (no road snapping/autocomplete).
+
+v322 — 2026-02-15 — Register consistency pass (standard button + username cap)
+Source ZIP: EnforcedSpeed_v321_2026-02-15_register_tooltips_phone_mask.zip
+Goals:
+- Make Register match the established Submit a Ticket UI standards (especially button styling).
+- Remove username example placeholder; cap usernames at 12 characters.
+- Center the “Already have an account?” line under the Create Account button and add visible whitespace.
+- Match homepage info-icon styling (white background, subtle border, grey icon color).
+
+Changes:
+- templates/register.html: Create Account uses .es-btn styling (same look as submit flow) with centered half-width layout; centered login/back links with larger spacing; username check shows “Max 12 characters” when exceeded.
+- forms.py: username validator max reduced to 12 + HTML maxlength=12; removed placeholder example.
+- templates/_mvp_styles.html: info-dot updated to match homepage info icon styling.
+
+Test steps:
+1) Register: Create Account button looks identical to Submit a Ticket buttons (same border, radius, shadow, hover) and is centered at ~half width.
+2) Register: username field has no example placeholder and cannot exceed 12 chars; username status shows “Max 12 characters.” if pasted longer.
+3) Register: “Already have an account?” line is centered and clearly separated from the button.
+4) Info icons: register “i” bubbles match the homepage “i” styling and tooltips still work on hover + tap.
+
+v323 — 2026-02-15 — Remove phone from Create Account (Phase 1)
+Changes:
+- Create Account no longer asks for/stores phone number (UI + forms + server route)
+- Phone DB column left intact for possible future use (no migrations)
+Notes:
+- Email verification intentionally deferred (solve real problems first)
+Local workflow:
+- Standard startup: es-up
+- For one-off commands in current terminal: es-env then echo $env:DATABASE_URL
+
+
+
+v324 — 2026-02-15 — Register: client-side submit gating (username + 18+)
+Goal:
+- Make Create Account button disabled until username is available + birthday is 18+ (client-side only; server enforcement unchanged)
+Changes:
+- Added DOB validation status line + wired it into submit button enabled state
+- Wired username availability result into submit button enabled state (strict: if check fails, button stays disabled)
+Notes:
+- Phone collection remains removed (Phase 1). DB column still intact for possible future use.
+Local workflow:
+- Standard startup: es-up
+- For one-off commands in current terminal: es-env then echo $env:DATABASE_URL
+
+
+
+v325 — 2026-02-15 — Login: standard button + spacing
+Goal:
+- Make Log In match the established Submit a Ticket button standard (site-wide consistency)
+- Add visible whitespace between Log In button and the "New here?" link row
+Changes:
+- templates/login.html: replaced legacy submit styling with .es-btn (same as submit flow); centered link row and increased spacing
+Test steps:
+1) Log In page: button uses the same elevated-outline .es-btn styling as Submit a Ticket.
+2) Log In page: the link row (Create an account / Forgot password / Back home) has clearly visible spacing below the button.
+
+
+
+v326 — 2026-02-15 — Login: fix button touching input + half width
+Goal:
+- Add clear whitespace between the password input and the Log In button
+- Make the Log In button ~half width and centered while keeping the site-standard .es-btn look
+Changes:
+- templates/login.html: Log In button now has top margin and is centered at ~50% width (with reasonable min/max widths)
+- templates/login.html: increased spacing before the link row
+Test steps:
+1) Log In page: password field has visible space before the button.
+2) Log In page: Log In button is centered and noticeably narrower than the input fields.
+
+
+v327 — 2026-02-15 — Home: state click → interactive map state highlight
+Goal:
+- Make the state label clickable on the home feed, just like county, and open the interactive map focused on the state.
+Changes:
+- templates/home_feed.html: state label is now a link to /map?state=XX (county remains unchanged).
+- templates/map_page.html: loads a state boundary outline when opened with ?state=XX (only when no county is selected).
+- app.py: adds additive PostGIS `states` cache table built once from counties (ST_Union grouped by stusps) and exposes /api/state_geom/<stusps>.
+Notes:
+- County remains the primary unit: if a county is selected, the map shows county-only highlight (state highlight is skipped).
+- State polygons are NOT recomputed per click/request; they are inserted once into `states` when empty (guarded by pg advisory lock).
+Test steps:
+1) Home feed: click a state name (e.g., Missouri) → opens interactive map with the whole state outlined + shaded.
+2) From that map, select a county (or open a county link) → county-only highlight behaves exactly as before.
+
+Local workflow:
+- Standard startup: es-up
+- If anything looks off: es-env then echo $env:DATABASE_URL; confirm Docker Desktop + Postgres container up (localhost:5433)
+
+v334 — 2026-02-15 — Interactive map: SVG pins + focus coloring (Deep Red/Rose/Warm Gray)
+Goal:
+- Keep the map stable (v327 baseline) while adding simple, consistent pin coloring for focus context.
+- Use a single classic teardrop SVG pin with thicker outline (Option 3) and only change colors.
+Behavior:
+- Selected ticket pin (from home feed click): Deep Red (#dc2626)
+- Other pins inside the focused county/state: Rose (#fb7185)
+- Pins outside the focused county/state: Warm Gray (#a1a1aa)
+Changes:
+- templates/map_page.html:
+  - Adds SVG data-URI marker icons (same silhouette, consistent size + anchor).
+  - Loads pins using viewport bounds (on map idle) and colors markers based on server-provided inside_focus and selected_id.
+  - Supports focus params: focus_state / focus_county_geoid.
+- templates/home_feed.html:
+  - State and county links now use focus_* params (focus without forcing a state/county filter) and include ticket_id for selected pin.
+- app.py (/api/map_pins):
+  - Accepts viewport bounds (north/south/east/west), focus_* params, and ticket_id.
+  - Returns inside_focus per pin + selected_id for client coloring.
+Test steps:
+1) Home feed: click a county → interactive map loads county boundary; pins inside county are Rose; outside viewport pins are Warm Gray; the clicked ticket pin is Deep Red.
+2) Home feed: click a state → interactive map loads state boundary; pins inside state are Rose; outside are Warm Gray; clicked ticket pin is Deep Red.
+3) Zoom/pan: pins refresh based on viewport (no full-page reload).
+
+[v335] 2026-02-15 — Hotfix: fix NameError on home
+- Fixed app startup crash: removed stray `viewport_mode` references accidentally left in the home feed query.
+- No behavior changes intended beyond restoring home page and keeping viewport logic only in /api/map_pins.
+
+
+[v336] 2026-02-15 — Pin center dot color tweak
+- Updated classic teardrop SVG pins: inner circle changed from white to charcoal (#111827 at 22% opacity) for better consistency and less glare.
+Changes:
+- templates/map_page.html (pin SVG generator): swap inner circle fill/opacity.
+
+
+v337 (2026-02-15) — Pin assets for Static Maps + updated pin colors
+- Added /static/img/pins/ PNG markers and wired Static Maps endpoints to use icon:<public_url>.
+- Updated interactive map markers to use the same assets with slight size/outline tweaks.
+Test:
+- es-up; home loads; interactive map pins render (yellow selected, deep red inside, warm gray outside).
+- Submit Ticket county preview still loads; in production the pin icon will match site pins.
+v338 (2026-02-15)
+- Hotfix: fix IndentationError in app.py (county_static_map_url params indentation) so app starts under es-up.
+
+[v339] 2026-02-15 Fix static map proxy indentation errors (api_staticmap) + remove undefined icon_url in static_map_url.

@@ -1,82 +1,123 @@
 {% extends "base.html" %}
-{% block title %}Terms of Use · EnforcedSpeed{% endblock %}
+{% block title %}Terms of Service · EnforcedSpeed{% endblock %}
 {% block content %}
 <div class="home-shell">
   <div class="home-center">
     <div class="card ticket-card policy-page">
-      <h2 style="margin-top:0">Terms of Use</h2>
-      <p class="policy-meta">Last updated: {{ last_updated }}</p>
-
-      <p class="policy-lead">
-        By accessing or using EnforcedSpeed, you agree to these Terms.
-      </p>
-
-      <h3>Informational use only</h3>
-      <p>
-        EnforcedSpeed is an informational data platform. Posted speed limits are the law and must always be obeyed.
-        EnforcedSpeed does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
-      </p>
-
-      <h3>Accounts</h3>
-      <p>
-        You are responsible for your account and for activities that occur under it. Keep your login credentials confidential and notify us if you believe your account has been compromised.
-      </p>
-
-      <h3>User submissions</h3>
-      <ul>
-        <li>You are responsible for the accuracy of information you submit.</li>
-        <li>Do not submit personal identifiers (names, addresses, driver’s license numbers, citation numbers, etc.).</li>
-        <li>Do not upload images containing sensitive personal information you do not want processed.</li>
-      </ul>
-
-      <h3>Photo uploads</h3>
-      <p>
-        If you upload a ticket photo for verification, you authorize us to process it for OCR verification.
-        <b>Photos are deleted within 24 hours</b>. We may keep verification status and non-sensitive derived fields needed to operate the site.
-      </p>
-
-      <h3>Acceptable use</h3>
-      <ul>
-        <li>No harassment, hate, threats, or illegal content.</li>
-        <li>No attempts to scrape, reverse engineer, overload, or disrupt the service.</li>
-        <li>No impersonation, deceptive submissions, or attempts to identify other users.</li>
-      </ul>
-
-      <h3>Content and moderation</h3>
-      <p>
-        You grant EnforcedSpeed a non-exclusive, worldwide license to host, display, and process the content you submit in order to operate and improve the service.
-        We may remove content or suspend accounts that violate these Terms, our policies, or harm the platform.
-      </p>
-
-      <h3>Intellectual property</h3>
-      <p>
-        The EnforcedSpeed service, branding, and site content (excluding user submissions) are owned by EnforcedSpeed and/or its licensors and are protected by applicable laws.
-      </p>
-
-      <h3>Disclaimers</h3>
-      <p>
-        The service is provided “as is” without warranties of any kind. We do not guarantee accuracy, completeness, or availability of the service or the data displayed.
-      </p>
-
-      <h3>Limitation of liability</h3>
-      <p>
-        To the maximum extent permitted by law, EnforcedSpeed will not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, arising from your use of the service.
-      </p>
-
-      <h3>Termination</h3>
-      <p>
-        We may suspend or terminate access to the service at any time for violation of these Terms or to protect the platform. You may stop using the service at any time.
-      </p>
-
-      <h3>Changes</h3>
-      <p>
-        We may update these Terms from time to time. The “Last updated” date above indicates when they were most recently revised.
-      </p>
-
-      <h3>Contact</h3>
-      <p>
-        Questions? Contact us at <b>{{ contact_email }}</b>.
-      </p>
+      <h2 style="margin-top:0">Terms of Service</h2>
+      <p>Effective Date: The date on which you first accept these Terms<br>Last Updated: February 13, 2026</p>
+      <p>These Terms of Service (“Terms”) constitute a legally binding agreement between you (“you” or “User”) and Mindra LLC, a Wyoming limited liability company (“Mindra,” “Company,” “we,” “us,” or “our”), governing your access to and use of the website located at www.enforcedspeed.com, including any subdomains, features, content, and services offered thereon (collectively, the “Platform” or “Services”).</p>
+      <p>BY CLICKING “I AGREE,” “ACCEPT,” OR A SIMILAR BUTTON, OR BY ACCESSING OR USING THE SERVICES, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS. THESE TERMS APPLY TO ALL VISITORS TO THE PLATFORM, INCLUDING USERS WHO BROWSE THE WEBSITE WITHOUT SUBMITTING TICKET INFORMATION, AS WELL AS USERS WHO CREATE ACCOUNTS OR SUBMIT USER CONTENT.</p>
+      <p>If you do not agree to these Terms, you may not access or use the Services.</p>
+      <h3>1. DEFINITIONS</h3>
+      <p>For purposes of these Terms:</p>
+      <p>“Account” means a registered user account created to access certain features of the Services.</p>
+      <p>“Automated Processing” means processing performed by software with minimal or no human oversight, including optical character recognition (“OCR”), text extraction, validation and consistency analysis. It also means the use of Artificial Intelligence agents (“agentic AI”) for support and delivery of the Services.</p>
+      <p>“Personal Information” has the meaning set forth in the Privacy Policy.</p>
+      <p>“Platform” means the website, applications, and related infrastructure operated by Mindra under the name EnforcedSpeed.</p>
+      <p>“Services” means the ticket submission, processing, and related functionality offered through the Platform.</p>
+      <p>“User Content” means any information, data, text, images, files, or materials submitted, uploaded, or transmitted by a User through the Services, including Ticket Data, Ticket Images and ticket-related information.</p>
+      <h3>2. ELIGIBILITY AND ACCOUNT REGISTRATION</h3>
+      <p>You represent and warrant that you are at least eighteen (18) years of age and have the legal capacity to enter into these Terms.</p>
+      <p>Certain features of the Services may require you to create an Account. You agree to provide accurate, current, and complete information and to keep such information up to date.</p>
+      <p>You are responsible for maintaining the confidentiality of your Account credentials and for all activity that occurs under your Account. You agree to notify Company immediately of any unauthorized use of your Account.</p>
+      <p>Company reserves the right to suspend or terminate Accounts that violate these Terms or applicable law.</p>
+      <h3>3. DESCRIPTION OF THE SERVICES</h3>
+      <p>The Services include an online platform that allows Users to submit information relating to traffic or speeding tickets, including the optional upload of ticket images, and to receive automated extraction and verification of certain information through software-based technologies, including OCR and related Automated Processing.</p>
+      <p>The Services are currently provided free of charge. Company does not charge users any fees for access to or use of the Services.</p>
+      <h3>3. TICKET IMAGE SUBMISSIONS</h3>
+      <p><b>3.1 Upload and Automated Image Processing</b></p>
+      <p>Ticket Image uploads are analyzed to verify the information entered by the User regarding their ticket. Below is a technical description of the Ticket Image upload and analysis process. Company provides this description as a good faith account of how Users’ Ticket Images are processed. This description is intended to be comprehensible to the average user and is not intended as, and should not be construed to be, a binding specification of the Services.</p>
+      <p>When a User submits information about a speeding ticket, the User may optionally upload an image of the ticket (i.e., a Ticket Image). Under normal operation, image handling is functions as follows:</p>
+      <p>Sanitization and Standardization. Uploaded images are sanitized server-side and re-encoded or resized to remove embedded metadata and prepare the image for Automated Processing.</p>
+      <p>Temporary Quarantine Storage. Sanitized images are placed in private, non-public storage for short-term processing. Only a reference to the image is stored in application databases.</p>
+      <p>Automated OCR Processing. Background processing systems retrieve the image and submit it to automated OCR services to extract text and identify relevant ticket values (i.e., speed, speed limit, location).</p>
+      <p>Deletion After Processing. Following completion of Automated Processing, the system is designed to delete the image as part of cleanup procedures.</p>
+      <p>Deletion Backstop. Temporary image storage is subject to automated lifecycle controls intended to delete images within a limited time window (not to exceed twenty-four (24) hours), even if processing is not completed as expected.</p>
+      <p><b>3.2 Image Retention and Visibility</b></p>
+      <p>The Services are not intended to operate as an image-hosting or image-archiving service.</p>
+      <p>Ticket Images are submitted solely to enable Automated Processing and are not retained.</p>
+      <p>Under normal operation, Ticket Images are deleted shortly after processing or automatically deleted within the limited time window described above. The Platform does not present Ticket Images for routine viewing or browsing by Company personnel, however, Company retains the right to access images to comply with lawful obligations and where necessary to enforce the Terms of this Agreement such as the prohibition on malicious content.</p>
+      <p>Ticket Data, as validated by Automated Processing of Ticket Images, may be displayed publicly including without limitation in feeds, maps, rankings and reports. If you do not want this information public, do not upload a Ticket Image or make a submission.</p>
+      <p><b>3.3 Retained Data</b></p>
+      <p>Following deletion of an Ticket Image, Company may retain structured information derived from User Content, such as jurisdictional data, speeds, dates, verification status, and internal processing indicators. Retained data does not include the underlying image or Personally Identifiable Information such as name, date of birth, driver’s license number, age, sex, etc.</p>
+      <p><b>3.4 User Responsibility; No Legal Advice</b></p>
+      <p>Automated Processing generally occurs without human review and may contain errors or inaccuracies. You are solely responsible for reviewing and verifying all information submitted to or generated by the Services.</p>
+      <p>The Services are provided for informational purposes only and do not constitute legal advice. Posted speed limits are the law, and you should always obey them.</p>
+      <h3>4. USER CONTENT</h3>
+      <p>You are solely responsible for all User Content you submit.</p>
+      <p>You represent and warrant that:</p>
+      <p>You own or have the right to submit the User Content;</p>
+      <p>The User Content is accurate to the best of your knowledge; and</p>
+      <p>The User Content does not violate applicable law or infringe third-party rights.</p>
+      <p>You agree not to submit fraudulent, misleading, unlawful, or malicious content as determined solely by Company.</p>
+      <h3>5. LICENSE GRANT TO COMPANY</h3>
+      <p>You retain ownership of your User Content. By submitting User Content through the Services, you grant Company a limited, non-exclusive, worldwide, royalty-free, and sublicensable license to:</p>
+      <p>Receive, host, and temporarily store User Content;</p>
+      <p>Sanitize, re-encode, resize, or otherwise technically modify User Content as necessary for processing;</p>
+      <p>Perform Automated Processing, including OCR and validation;</p>
+      <p>Extract, generate, and retain structured data and verification indicators derived from User Content;</p>
+      <p>Use such structured data to provide, operate, maintain, secure, and improve the Services; and</p>
+      <p>Create and use derivative works from User Content subject to processing of image submissions as described herein (e.g., aggregated statistics, trend charts, density/confidence indicators, etc.)</p>
+      <p>This license continues with respect to retained structured data even after deletion of the underlying image. The license terminates with respect to images once they are deleted in accordance with Company’s data handling practices. If you do not want us to process a Ticket Image, do not upload one.</p>
+      <p>Company does not claim ownership of User Content beyond the limited license expressly granted herein.</p>
+      <h3>6. DATA PROCESSING AND PRIVACY</h3>
+      <p>Company’s collection and use of Personal Information and Cookies are described in the Privacy Policy and Cookie Policy, respectively, which are incorporated by reference.</p>
+      <p>By using the Services, you consent to Automated Processing of information, including OCR, extraction, validation, and analysis, for purposes of operating the Services.</p>
+      <p>The Services do not perform biometric identification, facial recognition, or automated legal decision-making with legal or similarly significant effects.</p>
+      <p>Company may engage third-party service providers to perform processing on its behalf, subject to contractual confidentiality and data protection obligations. Company’s current service providers and their uses include:</p>
+      <p>- Cloudflare R2 (temporary private storage for Ticket Images)</p>
+      <p>- Google Cloud Vision (OCR)</p>
+      <p>- Google Maps/Places/Roads (mapping and location features)</p>
+      <p>- Render (hosting and database infrastructure)</p>
+      <p>- SendGrid (email delivery)</p>
+      <p>Your use of third-party features may be subject to those third parties’ terms and privacy policies. We do not control third-party services and are not responsible for them.</p>
+      <p>If you believe you are entitled to and would like to make a delete request or avail yourself of an analogous mechanism under an applicable law, please contact Company via the contact information listed below.</p>
+      <h3>7. ACCEPTABLE USE &amp; CONTENT MODERATION</h3>
+      <p>You agree not to:</p>
+      <p>Access or use the Services for unlawful purposes;</p>
+      <p>Submit false or misleading information including Ticket Data and Ticket Images;</p>
+      <p>Probe, scan, or test the vulnerability of the Services;</p>
+      <p>Scrape, harvest, or collect data at scale without written permission, or access the Services through unauthorized automated means.</p>
+      <p>Interfere with the operation or security of the Platform;</p>
+      <p>Attempt to reverse engineer or extract source code;</p>
+      <p>Upload malware or harmful code, including through submission functionality; or</p>
+      <p>Attempt to access non-public systems or user accounts not belonging to you</p>
+      <p>Company may investigate and take appropriate action for violations of this Section.</p>
+      <p>We may review, remove, or restrict content (including Ticket Data) for any reason, including suspected fraud, abuse, policy violations, or legal risk. A “Soft delete” may remove content from public views while retaining it internally for integrity, moderation, security, and audit.</p>
+      <h3>8. INTELLECTUAL PROPERTY</h3>
+      <p>The Platform, Services, and all associated software and content are owned by or licensed to Company and are protected by intellectual property laws.</p>
+      <p>Subject to these Terms, Company grants you a limited, non-exclusive, revocable license to access and use the Services for their intended purposes.</p>
+      <h3>9. DISCLAIMERS</h3>
+      <p>THE SERVICES ARE PROVIDED “AS IS” AND “AS AVAILABLE.” TO THE MAXIMUM EXTENT PERMITTED BY LAW, COMPANY DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED.</p>
+      <p>Company does not warrant the accuracy, completeness, or reliability of Automated Processing or OCR outputs. Outputs may contain errors or omissions.</p>
+      <p>You acknowledge that the Services are provided free of charge and that any reliance on information generated through the Services is undertaken entirely at your own risk.</p>
+      <p>Company does not guarantee any outcome, resolution, dismissal, or reduction of penalties associated with any traffic or speeding ticket.</p>
+      <h3>10. LIMITATION OF LIABILITY</h3>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL COMPANY OR ITS OFFICERS, DIRECTORS, EMPLOYEES, CONTRACTORS, AGENTS, OR SERVICE PROVIDERS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, EXEMPLARY, OR PUNITIVE DAMAGES, INCLUDING LOSS OF DATA, LOSS OF USE, LOSS OF PROFITS, OR BUSINESS INTERRUPTION, ARISING OUT OF OR RELATING TO THESE TERMS OR THE USE OF OR INABILITY TO USE THE SERVICES, EVEN IF COMPANY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+      <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, COMPANY’S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATING TO THESE TERMS OR THE SERVICES SHALL NOT EXCEED US $100.</p>
+      <p>You acknowledge and agree that:</p>
+      <p>The Services are provided free of charge;</p>
+      <p>The Services rely on Automated Processing and User Content, which inherently involve the risk of error or inaccuracy; and</p>
+      <p>The limitations of liability set forth in these Terms reflect a reasonable allocation of risk given the free nature of the Services.</p>
+      <p>Some jurisdictions do not allow the exclusion or limitation of certain damages. To the extent such exclusions or limitations are prohibited, Company’s liability shall be limited to the maximum extent permitted by law.</p>
+      <p>These limitations apply to all claims, whether based in contract, tort (including negligence), strict liability, statute, or any other legal theory, and survive any failure of essential purpose.</p>
+      <h3>11. INDEMNIFICATION</h3>
+      <p>You agree to indemnify and hold harmless Company and its affiliates, officers, directors, employees, and agents from and against any claims, damages, losses, and expenses arising out of your User Content, your use of the Services, or your violation of these Terms or applicable law.</p>
+      <h3>12. TERMINATION</h3>
+      <p>Company may suspend or terminate access to the Services at any time for violation of these Terms or conduct that is harmful to the Platform or other users.</p>
+      <p>Upon termination, your right to use the Services will cease. Sections that by their nature should survive termination shall survive.</p>
+      <h3>13. CHANGES TO THE TERMS</h3>
+      <p>Company may update these Terms from time to time. When changes are made, the “Last Updated” date will be revised.</p>
+      <p>Your continued use of the Services after the effective date of revised Terms constitutes acceptance of the changes.</p>
+      <h3>14. GOVERNING LAW AND VENUE</h3>
+      <p>These Terms shall be governed by and construed in accordance with the laws of the State of Wyoming, without regard to its conflict-of-laws principles.</p>
+      <p>Any legal action or proceeding arising out of or relating to these Terms or the Services shall be brought exclusively in the state or federal courts located in the State of Wyoming, and the parties consent to personal jurisdiction and venue in such courts.</p>
+      <h3>15. MISCELLANEOUS</h3>
+      <p>These Terms constitute the entire agreement between you and Company regarding the Services.</p>
+      <p>If any provision is held unenforceable, the remaining provisions shall remain in full force and effect.</p>
+      <p>You may not assign these Terms without Company’s prior written consent.</p>
+      <p>Questions regarding these Terms may be directed to: contact@enforcedspeed.com</p>
     </div>
   </div>
 </div>

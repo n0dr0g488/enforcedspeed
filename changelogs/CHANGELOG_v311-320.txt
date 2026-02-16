@@ -1,0 +1,14 @@
+CHANGELOG v311–v320
+
+v311 (2026-02-14) — Filter rail: switched Posted speed limit + Overage from custom multi-select summaries to native dropdowns across Home/Map/Statistics so typography matches State/Date/Sort.
+v312 (2026-02-14) — Fix v311 startup crash + normalize Overage 'Any' so it doesn't filter.
+v316 (2026-02-15) — Legal: updated Privacy + Terms pages, added Cookie Policy page, and added footer link.
+v317 (2026-02-15) — Home: shortened the Welcome disclaimer text and removed the separate “Important:” line.
+v318 (2026-02-15) — Filter rail: rename confusing sort labels to Highest overage / Lowest overage (ticket-level), keeping median wording reserved for county-level stats.
+
+v319 (2026-02-15) — Register page upgrades (DOB 18+, phone, username availability)
+- Register: rename Username → Desired Username; neutral placeholder.
+- Add Birthday dropdowns (prefilled today) with server-side 18+ enforcement.
+- Add Mobile number field with tooltip; store digits-only; block duplicates.
+- Live username availability check during typing.
+- Password + Confirm Password side-by-side; add Terms/Privacy/Cookie consent line and keep “Already have an account?” link.

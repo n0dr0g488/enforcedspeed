@@ -3,6 +3,43 @@ from __future__ import annotations
 
 import os
 
+def _get_county_filter_from_request():
+    """Parse county filter from query params.
+
+    Accepts either ?county_geoid=<GEOID> or legacy ?county=<GEOID>.
+    Returns (geoid, label). Label is best-effort and may be empty.
+
+    NOTE: County GEOIDs are 5 digits (statefp+countyfp). We validate to avoid
+    accidentally treating the visible label text as a GEOID.
+    """
+    geoid = (request.args.get('county_geoid') or request.args.get('county') or '').strip()
+    label = ''
+
+    # Validate county GEOID (5 digits). If it isn't, ignore it.
+    if geoid and not re.fullmatch(r"\d{5}", geoid):
+        geoid = ''
+
+    if geoid:
+        try:
+            row = db.session.execute(
+                text('SELECT namelsad, name, stusps FROM counties WHERE geoid = :g LIMIT 1'),
+                {'g': geoid},
+            ).mappings().first()
+            if row:
+                nm = row.get('namelsad') or row.get('name') or ''
+                st = row.get('stusps') or ''
+                label = f"{nm}, {st}".strip(', ')
+        except Exception:
+            # If the counties table/columns aren't available, don't poison the session.
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            label = ''
+
+    return geoid, label
+
+
 # Load local environment variables from .env (if present).
 # This avoids having to re-type secrets each run during local dev.
 try:
@@ -24,13 +61,14 @@ from datetime import datetime, timedelta, timezone
 from statistics import median
 from bisect import bisect_right
 from typing import Dict, List
+from state_bounds import get_bounds_for_state
 
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
-from sqlalchemy import text, func, tuple_, or_, and_
+from sqlalchemy import text, func, tuple_, or_, and_, bindparam
 from sqlalchemy.orm import joinedload
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sendgrid import SendGridAPIClient
@@ -56,6 +94,7 @@ except Exception:
 from config import Config
 from forms import (
     SpeedReportForm,
+    SubmitTicketForm,
     RegisterForm,
     LoginForm,
     ChangePasswordForm,
@@ -66,6 +105,103 @@ from forms import (
     DeleteCommentForm,
 )
 from models import db, SpeedReport, User, Like, Comment, normalize_road, state_code_from_value
+
+
+# -----------------------------------------------------------------------------
+# DB schema patching (migration safety net)
+#
+# Your local DB can easily drift behind the latest model definitions (especially
+# when switching ZIP versions or recreating containers). When that happens, the
+# app will crash with “column does not exist”. We keep this patcher intentionally
+# conservative: it only *adds* missing columns with safe types/defaults.
+# It never drops/renames columns.
+# -----------------------------------------------------------------------------
+
+from sqlalchemy import text as sa_text
+
+
+def _col_exists(conn, table: str, column: str, schema: str = "public") -> bool:
+    q = sa_text(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = :schema
+          AND table_name = :table
+          AND column_name = :column
+        LIMIT 1
+        """
+    )
+    return conn.execute(q, {"schema": schema, "table": table, "column": column}).first() is not None
+
+
+def _ensure_col(conn, table: str, column: str, ddl: str, schema: str = "public") -> None:
+    if not _col_exists(conn, table, column, schema=schema):
+        conn.execute(sa_text(f"ALTER TABLE {schema}.{table} ADD COLUMN {ddl}"))
+
+
+def ensure_schema_patches() -> None:
+    """Best-effort schema patches so the app can start on older DBs."""
+    # db must already be initialized + have an engine
+    with db.engine.begin() as conn:
+        # --- speed_reports: columns frequently added over time ---
+        # Core identity
+        _ensure_col(conn, "speed_reports", "route_class", "route_class TEXT")
+        _ensure_col(conn, "speed_reports", "overage", "overage INTEGER")
+
+        # County fields (single-page submit)
+        _ensure_col(conn, "speed_reports", "county_geoid", "county_geoid TEXT")
+        _ensure_col(conn, "speed_reports", "county_name", "county_name TEXT")
+        _ensure_col(conn, "speed_reports", "county_state", "county_state TEXT")
+
+        # Location fields
+        _ensure_col(conn, "speed_reports", "raw_lat", "raw_lat DOUBLE PRECISION")
+        _ensure_col(conn, "speed_reports", "raw_lng", "raw_lng DOUBLE PRECISION")
+        _ensure_col(conn, "speed_reports", "lat", "lat DOUBLE PRECISION")
+        _ensure_col(conn, "speed_reports", "lng", "lng DOUBLE PRECISION")
+        _ensure_col(conn, "speed_reports", "location_hint", "location_hint TEXT")
+        _ensure_col(conn, "speed_reports", "location_source", "location_source TEXT")
+        _ensure_col(conn, "speed_reports", "location_accuracy_m", "location_accuracy_m INTEGER")
+
+        # Photo/OCR
+        _ensure_col(conn, "speed_reports", "photo_key", "photo_key TEXT")
+        _ensure_col(conn, "speed_reports", "ocr_status", "ocr_status TEXT")
+        _ensure_col(conn, "speed_reports", "verification_status", "verification_status TEXT")
+        _ensure_col(conn, "speed_reports", "ocr_posted_speed", "ocr_posted_speed INTEGER")
+        _ensure_col(conn, "speed_reports", "ocr_ticketed_speed", "ocr_ticketed_speed INTEGER")
+        _ensure_col(conn, "speed_reports", "ocr_confidence", "ocr_confidence DOUBLE PRECISION")
+
+        # Verification / moderation
+        _ensure_col(conn, "speed_reports", "verified_at", "verified_at TIMESTAMP")
+        _ensure_col(conn, "speed_reports", "verified_by", "verified_by INTEGER")
+        _ensure_col(conn, "speed_reports", "verify_attempts", "verify_attempts INTEGER DEFAULT 0")
+        _ensure_col(conn, "speed_reports", "verify_reason", "verify_reason TEXT")
+
+        _ensure_col(conn, "speed_reports", "is_deleted", "is_deleted BOOLEAN DEFAULT FALSE")
+        _ensure_col(conn, "speed_reports", "deleted_at", "deleted_at TIMESTAMP")
+        _ensure_col(conn, "speed_reports", "deleted_by", "deleted_by INTEGER")
+
+        # created_at exists in most versions, but add if missing
+        _ensure_col(conn, "speed_reports", "created_at", "created_at TIMESTAMP DEFAULT NOW()")
+
+        # Optional: backfill overage for existing rows (safe + idempotent)
+        # Only runs if overage exists; the UPDATE is harmless if already correct.
+        if _col_exists(conn, "speed_reports", "overage"):
+            conn.execute(
+                sa_text(
+                    """
+                    UPDATE speed_reports
+                    SET overage = (ticketed_speed - posted_speed)
+                    WHERE overage IS NULL
+                      AND ticketed_speed IS NOT NULL
+                      AND posted_speed IS NOT NULL;
+                    """
+                )
+            )
+
+
+        # --- users: account integrity fields ---
+        _ensure_col(conn, "users", "phone", "phone TEXT")
+        _ensure_col(conn, "users", "birthdate", "birthdate DATE")
 
 from queue_utils import get_queue
 from r2_utils import put_bytes
@@ -84,6 +220,19 @@ STATE_OPTIONS = [
     "VA - Virginia", "WA - Washington", "WV - West Virginia", "WI - Wisconsin", "WY - Wyoming",
     "DC - District of Columbia",
 ]
+
+# Convenience map for canonical state storage ("MO" -> "MO - Missouri").
+STATE_BY_ABBR = {s[:2].upper(): s for s in STATE_OPTIONS}
+
+# Template-friendly [("MO", "Missouri"), ...] pairs.
+STATE_PAIRS = []
+for _s in STATE_OPTIONS:
+    try:
+        _abbr, _name = _s.split(" - ", 1)
+        STATE_PAIRS.append((_abbr.strip().upper(), _name.strip()))
+    except Exception:
+        # Fallback: best-effort two-letter code + full string
+        STATE_PAIRS.append((_s[:2].upper(), _s))
 
 
 def normalize_state_group(value: str) -> str:
@@ -167,10 +316,399 @@ def static_map_url(lat: float | None, lng: float | None, *, zoom: int = 14, widt
         "size": f"{int(width)}x{int(height)}",
         "scale": "2",
         "maptype": "roadmap",
-        "markers": f"color:red|{center}",
+        "markers": center,
         "key": key,
     }
     return "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params)
+
+
+
+
+# ---- County static map helper (feed card) ----
+# We want feed/map previews to be stable and uniform: show the whole county outline,
+# not a zoomed-in street view that varies by pin placement.
+# This uses the same GOOGLE_MAPS_API_KEY as static_map_url().
+
+def _encode_polyline(points):
+    """Encode a list of (lat, lng) into a Google Encoded Polyline string."""
+    result = []
+    prev_lat = 0
+    prev_lng = 0
+
+    def _enc(value):
+        value = ~(value << 1) if value < 0 else (value << 1)
+        while value >= 0x20:
+            result.append(chr((0x20 | (value & 0x1F)) + 63))
+            value >>= 5
+        result.append(chr(value + 63))
+
+    for lat, lng in points:
+        ilat = int(round(lat * 1e5))
+        ilng = int(round(lng * 1e5))
+        _enc(ilat - prev_lat)
+        _enc(ilng - prev_lng)
+        prev_lat, prev_lng = ilat, ilng
+
+    return ''.join(result)
+
+
+def _county_bbox_and_outline_polyline(geoid: str):
+    """Return (minlat, minlng, maxlat, maxlng, polyline) for the county geom.
+
+    Notes
+    - Static Maps path data is carried in the URL, so we must simplify/limit the
+      outline somewhat.
+    - We intentionally draw ONLY the exterior ring (no holes) for the feed
+      preview. This keeps the URL smaller and avoids complex multi-path shapes.
+    - To keep zoom framing consistent with what we actually draw, we compute the
+      bbox from the exterior ring we choose (not from the full raw geometry).
+    """
+    try:
+        # Gentler simplification than earlier versions (0.01 was too aggressive).
+        # ~0.0025 degrees is roughly ~275m in latitude; the point/URL cap below
+        # provides an additional safety net for huge/complex counties.
+        row = db.session.execute(
+            text(
+                """
+                SELECT ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, :tol)) AS geom_json
+                FROM counties
+                WHERE geoid = :geoid
+                LIMIT 1
+                """
+            ),
+            {"geoid": geoid, "tol": 0.0025},
+        ).mappings().first()
+    except Exception:
+        return None
+
+    if not row:
+        return None
+
+    geom_json = row.get('geom_json')
+    if not geom_json:
+        return None
+
+    try:
+        import json
+        geom = json.loads(geom_json)
+    except Exception:
+        geom = None
+
+    if not geom or 'coordinates' not in geom:
+        return None
+
+    # Choose a reasonable exterior ring: pick the longest exterior ring.
+    rings = []
+    gtype = (geom.get('type') or '').lower()
+    coords = geom.get('coordinates')
+
+    def add_polygon(poly):
+        # poly: [ [ [lng,lat], ... ] , holes...]
+        if not poly or not poly[0]:
+            return
+        ring = poly[0]
+        rings.append(ring)
+
+    try:
+        if gtype == 'polygon':
+            add_polygon(coords)
+        elif gtype == 'multipolygon':
+            for poly in coords:
+                add_polygon(poly)
+    except Exception:
+        rings = []
+
+    if not rings:
+        return None
+
+    ring = max(rings, key=lambda r: len(r) if r else 0)
+
+    # Compute bbox from the chosen exterior ring (so zoom framing matches the outline).
+    try:
+        lats = [float(p[1]) for p in ring if p and len(p) >= 2]
+        lngs = [float(p[0]) for p in ring if p and len(p) >= 2]
+        if not lats or not lngs:
+            return None
+        min_lat = min(lats)
+        max_lat = max(lats)
+        min_lng = min(lngs)
+        max_lng = max(lngs)
+    except Exception:
+        return None
+
+    # Downsample to keep URL length reasonable (Static Maps has URL length limits).
+    # Use a higher point budget than before and auto-tighten only if the encoded
+    # polyline becomes too long.
+    if not ring:
+        return (float(min_lat), float(min_lng), float(max_lat), float(max_lng), None)
+
+    max_poly_chars = 4200  # conservative; leaves room for other URL params
+    target_points = 420
+    step = max(1, int(len(ring) / target_points))
+
+    def build_pts(step_n: int):
+        pts_local = []
+        for i in range(0, len(ring), max(1, int(step_n))):
+            lng, lat = ring[i]
+            pts_local.append((float(lat), float(lng)))
+        if pts_local and pts_local[0] != pts_local[-1]:
+            pts_local.append(pts_local[0])
+        return pts_local
+
+    poly = None
+    for _ in range(6):
+        pts = build_pts(step)
+        poly_try = _encode_polyline(pts) if len(pts) >= 3 else None
+        if not poly_try:
+            poly = None
+            break
+        if len(poly_try) <= max_poly_chars:
+            poly = poly_try
+            break
+        # Too long: sample fewer points.
+        step = int(step * 1.6) + 1
+
+    return (float(min_lat), float(min_lng), float(max_lat), float(max_lng), poly)
+
+
+def _mercator_y(lat: float) -> float:
+    """Mercator projection helper for zoom calculations."""
+    # Google Maps clamps usable latitude to ~85.0511.
+    lat = max(min(lat, 85.05112878), -85.05112878)
+    rad = math.radians(lat)
+    return math.log(math.tan((rad / 2.0) + (math.pi / 4.0)))
+
+
+def _zoom_for_bbox(
+    min_lat: float,
+    min_lng: float,
+    max_lat: float,
+    max_lng: float,
+    *,
+    width_px: int,
+    height_px: int,
+    padding: float = 1.03,
+    max_zoom: int = 16,
+) -> int:
+    """Approximate a Google Maps zoom level that fits the bbox into a given pixel size.
+
+    We use a small padding factor so the county outline fills more of the preview
+    while still avoiding edge clipping.
+    """
+    # Longitude span (handle weird negatives; we don't expect antimeridian counties).
+    lng_diff = float(max_lng) - float(min_lng)
+    if lng_diff <= 0:
+        lng_diff = abs(lng_diff)
+    lng_diff = max(lng_diff, 1e-6)
+
+    y_min = _mercator_y(float(min_lat))
+    y_max = _mercator_y(float(max_lat))
+    y_diff = max(abs(y_max - y_min), 1e-6)
+
+    # World is 256px at zoom 0.
+    zoom_lng = math.log2((float(width_px) * 360.0) / (lng_diff * 256.0 * float(padding)))
+    zoom_lat = math.log2((float(height_px) * 2.0 * math.pi) / (y_diff * 256.0 * float(padding)))
+
+    z = int(math.floor(min(zoom_lng, zoom_lat)))
+    return max(0, min(z, int(max_zoom)))
+
+
+
+def _zoom_for_bbox_pxpad(
+    min_lat: float,
+    min_lng: float,
+    max_lat: float,
+    max_lng: float,
+    *,
+    width_px: int,
+    height_px: int,
+    pad_px: int = 24,
+    max_zoom: int = 18,
+) -> int:
+    """Approximate zoom similar to Google Maps JS `fitBounds` with padding.
+
+    We emulate `map.fitBounds(bounds, {top/right/bottom/left: pad_px})` by shrinking
+    the available viewport before computing zoom. This produces a noticeably tighter
+    framing than the older multiplicative padding factor and matches the interactive
+    county view more closely.
+    """
+    w = max(1, int(width_px) - (2 * int(pad_px)))
+    h = max(1, int(height_px) - (2 * int(pad_px)))
+    return _zoom_for_bbox(
+        float(min_lat),
+        float(min_lng),
+        float(max_lat),
+        float(max_lng),
+        width_px=w,
+        height_px=h,
+        padding=1.0,
+        max_zoom=int(max_zoom),
+    )
+
+
+def _bbox_fits_zoom_pxpad(
+    min_lat: float,
+    min_lng: float,
+    max_lat: float,
+    max_lng: float,
+    *,
+    zoom: int,
+    width_px: int,
+    height_px: int,
+    pad_px: int = 24,
+) -> bool:
+    """Return True if the bbox fits in the viewport at the given zoom (fitBounds-style padding)."""
+    w = max(1, int(width_px) - (2 * int(pad_px)))
+    h = max(1, int(height_px) - (2 * int(pad_px)))
+
+    lng_diff = float(max_lng) - float(min_lng)
+    if lng_diff <= 0:
+        lng_diff = abs(lng_diff)
+    lng_diff = max(lng_diff, 1e-9)
+
+    y_min = _mercator_y(float(min_lat))
+    y_max = _mercator_y(float(max_lat))
+    y_diff = max(abs(y_max - y_min), 1e-9)
+
+    world_px = 256.0 * (2.0 ** float(int(zoom)))
+    span_x = world_px * (lng_diff / 360.0)
+    span_y = world_px * (y_diff / (2.0 * math.pi))
+    return (span_x <= float(w)) and (span_y <= float(h))
+def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None, pin_lng: float | None = None, *, width: int = 640, height: int = 340, center_on_pin: bool = False) -> str:
+    """Static map URL showing the county boundary (black outline + subtle fill) and an optional red pin.
+
+    If center_on_pin=True (and a pin is provided), the map center is set to the pin location.
+    This makes it possible to place UI overlays (like the speed pill) deterministically relative to the marker.
+
+    v292+ approach (static, premium):
+      - Integer zoom with a small padding factor (consistent framing)
+      - Request full-size retina images (scale=2)
+      - Let the browser downscale (no fractional-size upscale hack)
+    """
+    try:
+        from flask import current_app
+        # Prefer the server key (used elsewhere for Places/proxy calls).
+        # Fallback to GOOGLE_MAPS_API_KEY for older configs.
+        key = (
+            (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
+            or (current_app.config.get('GOOGLE_MAPS_API_KEY') or '').strip()
+        )
+    except Exception:
+        key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip() or (os.environ.get('GOOGLE_MAPS_API_KEY') or '').strip()
+
+    geoid = (county_geoid or '').strip()
+    if not key or not geoid:
+        return ''
+
+    info = _county_bbox_and_outline_polyline(geoid)
+    if not info:
+        return ''
+
+    min_lat, min_lng, max_lat, max_lng, poly = info
+
+    # Compute center (Mercator midpoint) + a continuous fit zoom (Web Mercator math).
+    # Static Maps `zoom` is integer-only: we use the best integer zoom with a small padding factor.
+    pad_px = 24
+    pad_pct = 0.12  # ~12% extra span for consistent breathing room
+
+    # BBox in Mercator space
+    y_min = _mercator_y(float(min_lat))
+    y_max = _mercator_y(float(max_lat))
+
+    # Default center: Mercator midpoint (closer to Google fitBounds than simple lat/lng midpoint).
+    y_center = (y_min + y_max) / 2.0
+    center_lat = math.degrees(2.0 * math.atan(math.exp(y_center)) - (math.pi / 2.0))
+    center_lng = (float(min_lng) + float(max_lng)) / 2.0
+
+    # Optional: for feed pin-based tickets, re-center on the pin.
+    if center_on_pin and pin_lat is not None and pin_lng is not None:
+        center_lat = float(pin_lat)
+        center_lng = float(pin_lng)
+
+    # Available viewport inside the image after padding.
+    avail_w = max(1, int(width) - (2 * int(pad_px)))
+    avail_h = max(1, int(height) - (2 * int(pad_px)))
+
+    lng_min = float(min_lng)
+    lng_max = float(max_lng)
+    lng_diff = max(abs(lng_max - lng_min), 1e-9)
+
+    # Keep zoom consistent (based on the county bbox), even when centering on a user pin.
+    # This avoids zooming out when the pin is near the edge of the county.
+    y_diff = max(abs(y_max - y_min), 1e-9)
+
+    # Apply padding percentage.
+    lng_diff *= (1.0 + pad_pct)
+    y_diff *= (1.0 + pad_pct)
+
+    zoom_lng = math.log2((float(avail_w) * 360.0) / (lng_diff * 256.0))
+    zoom_lat = math.log2((float(avail_h) * 2.0 * math.pi) / (y_diff * 256.0))
+    z_star = min(zoom_lng, zoom_lat)
+    z_star = max(0.0, min(float(z_star), 18.0))
+
+    zoom_int = int(math.floor(z_star))
+
+
+    base_url = request.url_root.rstrip('/')
+    icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
+
+    params = {
+        'size': f"{int(width)}x{int(height)}",
+        'scale': '2',
+        'maptype': 'roadmap',
+        'center': f"{center_lat:.6f},{center_lng:.6f}",
+        'zoom': str(int(zoom_int)),
+        # De-clutter slightly so roads/labels stand out.
+        'style': [
+            'feature:poi|visibility:off',
+            'feature:transit|visibility:off',
+        ],
+        'key': key,
+    }
+
+    # County outline (black + subtle fill). Note: we must URL-encode the polyline.
+    if poly:
+        params['path'] = f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly}"
+
+    # Optional pin (default-size Google marker for readability)
+    if pin_lat is not None and pin_lng is not None:
+        center = f"{pin_lat:.6f},{pin_lng:.6f}"
+        params['markers'] = f"icon:{icon_url}|{center}"
+
+    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True)
+
+def us_static_map_url(*, width: int = 640, height: int = 640) -> str:
+    """Static map URL of the United States (default preview before a county is selected)."""
+    try:
+        from flask import current_app
+        key = (
+            (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
+            or (current_app.config.get('GOOGLE_MAPS_API_KEY') or '').strip()
+        )
+    except Exception:
+        key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip() or (os.environ.get('GOOGLE_MAPS_API_KEY') or '').strip()
+
+    if not key:
+        return ''
+
+    w = max(120, min(1024, int(width)))
+    h = max(120, min(1024, int(height)))
+
+    params = {
+        'size': f"{w}x{h}",
+        'scale': '2',
+        'maptype': 'roadmap',
+        # Rough visual center of the continental US
+        'center': '39.8283,-98.5795',
+        'zoom': '4',
+        # Keep roads/labels clear; just reduce non-essential clutter
+        'style': [
+            'feature:poi|visibility:off',
+            'feature:transit|visibility:off',
+        ],
+        'key': key,
+    }
+    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True)
 
 
 def column_exists(table_name: str, column_name: str) -> bool:
@@ -193,124 +731,181 @@ def column_exists(table_name: str, column_name: str) -> bool:
     return db.session.execute(q, {"t": table_name, "c": column_name}).first() is not None
 
 
-def ensure_schema_patches() -> None:
-    # Add nullable user_id to speed_reports for existing databases.
-    if not column_exists("speed_reports", "user_id"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN user_id INTEGER"))
+def ensure_schema():
+    """Best-effort schema bootstrap for local/dev DBs.
+
+    IMPORTANT:
+    - We do NOT drop or recreate tables here.
+    - We only add missing columns/indexes that the current models expect.
+    - This keeps older local DBs working after model evolution, without Alembic.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        from sqlalchemy import text as sa_text
+        from sqlalchemy.sql.sqltypes import Integer, String, Text, Float, Boolean, DateTime
+    except Exception as e:  # pragma: no cover
+        print(f"[SCHEMA INIT ERROR] unable to import sqlalchemy helpers: {e}")
+        return
+
+    def _sql_type(coltype) -> str:
+        # Keep this conservative and Postgres-friendly.
+        if isinstance(coltype, Integer):
+            return "INTEGER"
+        if isinstance(coltype, Float):
+            return "DOUBLE PRECISION"
+        if isinstance(coltype, Boolean):
+            return "BOOLEAN"
+        if isinstance(coltype, DateTime):
+            return "TIMESTAMP"
+        if isinstance(coltype, Text):
+            return "TEXT"
+        if isinstance(coltype, String):
+            # String(length=None) => use TEXT to avoid arbitrary limits
+            return f"VARCHAR({coltype.length})" if getattr(coltype, "length", None) else "TEXT"
+        # Fallback
+        return "TEXT"
+
+    # Columns where we want a strong default to avoid NULL semantics breaking queries.
+    _overrides = {
+        # speed_reports
+        "is_deleted": "BOOLEAN NOT NULL DEFAULT FALSE",
+        "verify_attempts": "INTEGER NOT NULL DEFAULT 0",
+        "verification_status": "TEXT NOT NULL DEFAULT 'pending'",
+        "ocr_status": "TEXT NOT NULL DEFAULT 'pending'",
+        # likes/comments soft defaults can be added here if needed later
+    }
+
+    def _ensure_table_columns(model):
+        table = model.__table__
+        table_name = table.name
+
+        insp = sa_inspect(db.engine)
+        if not insp.has_table(table_name):
+            # Create missing table(s)
+            db.create_all()
+            return
+
+        existing = {c["name"] for c in insp.get_columns(table_name)}
+        missing = []
+        for col in table.columns:
+            if col.name not in existing:
+                missing.append(col)
+
+        if not missing:
+            return
+
+        for col in missing:
+            # Quote column names that could be reserved (route_class etc are fine but safe anyway).
+            col_name = col.name
+            col_sql = _overrides.get(col_name, _sql_type(col.type))
+
+            # Allow NULL by default unless we have an override specifying NOT NULL.
+            # If override includes NOT NULL, it *must* include DEFAULT so existing rows pass.
+            if "NOT NULL" not in col_sql:
+                col_sql = f"{col_sql} NULL"
+
+            ddl = f'ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS "{col_name}" {col_sql};'
+            db.session.execute(sa_text(ddl))
+
         db.session.commit()
+        print(f"[SCHEMA] Added missing columns to {table_name}: {[c.name for c in missing]}")
+    try:
+        # Ensure all base tables exist first
+        db.create_all()
 
-    # Add OCR verification fields to speed_reports for existing databases.
-    if not column_exists("speed_reports", "verification_status"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verification_status VARCHAR(20) NOT NULL DEFAULT 'unverified'"))
-        db.session.commit()
+        # Apply additive patches for evolving models
+        _ensure_table_columns(User)
+        _ensure_table_columns(SpeedReport)
 
-    if not column_exists("speed_reports", "verified_at"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verified_at TIMESTAMP"))
-        db.session.commit()
+        # Optional tables (these may not exist in some older zips)
+        try:
+            _ensure_table_columns(Like)
+        except Exception:
+            pass
+        try:
+            _ensure_table_columns(Comment)
+        except Exception:
+            pass
 
-    if not column_exists("speed_reports", "ocr_posted_speed"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_posted_speed INTEGER"))
-        db.session.commit()
+        # --- Data backfills / defaults (safe, additive) ---
+        # Some older local DBs may have the column but NULL values, which can break filters/queries.
+        try:
+            db.session.execute(sa_text("UPDATE speed_reports SET is_deleted = FALSE WHERE is_deleted IS NULL;"))
+            db.session.execute(sa_text("UPDATE speed_reports SET verify_attempts = 0 WHERE verify_attempts IS NULL;"))
+            db.session.execute(sa_text("UPDATE speed_reports SET ocr_status = 'pending' WHERE ocr_status IS NULL;"))
+            db.session.execute(sa_text("UPDATE speed_reports SET verification_status = 'pending' WHERE verification_status IS NULL;"))
+            db.session.execute(sa_text(
+                """
+                UPDATE speed_reports
+                SET overage = (ticketed_speed - posted_speed)
+                WHERE overage IS NULL
+                  AND ticketed_speed IS NOT NULL
+                  AND posted_speed IS NOT NULL;
+                """
+            ))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[SCHEMA] warning: could not apply value backfills: {e}")
 
-    if not column_exists("speed_reports", "ocr_ticketed_speed"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_ticketed_speed INTEGER"))
-        db.session.commit()
+        # --- Enforce critical NOT NULL defaults (best-effort) ---
+        # Some DBs may have NOT NULL constraints without DEFAULTs, causing inserts to fail
+        # even when the app intends these fields to be 0/'pending'.
+        try:
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN verify_attempts SET DEFAULT 0;"))
+            db.session.execute(sa_text("UPDATE speed_reports SET verify_attempts = 0 WHERE verify_attempts IS NULL;"))
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN verify_attempts SET NOT NULL;"))
 
-    if not column_exists("speed_reports", "ocr_confidence"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_confidence DOUBLE PRECISION"))
-        db.session.commit()
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN is_deleted SET DEFAULT FALSE;"))
+            db.session.execute(sa_text("UPDATE speed_reports SET is_deleted = FALSE WHERE is_deleted IS NULL;"))
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN is_deleted SET NOT NULL;"))
 
-    if not column_exists("speed_reports", "verify_attempts"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verify_attempts INTEGER NOT NULL DEFAULT 0"))
-        db.session.commit()
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN ocr_status SET DEFAULT 'pending';"))
+            db.session.execute(sa_text("UPDATE speed_reports SET ocr_status = 'pending' WHERE ocr_status IS NULL;"))
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN ocr_status SET NOT NULL;"))
 
-    if not column_exists("speed_reports", "verify_reason"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN verify_reason VARCHAR(50)"))
-        db.session.commit()
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN verification_status SET DEFAULT 'pending';"))
+            db.session.execute(sa_text("UPDATE speed_reports SET verification_status = 'pending' WHERE verification_status IS NULL;"))
+            db.session.execute(sa_text("ALTER TABLE speed_reports ALTER COLUMN verification_status SET NOT NULL;"))
 
-    # Add password reset rate limit columns to users for existing databases.
-    if not column_exists("users", "reset_req_window_start"):
-        db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_window_start TIMESTAMP"))
-        db.session.commit()
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[SCHEMA] warning: could not enforce defaults/constraints: {e}")
 
-    if not column_exists("users", "reset_req_count"):
-        db.session.execute(text("ALTER TABLE users ADD COLUMN reset_req_count INTEGER"))
-        db.session.commit()
+        # Backfill road_key in Python (matches normalize_road() behavior).
+        try:
+            missing = (
+                db.session.query(SpeedReport.id, SpeedReport.road_name, SpeedReport.state)
+                .filter((SpeedReport.road_key.is_(None)) | (SpeedReport.road_key == ""))
+                .limit(50000)
+                .all()
+            )
+            if missing:
+                updates = []
+                for rid, road_name, state_val in missing:
+                    rk = normalize_road(road_name or "", state_val or "")
+                    updates.append({"id": rid, "road_key": (rk or None)})
+                db.session.bulk_update_mappings(SpeedReport, updates)
+                db.session.commit()
+                print(f"[SCHEMA] Backfilled road_key for {len(updates)} speed_reports rows")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[SCHEMA] warning: could not backfill road_key: {e}")
 
+        # --- Indexes (safe, additive) ---
+        try:
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_speed_reports_state_road_key ON speed_reports(state, road_key);"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_speed_reports_state_posted_speed ON speed_reports(state, posted_speed);"))
+            db.session.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_speed_reports_state_ticketed_speed ON speed_reports(state, ticketed_speed);"))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[SCHEMA] warning: could not create indexes: {e}")
 
-    # Soft delete (admin moderation) columns for speed_reports.
-    if not column_exists("speed_reports", "is_deleted"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "deleted_at"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN deleted_at TIMESTAMP"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "deleted_by"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN deleted_by INTEGER"))
-        db.session.commit()
-
-
-
-
-    # Photo + OCR job tracking columns for speed_reports.
-    if not column_exists("speed_reports", "photo_key"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN photo_key TEXT"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "photo_uploaded_at"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN photo_uploaded_at TIMESTAMP"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "ocr_status"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_status VARCHAR(20)"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "ocr_job_id"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_job_id VARCHAR(64)"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "ocr_error"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN ocr_error TEXT"))
-        db.session.commit()
-
-    # Mapping (optional) columns for speed_reports.
-    if not column_exists("speed_reports", "location_hint"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN location_hint VARCHAR(200)"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "raw_lat"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN raw_lat DOUBLE PRECISION"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "raw_lng"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN raw_lng DOUBLE PRECISION"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "lat"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN lat DOUBLE PRECISION"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "lng"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN lng DOUBLE PRECISION"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "lat_lng_source"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN lat_lng_source VARCHAR(30)"))
-        db.session.commit()
-
-    if not column_exists("speed_reports", "google_place_id"):
-        db.session.execute(text("ALTER TABLE speed_reports ADD COLUMN google_place_id VARCHAR(128)"))
-        db.session.commit()
-
-    # Add parent_id to comments for threaded replies.
-    if not column_exists("comments", "parent_id"):
-        db.session.execute(text("ALTER TABLE comments ADD COLUMN parent_id INTEGER"))
-        db.session.commit()
-
-
-
+    except Exception as e:
+        db.session.rollback()
+        print(f"[SCHEMA INIT ERROR] failed to ensure schema: {e}")
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -322,13 +917,148 @@ def create_app() -> Flask:
 
     @login_manager.user_loader
     def load_user(user_id: str):
-        return User.query.get(int(user_id))
+        # SQLAlchemy 2.x: Query.get() is legacy; use Session.get()
+        try:
+            return db.session.get(User, int(user_id))
+        except Exception:
+            return None
 
     @app.context_processor
     def inject_helpers():
-        return {"format_road_bucket": format_road_bucket, "static_map_url": static_map_url}
+        return {"format_road_bucket": format_road_bucket,
+                "static_map_url": static_map_url,
+                "county_static_map_url": county_static_map_url}
 
 
+    # --- County GIS (PostGIS) ---
+    # ZIP 1 foundation: create table + indexes. Import happens via scripts (see scripts/import_counties_*).
+    def ensure_counties_schema() -> None:
+        """Ensure the counties table supports both autocomplete and (optional) geometry features.
+
+        Why this exists:
+          - The import script creates/uses a `center` point column.
+          - Earlier app code used a `centroid` column.
+          - We want the app to work with either, without re-importing.
+
+        Columns we support (all optional except geoid/stusps/name_norm for autocomplete):
+          - geom     : MULTIPOLYGON (SRID 4326) for boundary outline + inside-county validation
+          - center   : POINT (SRID 4326) stable point-on-surface used by our import script
+          - centroid : POINT (SRID 4326) legacy name used by older app code
+        """
+        try:
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS postgis;')
+
+                # Base table (kept permissive so existing installs don't break).
+                conn.exec_driver_sql('''
+CREATE TABLE IF NOT EXISTS counties (
+    geoid TEXT PRIMARY KEY,
+    name TEXT,
+    namelsad TEXT,
+    statefp TEXT,
+    stusps TEXT,
+    state_name TEXT,
+    name_norm TEXT,
+    geom geometry(MULTIPOLYGON, 4326),
+    center geometry(POINT, 4326),
+    centroid geometry(POINT, 4326)
+);
+''')
+
+                # Additive patches (table may already exist with a slightly different schema).
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS namelsad TEXT;')
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS statefp TEXT;')
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS state_name TEXT;')
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS name_norm TEXT;')
+
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS geom geometry(MULTIPOLYGON, 4326);')
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS center geometry(POINT, 4326);')
+                conn.exec_driver_sql('ALTER TABLE counties ADD COLUMN IF NOT EXISTS centroid geometry(POINT, 4326);')
+
+                # Keep center/centroid in sync when one exists and the other is NULL.
+                conn.exec_driver_sql('UPDATE counties SET centroid = center WHERE centroid IS NULL AND center IS NOT NULL;')
+                conn.exec_driver_sql('UPDATE counties SET center = centroid WHERE center IS NULL AND centroid IS NOT NULL;')
+
+                # Indexes (safe, additive).
+                conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_counties_stusps ON counties(stusps);')
+                conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_counties_name_norm ON counties(name_norm);')
+                conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_counties_geom_gist ON counties USING GIST(geom);')
+                conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_counties_center_gist ON counties USING GIST(center);')
+                conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_counties_centroid_gist ON counties USING GIST(centroid);')
+        except Exception as e:
+            try:
+                print(f'[COUNTY INIT ERROR] failed to ensure counties schema: {e}')
+            except Exception:
+                pass
+
+    
+    # --- State GIS (derived from counties, cached in PostGIS) ---
+    # We are county-based, but we want a state-level highlight view that behaves like county:
+    # outline + subtle fill + fit-to-frame zoom.
+    #
+    # IMPORTANT: We do NOT union counties on every request. We build cached state geometries once
+    # into a `states` table and then read them cheaply at runtime.
+    def ensure_states_schema() -> None:
+        try:
+            with db.engine.begin() as conn:
+                conn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS postgis;')
+
+                conn.exec_driver_sql('''
+CREATE TABLE IF NOT EXISTS states (
+    stusps TEXT PRIMARY KEY,
+    state_name TEXT,
+    geom geometry(MULTIPOLYGON, 4326)
+);
+''')
+                conn.exec_driver_sql('ALTER TABLE states ADD COLUMN IF NOT EXISTS state_name TEXT;')
+                conn.exec_driver_sql('ALTER TABLE states ADD COLUMN IF NOT EXISTS geom geometry(MULTIPOLYGON, 4326);')
+                conn.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_states_geom_gist ON states USING GIST(geom);')
+
+                # Build once (only when empty). Protect with an advisory lock to avoid races
+                # when both web + worker boot at the same time.
+                rows = conn.exec_driver_sql('SELECT COUNT(1) FROM states;').fetchone()
+                n = int(rows[0] or 0) if rows else 0
+                if n > 0:
+                    return
+
+                # Try to acquire lock quickly; if we can't, another process is building.
+                lock = conn.exec_driver_sql('SELECT pg_try_advisory_lock(987654321);').fetchone()
+                got_lock = bool(lock and lock[0])
+                if not got_lock:
+                    return
+
+                try:
+                    # Re-check now that we hold the lock.
+                    rows2 = conn.exec_driver_sql('SELECT COUNT(1) FROM states;').fetchone()
+                    n2 = int(rows2[0] or 0) if rows2 else 0
+                    if n2 > 0:
+                        return
+
+                    # Populate cached state geometries from counties (one-time).
+                    # We take the union of county MULTIPOLYGONs per state and coerce to MULTIPOLYGON.
+                    conn.exec_driver_sql('''
+INSERT INTO states (stusps, state_name, geom)
+SELECT
+    UPPER(TRIM(stusps)) AS stusps,
+    MAX(NULLIF(TRIM(state_name), '')) AS state_name,
+    ST_Multi(ST_Union(geom)) AS geom
+FROM counties
+WHERE stusps IS NOT NULL AND TRIM(stusps) <> '' AND geom IS NOT NULL
+GROUP BY UPPER(TRIM(stusps));
+''')
+                finally:
+                    try:
+                        conn.exec_driver_sql('SELECT pg_advisory_unlock(987654321);')
+                    except Exception:
+                        pass
+        except Exception as e:
+            try:
+                print(f'[STATE INIT ERROR] failed to ensure states schema: {e}')
+            except Exception:
+                pass
+
+
+# Try to ensure counties schema at boot (non-fatal). (non-fatal).
 
 
     # --- Mobile/API auth (JWT) ---
@@ -444,10 +1174,304 @@ def create_app() -> Flask:
         except Exception:
             return None, None
 
+
+    def nearest_roads_multi(points: list[tuple[float, float]]):
+        """Batch Roads API nearestRoads call for multiple points.
+
+        Returns a list of snappedPoints with `originalIndex` preserved.
+        """
+        try:
+            if not points:
+                return []
+
+            # Roads API supports multiple points as a '|' separated list.
+            # Keep this bounded to avoid URL length/timeouts.
+            pts = [(float(a), float(b)) for a, b in points[:100]]
+
+            pts_str = "|".join([f"{a:.6f},{b:.6f}" for a, b in pts])
+            q = urllib.parse.urlencode({"points": pts_str, "key": app.config.get("GOOGLE_MAPS_SERVER_KEY") or ""})
+            url = f"https://roads.googleapis.com/v1/nearestRoads?{q}"
+            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                payload = resp.read().decode("utf-8")
+            data = json.loads(payload)
+            return data.get("snappedPoints") or []
+        except Exception:
+            return []
+
+
+    # --- Highway-biased snapping (optional) ---
+    _HIGHWAY_PENALTY_WORDS = (
+        # Things that often show up on frontage/side roads or interchanges.
+        'ramp', 'service', 'frontage', 'access', 'collector', 'local', 'drive', 'dr', 'loop', 'spur', 'bypass',
+        'parkway', 'connector', 'circle'
+    )
+
+    def _offset_latlng_m(lat: float, lng: float, north_m: float, east_m: float):
+        """Return a lat/lng offset by meters (rough)."""
+        try:
+            dlat = north_m / 111320.0
+            dlng = east_m / (111320.0 * math.cos(math.radians(lat)) + 1e-9)
+            return lat + dlat, lng + dlng
+        except Exception:
+            return lat, lng
+
+    def _score_highway_candidate(road_label: str) -> int:
+        s = (road_label or '').strip().lower()
+        if not s:
+            return 0
+
+        score = 0
+
+        # Strongest: Interstates
+        if s.startswith('interstate ') or ' interstate ' in s:
+            score += 160
+        if re.search(r'(?<!\w)i\s*-?\s*\d{1,3}(?!\w)', s):
+            score += 140
+
+        # US routes
+        if 'us route' in s or re.search(r'(?<!\w)us\s*-?\s*\d{1,4}(?!\w)', s):
+            score += 110
+
+        # State routes often appear like "nc-33", "wa 520", etc.
+        if 'state route' in s or re.search(r'(?<!\w)[a-z]{2}\s*-?\s*\d{1,4}(?!\w)', s):
+            score += 85
+
+        # Generic highway keywords / route markers
+        if 'highway' in s or re.search(r'(?<!\w)hwy(?!\w)', s):
+            score += 70
+        if 'route' in s:
+            score += 25
+
+        # Route numbers alone (fallback)
+        if re.search(r'(?<!\w)\d{1,4}(?!\w)', s) and (
+            'rd' in s or 'road' in s or 'route' in s or 'hwy' in s or '-' in s
+        ):
+            score += 10
+
+        # Penalize common side-road artifacts.
+        for w in _HIGHWAY_PENALTY_WORDS:
+            if w in s:
+                score -= 35
+
+        # Heavy penalty for obvious local streets if we have no route-ish markers
+        if score < 50 and not re.search(r'(?<!\w)(i\s*-?\s*\d|us\s*-?\s*\d|[a-z]{2}\s*-?\s*\d|highway|hwy|route)(?!\w)', s):
+            score -= 40
+
+        return score
+
+    def _route_kind(road_label: str) -> str:
+        """Classify a road label into: interstate | numbered | local."""
+        s = (road_label or '').strip().lower()
+        if not s:
+            return 'local'
+
+        # Interstates
+        if s.startswith('interstate ') or ' interstate ' in s:
+            return 'interstate'
+        if re.search(r'(?<!\w)i\s*-?\s*\d{1,3}(?!\w)', s):
+            return 'interstate'
+
+        # Helper: avoid treating "1st/2nd/3rd" street names as numbered routes.
+        if re.search(r'(?<!\w)\d{1,2}(st|nd|rd|th)(?!\w)', s):
+            return 'local'
+
+        # Numbered routes (US routes, state routes, highways/parkways with numbers)
+        if 'us route' in s or 'u.s. route' in s:
+            return 'numbered'
+        if re.search(r'(?<!\w)us\s*-?\s*\d{1,4}(?!\w)', s):
+            return 'numbered'
+        if 'state route' in s or re.search(r'(?<!\w)[a-z]{2}\s*-?\s*\d{1,4}(?!\w)', s):
+            return 'numbered'
+        if ('highway' in s or re.search(r'(?<!\w)hwy(?!\w)', s) or 'route' in s or 'parkway' in s) and re.search(r'(?<!\w)\d{1,4}(?!\w)', s):
+            return 'numbered'
+
+        return 'local'
+
+    def _score_route_class_candidate(road_label: str, route_class: str, rstage_m: int, max_r_m: int) -> int:
+        """Score a candidate *within* a selected route_class.
+
+        route_class: interstate | numbered | local
+        Strict: if the candidate doesn't match the selected class (or is excluded), return a very negative score.
+        """
+        rc = (route_class or '').strip().lower()
+        kind = _route_kind(road_label)
+        if rc == 'interstate':
+            if kind != 'interstate':
+                return -10**9
+            base = _score_highway_candidate(road_label)
+        elif rc in ('numbered', 'us_route', 'other'):
+            # Back-compat: accept older values too.
+            if kind != 'numbered':
+                return -10**9
+            base = _score_highway_candidate(road_label)
+        elif rc == 'local':
+            # Explicitly exclude Interstate + numbered routes.
+            if kind in ('interstate', 'numbered'):
+                return -10**9
+            base = 0
+            s = (road_label or '').strip().lower()
+            # Lightly penalize obvious ramps/frontage for local too.
+            for w in _HIGHWAY_PENALTY_WORDS:
+                if w in s:
+                    base -= 15
+        else:
+            # Unknown selection: don't accept anything.
+            return -10**9
+
+        # Prefer closer candidates within the chosen class.
+        try:
+            rstage = int(rstage_m)
+        except Exception:
+            rstage = max_r_m
+        dist_bonus = int(max(0, int(max_r_m) - rstage) / 50)
+        return int(base) + dist_bonus
+
+    def _snap_and_get_road(lat: float, lng: float):
+        slat, slng = snap_to_nearest_road(lat, lng)
+        if slat is None or slng is None:
+            return None
+        road = _reverse_geocode_route(float(slat), float(slng))
+        if not road:
+            return None
+        return {
+            'snapped_lat': float(slat),
+            'snapped_lng': float(slng),
+            'road_name': road,
+        }
+
+    def _confirm_location_route_class(raw_lat: float, raw_lng: float, route_class: str, max_radius_m: int = 2500):
+        """Highway-biased snapping.
+
+        Strategy:
+        - Generate a candidate cloud around the pin.
+        - Run ONE Roads nearestRoads call for all candidates.
+        - Reverse-geocode a bounded set of unique snapped points.
+        - Pick the best highway-like match by score.
+
+        When route_class is:
+        - interstate: only accept Interstates
+        - numbered: only accept numbered routes/highways (US routes, state routes, parkways with numbers)
+        - local: reject interstate + numbered and choose a named street/road
+
+        Returns None when no match is found within the selected class.
+        """
+        try:
+            max_r = int(max_radius_m)
+        except Exception:
+            max_r = 2500
+        max_r = max(200, min(6000, max_r))
+
+        # Radii stages: close-first, then broader.
+        radii = sorted(set([0, 150, 500, 1500, max_r]))
+
+        dirs = [
+            (1, 0), (-1, 0), (0, 1), (0, -1),
+            (1, 1), (1, -1), (-1, 1), (-1, -1),
+        ]
+
+        candidates = [(raw_lat, raw_lng)]
+        meta = [0]
+        for r in radii:
+            if r == 0:
+                continue
+            for dn, de in dirs:
+                scale = (1 / math.sqrt(2)) if (dn != 0 and de != 0) else 1.0
+                c_lat, c_lng = _offset_latlng_m(raw_lat, raw_lng, dn * r * scale, de * r * scale)
+                candidates.append((c_lat, c_lng))
+                meta.append(r)
+
+        snapped = nearest_roads_multi(candidates)
+        if not snapped:
+            return None
+
+        # original_index -> (slat, slng, radius_stage)
+        idx_to: dict[int, tuple[float, float, int]] = {}
+        for sp in snapped:
+            oi = sp.get('originalIndex')
+            loc = (sp.get('location') or {}) if isinstance(sp, dict) else {}
+            if oi is None:
+                continue
+            try:
+                oi_i = int(oi)
+            except Exception:
+                continue
+            if oi_i < 0 or oi_i >= len(candidates):
+                continue
+            slat = loc.get('latitude')
+            slng = loc.get('longitude')
+            if slat is None or slng is None:
+                continue
+            idx_to[oi_i] = (float(slat), float(slng), int(meta[oi_i]))
+
+        # Deduplicate snapped points (rounded), keep smallest radius stage
+        uniq: dict[tuple[float, float], dict[str, float | int]] = {}
+        for (slat, slng, rstage) in idx_to.values():
+            key = (round(slat, 5), round(slng, 5))
+            cur = uniq.get(key)
+            if cur is None or rstage < int(cur['rstage']):
+                uniq[key] = {'slat': slat, 'slng': slng, 'rstage': rstage}
+
+        stages_present = sorted({int(u['rstage']) for u in uniq.values()})
+        stage_order = [s for s in radii if s in stages_present]
+        for s in stages_present:
+            if s not in stage_order:
+                stage_order.append(s)
+
+        best = None
+        best_score = -10**9
+
+        rc = (route_class or '').strip().lower()
+        if rc == 'interstate':
+            ACCEPT_THRESHOLD = 120
+        elif rc in ('numbered', 'us_route', 'other'):
+            # Back-compat: accept older values too.
+            ACCEPT_THRESHOLD = 90
+        elif rc == 'local':
+            ACCEPT_THRESHOLD = 10
+        else:
+            ACCEPT_THRESHOLD = 999999
+        remaining_budget = 18  # reverse-geocode budget
+
+        for rstage in stage_order:
+            stage_pts = [u for u in uniq.values() if int(u['rstage']) == rstage]
+            for u in stage_pts:
+                if remaining_budget <= 0:
+                    break
+                road = _reverse_geocode_route(float(u['slat']), float(u['slng']))
+                remaining_budget -= 1
+                if not road:
+                    continue
+                score = _score_route_class_candidate(road, rc, int(u['rstage']), max_r)
+                if score > best_score:
+                    best_score = score
+                    best = {
+                        'snapped_lat': float(u['slat']),
+                        'snapped_lng': float(u['slng']),
+                        'road_name': road,
+                    }
+
+                # If we hit a very strong match, stop early.
+                if score >= 180:
+                    break
+            if best_score >= 120:
+                break
+
+        if not best or best_score < ACCEPT_THRESHOLD:
+            return None
+
+        return best
+
+    # Backward-compatible wrapper for older clients that still send prefer_highway Yes/No.
+    def _confirm_location_prefer_highway(raw_lat: float, raw_lng: float, max_radius_m: int = 2500):
+        # Try major route types first; do NOT fall back to local streets.
+        return _confirm_location_route_class(raw_lat, raw_lng, route_class='interstate', max_radius_m=max_radius_m) or \
+               _confirm_location_route_class(raw_lat, raw_lng, route_class='us_route', max_radius_m=max_radius_m)
+
     with app.app_context():
         try:
-            db.create_all()
-            ensure_schema_patches()
+            # Single, centralized schema bootstrap (additive, no destructive changes).
+            ensure_schema()
         except Exception as e:
             # Don't start a server that can't reach the database; fail fast with a clear error.
             print(f"[DB INIT ERROR] {e}")
@@ -465,6 +1489,13 @@ def create_app() -> Flask:
             # Preserve casing as-entered, but treat usernames as case-insensitive for uniqueness.
             username = form.username.data.strip()
 
+            # Birthday (validated in form: must be 18+)
+            try:
+                import datetime as _dt
+                dob = _dt.date(int(form.birth_year.data), int(form.birth_month.data), int(form.birth_day.data))
+            except Exception:
+                flash("Please select a valid birth date.", "error")
+                return render_template("register.html", form=form)
             if User.query.filter_by(email=email).first():
                 flash("That email is already registered. Please log in.", "error")
                 return redirect(url_for("login", next=request.args.get('next')))
@@ -472,8 +1503,7 @@ def create_app() -> Flask:
             if User.query.filter(func.lower(User.username) == username.lower()).first():
                 flash("That username is taken. Try another.", "error")
                 return render_template("register.html", form=form)
-
-            user = User(email=email, username=username)
+            user = User(email=email, username=username, birthdate=dob)
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
@@ -662,20 +1692,21 @@ def create_app() -> Flask:
         exclude_anonymous: bool,
         state_filter: str | None = None,
         road_filter: str | None = None,
+        county_geoid: str | None = None,
         speed_limit_list: List[str] | None = None,
         over_list: List[str] | None = None,
         photo_only: bool = False,
         verify: str = "any",
         date: str = "any",
+                pin_only: bool = False,
         deleted_mode: str = "hide",
     ) -> Dict[str, List[Dict]]:
-        """Return Most Strict and Least Strict rankings.
+        """Return county-based statistics (Lower/Higher median overage).
 
-        Strictness is based on the MEDIAN overage (ticketed - posted), considering only tickets where
-        ticketed_speed > posted_speed. Lower median overage = more strict.
+        Metric: MEDIAN overage (ticketed - posted), considering only tickets where ticketed_speed > posted_speed.
+        Lower median overage = more strict.
 
-        IMPORTANT: This function supports the shared filter rail inputs so the strictness page
-        filters behave the same way as the other pages.
+        Supports the shared filter rail inputs so the Statistics page behaves like other pages.
         """
 
         speed_limit_list = speed_limit_list or []
@@ -686,10 +1717,7 @@ def create_app() -> Flask:
         q = (
             db.session.query(
                 SpeedReport.state.label("state"),
-                SpeedReport.road_key.label("road_key"),
-                SpeedReport.road_name.label("road_name"),
-                SpeedReport.posted_speed.label("posted_speed"),
-                SpeedReport.ticketed_speed.label("ticketed_speed"),
+                SpeedReport.county_geoid.label("county_geoid"),
                 expr.label("overage"),
                 SpeedReport.created_at.label("created_at"),
                 SpeedReport.photo_key.label("photo_key"),
@@ -698,6 +1726,7 @@ def create_app() -> Flask:
                 SpeedReport.user_id.label("user_id"),
             )
             .filter(SpeedReport.ticketed_speed > SpeedReport.posted_speed)
+            .filter(SpeedReport.county_geoid.isnot(None))
         )
 
         # Deleted visibility (admin can request include/only; non-admin callers should pass "hide")
@@ -716,6 +1745,14 @@ def create_app() -> Flask:
         if state_filter:
             q = q.filter(SpeedReport.state.ilike(f"{state_filter}%"))
 
+        # County filter (GEOID)
+        if county_geoid:
+            q = q.filter(SpeedReport.county_geoid == county_geoid)
+
+        # Map pin filter (only tickets with a user-placed pin)
+        if pin_only:
+            q = q.filter(SpeedReport.location_source.in_(("user_pin", "user_pin_snapped")))
+
         # Date filter
         if date not in ("", "any"):
             try:
@@ -725,7 +1762,7 @@ def create_app() -> Flask:
             if days > 0:
                 q = q.filter(SpeedReport.created_at >= (datetime.utcnow() - timedelta(days=days)))
 
-        # Road filter (forgiving: match normalized bucket OR partial raw text)
+        # Optional road filter (legacy param support)
         if road_filter:
             try:
                 road_key = normalize_road(road_filter, (state_filter or ""))
@@ -740,7 +1777,13 @@ def create_app() -> Flask:
         if speed_limit_list:
             sl_conds = []
             for v in speed_limit_list:
-                if v == "25-35":
+                if v == "lte35":
+                    sl_conds.append(SpeedReport.posted_speed <= 35)
+                elif v == "40-55":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 55))
+                elif v == "gte60":
+                    sl_conds.append(SpeedReport.posted_speed >= 60)
+                elif v == "25-35":
                     sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
                 elif v == "40-50":
                     sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
@@ -757,7 +1800,13 @@ def create_app() -> Flask:
         if over_list:
             over_conds = []
             for v in over_list:
-                if v == "5-9":
+                if v == "1-10":
+                    over_conds.append(and_(expr >= 1, expr <= 10))
+                elif v == "11-20":
+                    over_conds.append(and_(expr >= 11, expr <= 20))
+                elif v == "21+":
+                    over_conds.append(expr >= 21)
+                elif v == "5-9":
                     over_conds.append(and_(expr >= 5, expr <= 9))
                 elif v == "10-14":
                     over_conds.append(and_(expr >= 10, expr <= 14))
@@ -788,57 +1837,382 @@ def create_app() -> Flask:
 
         groups: Dict[tuple, Dict] = {}
         for r in rows:
-            key = (normalize_state_group(r.state), r.road_key)
+            geoid = (r.county_geoid or "").strip()
+            if not geoid:
+                continue
+            key = (normalize_state_group(r.state), geoid)
             g = groups.get(key)
             if g is None:
                 g = {
                     "state": key[0],
-                    "road": key[1],
+                    "county_geoid": geoid,
                     "overages": [],
                     "tickets": 0,
-                    "anon_tickets": 0,
-                    "member_tickets": 0,
                 }
                 groups[key] = g
 
-            g["overages"].append(int(r.overage))
+            try:
+                g["overages"].append(int(r.overage))
+            except Exception:
+                continue
             g["tickets"] += 1
 
-            if r.user_id is None:
-                g["anon_tickets"] += 1
-            else:
-                g["member_tickets"] += 1
+        geoids = sorted({g["county_geoid"] for g in groups.values() if g.get("county_geoid")})
 
-        results: List[Dict] = []
-        for g in groups.values():
-            med = float(median(g["overages"])) if g["overages"] else 0.0
+        # Resolve county + full state names from counties table (best-effort)
+        county_meta = {}
+        if geoids:
+            try:
+                stmt = (
+                    text(
+                        """
+                        SELECT geoid,
+                               COALESCE(namelsad, name) AS county_label,
+                               COALESCE(state_name, '') AS state_name,
+                               COALESCE(stusps, '') AS stusps
+                        FROM counties
+                        WHERE geoid IN :geoids
+                        """
+                    ).bindparams(bindparam("geoids", expanding=True))
+                )
+                meta_rows = db.session.execute(stmt, {"geoids": geoids}).mappings().all()
+                for rr in meta_rows:
+                    county_meta[rr.get("geoid")] = {
+                        "county_name": (rr.get("county_label") or "").strip(),
+                        "state_name": (rr.get("state_name") or "").strip(),
+                        "stusps": (rr.get("stusps") or "").strip().upper(),
+                    }
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+
+        state_name_by_abbr = {abbr: name for abbr, name in STATE_PAIRS}
+
+        results = []
+        for key, g in groups.items():
+            overages = g.get("overages") or []
+            if not overages:
+                continue
+
+            med = float(median(sorted(overages)))
+
+            geoid = g.get("county_geoid")
+            meta = county_meta.get(geoid, {})
+
+            st_code = g.get("state") or ""
+            st_name = (meta.get("state_name") or "").strip() or state_name_by_abbr.get(st_code, st_code)
+            county_name = (meta.get("county_name") or "").strip() or "Unknown County"
+
             results.append(
                 {
-                    "state": g["state"],
-                    "road": g["road"],
-                    "median_overage": round(med, 1),
-                    "tickets": int(g["tickets"]),
-                    "anon_pct": int(round((g["anon_tickets"] / g["tickets"]) * 100)) if g["tickets"] else 0,
-                    "member_pct": (100 - int(round((g["anon_tickets"] / g["tickets"]) * 100))) if g["tickets"] else 0,
+                    "state": st_code,
+                    "state_name": st_name,
+                    "county_geoid": geoid,
+                    "county_name": county_name,
+                    "median_overage": med,
+                    "tickets": int(g.get("tickets") or 0),
                 }
             )
 
-        # Primary sort key: median_overage (asc for strict, desc for least)
-        # Tie-breakers: tickets (desc), then (state, road) alphabetical
-        most_strict = sorted(
-            results,
-            key=lambda x: (x["median_overage"], -x["tickets"], x["state"], x["road"]),
-        )[:limit]
+        results.sort(key=lambda d: (d["median_overage"], -d["tickets"], d["state"], d["county_name"]))
+        most_strict = results[:limit]
 
-        least_strict = sorted(
-            results,
-            key=lambda x: (-x["median_overage"], -x["tickets"], x["state"], x["road"]),
-        )[:limit]
+        least_sorted = sorted(results, key=lambda d: (-d["median_overage"], -d["tickets"], d["state"], d["county_name"]))
+        least_strict = least_sorted[:limit]
 
         return {"most_strict": most_strict, "least_strict": least_strict}
 
+    @app.get("/strictness", endpoint="strictness")
+    def strictness():
+        filter_county_geoid, filter_county_label = _get_county_filter_from_request()
+        """Web rankings page (server-rendered) used by base.html nav."""
+        hide_anon_requested = (request.args.get("hide_anon") == "1")
+        if hide_anon_requested and not current_user.is_authenticated:
+            flash("You must be logged in to hide anonymous posts.", "info")
+
+        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        is_admin = is_admin_user(current_user)
+        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
+        if not is_admin:
+            deleted_mode = "hide"
+        if deleted_mode not in ("hide", "include", "only"):
+            deleted_mode = "hide"
+
+        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_road = (request.args.get("road") or "").strip()
+
+        filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
+        filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
+        filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
+
+        filter_over_list = [v.strip() for v in request.args.getlist("overage") if (v or "").strip()]
+        filter_over_list = [v for v in filter_over_list if v not in ("all", "any")]
+        legacy_over = (request.args.get("over") or "").strip()
+        if legacy_over and legacy_over not in ("all", ""):
+            filter_over_list = list(dict.fromkeys(filter_over_list + [legacy_over]))
+
+        filter_photo_only = (request.args.get("photo_only") == "1")
+        filter_verify = (request.args.get("verify") or "any").strip()
+        filter_pin = (request.args.get("pin") == "1")
+
+        filter_date = (request.args.get("date") or "any").strip()
+
+        if request.args.get("verified_photo") == "1":
+            filter_photo_only = True
+            filter_verify = "verified"
+
+        filter_sort = (request.args.get("sort") or "new").strip()
+
+        # Back-compat: older UI used 'most_strict'/'least_strict' labels for overage sorting
+        if filter_sort == "most_strict":
+            filter_sort = "least_over"
+        elif filter_sort == "least_strict":
+            filter_sort = "most_over"
+
+        # State dropdown options (2-letter codes)
+        state_filter_options = []
+        try:
+            rows = db.session.query(SpeedReport.state).distinct().all()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            rows = []
+        seen = set()
+        for (sv,) in rows:
+            if not sv:
+                continue
+            code = sv.split(" - ")[0].strip().upper()
+            if len(code) != 2 or not code.isalpha():
+                continue
+            if code in seen:
+                continue
+            seen.add(code)
+            state_filter_options.append({"code": code})
+        state_filter_options.sort(key=lambda d: d["code"])
+
+        speed_limit_buckets = [
+            {"value": "any", "label": "Any"},
+            {"value": "lte35", "label": "≤ 35 mph"},
+            {"value": "40-55", "label": "40–55 mph"},
+            {"value": "gte60", "label": "≥ 60 mph"},
+        ]
+
+        over_buckets = [
+            {"value": "all", "label": "Any"},
+            {"value": "1-10", "label": "1–10 mph over"},
+            {"value": "11-20", "label": "11–20 mph over"},
+            {"value": "21+", "label": "≥ 21 mph over"},
+        ]
+
+        date_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "7", "label": "Last 7 days"},
+            {"value": "30", "label": "Last 30 days"},
+            {"value": "90", "label": "Last 90 days"},
+            {"value": "365", "label": "Last year"},
+        ]
+
+        verify_options = [
+            {"value": "any", "label": "Any"},
+            {"value": "verified", "label": "Auto-Extracted"},
+            {"value": "not_verified", "label": "Not auto-extracted"},
+        ]
+
+        filters_active = bool(
+            filter_state
+            or filter_county_geoid
+            or filter_road
+            or bool(filter_speed_limit_list)
+            or bool(filter_over_list)
+            or filter_pin
+            or filter_photo_only
+            or (filter_verify not in ("", "any"))
+            or (filter_date not in ("", "any"))
+            or (filter_sort not in ("", "new"))
+            or (deleted_mode not in ("", "hide"))
+            or hide_anon
+        )
+
+        # Road suggestions for datalist (same pattern as home)
+        road_suggestions: List[str] = []
+        try:
+            rq = db.session.query(SpeedReport.road_name).filter(SpeedReport.road_name.isnot(None))
+            if filter_state:
+                rq = rq.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+            rows2 = rq.distinct().order_by(SpeedReport.road_name.asc()).limit(40).all()
+            road_suggestions = [rn for (rn,) in rows2 if rn]
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            road_suggestions = []
+
+        data = strictness_rows(
+            limit=20,
+            exclude_anonymous=hide_anon,
+            state_filter=(filter_state or None),
+            road_filter=(filter_road or None),
+            county_geoid=(filter_county_geoid or None),
+            speed_limit_list=filter_speed_limit_list,
+            over_list=filter_over_list,
+            photo_only=filter_photo_only,
+            verify=(filter_verify or "any"),
+            date=(filter_date or "any"),
+            pin_only=filter_pin,
+            deleted_mode=deleted_mode,
+        )
+
+        return render_template(
+            "strictness.html",
+            most_strict=data.get("most_strict", []),
+            least_strict=data.get("least_strict", []),
+            is_admin=is_admin,
+            deleted_mode=deleted_mode,
+            hide_anon=hide_anon,
+            filters_active=filters_active,
+            filter_state=filter_state,
+            filter_road=filter_road,
+            filter_county_geoid=filter_county_geoid,
+            filter_county_label=filter_county_label,
+            filter_speed_limit_list=filter_speed_limit_list,
+            filter_over_list=filter_over_list,
+            filter_photo_only=filter_photo_only,
+            filter_verify=filter_verify,
+            filter_pin=filter_pin,
+            filter_date=filter_date,
+            filter_sort=filter_sort,
+            state_filter_options=state_filter_options,
+            speed_limit_buckets=speed_limit_buckets,
+            over_buckets=over_buckets,
+            date_options=date_options,
+            verify_options=verify_options,
+            road_suggestions=road_suggestions,
+        )
+
+
+    @app.get("/statistics")
+    def statistics_redirect():
+        """Alias for the Statistics page (redirects to /strictness)."""
+        qs = request.query_string.decode('utf-8') if request.query_string else ''
+        return redirect('/strictness' + (('?' + qs) if qs else ''))
+
+
+
+    @app.get("/bucket", endpoint="bucket_tickets")
+    def bucket_tickets():
+        """Simple per-(state, road) ticket list used by strictness + feed links."""
+        state_raw = (request.args.get("state") or "").strip()
+        road_raw = (request.args.get("road") or "").strip()
+
+        if not state_raw or not road_raw:
+            flash("Missing road selection.", "error")
+            return redirect(url_for("home"))
+
+        state_code = state_raw.split(" - ")[0].strip().upper()
+        if len(state_code) != 2 or not state_code.isalpha():
+            # fall back to raw prefix matching
+            state_code = state_raw.strip()
+
+        # Normalize road filter if possible
+        road_key = road_raw
+        try:
+            rk = normalize_road(road_raw, state_code if len(state_code) == 2 else "")
+            if rk:
+                road_key = rk
+        except Exception:
+            road_key = road_raw
+
+        q = SpeedReport.query.options(joinedload(SpeedReport.user))
+
+        # state prefix match (keeps compatibility with "MO - Missouri" stored values)
+        if len(state_code) == 2:
+            q = q.filter(SpeedReport.state.ilike(f"{state_code}%"))
+        else:
+            q = q.filter(SpeedReport.state.ilike(f"{state_code}%"))
+
+        # road match: exact key OR forgiving partial name
+        conds = []
+        if road_key:
+            conds.append(SpeedReport.road_key == road_key)
+        conds.append(SpeedReport.road_name.ilike(f"%{road_raw}%"))
+        q = q.filter(or_(*conds))
+
+        q = q.filter(SpeedReport.is_deleted.is_(False)).order_by(SpeedReport.created_at.desc())
+
+        reports = q.limit(50).all()
+
+        total_tickets = len(reports)
+        member_count = sum(1 for r in reports if getattr(r, "user_id", None))
+        anon_count = total_tickets - member_count
+        member_pct = int(round((member_count / total_tickets) * 100)) if total_tickets else 0
+        anon_pct = int(round((anon_count / total_tickets) * 100)) if total_tickets else 0
+
+        rows = []
+        for r in reports:
+            try:
+                username = r.user.username if getattr(r, "user", None) else None
+            except Exception:
+                username = None
+            rows.append(
+                {
+                    "id": r.id,
+                    "posted_speed": r.posted_speed,
+                    "ticketed_speed": r.ticketed_speed,
+                    "username": username,
+                    "created_at": r.created_at,
+                }
+            )
+
+        return render_template(
+            "bucket_tickets.html",
+            state=(state_code if len(state_code) == 2 else state_raw),
+            road_key=road_key,
+            rows=rows,
+            total_tickets=total_tickets,
+            member_pct=member_pct,
+            anon_pct=anon_pct,
+        )
+
+
+    @app.get("/result/<int:report_id>", endpoint="result")
+    def result(report_id: int):
+        """Minimal report detail page (compat for legacy profile links)."""
+        r = SpeedReport.query.options(joinedload(SpeedReport.user)).get_or_404(report_id)
+
+        try:
+            username = r.user.username if r.user else None
+        except Exception:
+            username = None
+
+        state_code = (r.state or "").split(" - ")[0].strip().upper()
+        if len(state_code) != 2:
+            state_code = (r.state or "").strip()
+
+        road_label = r.road_key or r.road_name or ""
+
+        return render_template(
+            "report_detail.html",
+            report=r,
+            username=username,
+            state_code=state_code,
+            road_label=road_label,
+        )
+
+
+    @app.get("/submit-ticket", endpoint="submit_ticket")
+    def submit_ticket():
+        """Legacy endpoint alias (older landing pages)."""
+        return redirect(url_for("submit"))
+
     @app.get("/")
     def home():
+        filter_county_geoid, filter_county_label = _get_county_filter_from_request()
         """
         Soft-gated public feed (newest first).
         Anonymous posts are visible by default.
@@ -885,6 +2259,7 @@ def create_app() -> Flask:
         # Evidence filters
         filter_photo_only = (request.args.get("photo_only") == "1")
         filter_verify = (request.args.get("verify") or "any").strip()
+        filter_pin = (request.args.get("pin") == "1")
 
         # Date filter (created_at)
         filter_date = (request.args.get("date") or "any").strip()
@@ -897,9 +2272,22 @@ def create_app() -> Flask:
         # Sort
         filter_sort = (request.args.get("sort") or "new").strip()
 
+        # Back-compat: older UI used 'most_strict'/'least_strict' labels for overage sorting
+        if filter_sort == "most_strict":
+            filter_sort = "least_over"
+        elif filter_sort == "least_strict":
+            filter_sort = "most_over"
+
         # State dropdown options (2-letter codes)
         state_filter_options = []
-        rows = db.session.query(SpeedReport.state).distinct().all()
+        try:
+            rows = db.session.query(SpeedReport.state).distinct().all()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            rows = []
         seen = set()
         for (sv,) in rows:
             if not sv:
@@ -946,13 +2334,16 @@ def create_app() -> Flask:
 
         filters_active = bool(
             filter_state
+            or filter_county_geoid
             or filter_road
             or bool(filter_speed_limit_list)
             or bool(filter_over_list)
+            or filter_pin
             or filter_photo_only
             or (filter_verify not in ("", "any"))
             or (filter_date not in ("", "any"))
             or (filter_sort not in ("", "new"))
+            or (deleted_mode not in ("", "hide"))
             or hide_anon
         )
 
@@ -961,10 +2352,6 @@ def create_app() -> Flask:
 
         # Deleted visibility (admin: ?deleted=hide|include|only)
         if deleted_only:
-            q = q.filter(SpeedReport.is_deleted.is_(True))
-        elif deleted_only:
-            q = q.filter(SpeedReport.is_deleted.is_(True))
-        elif deleted_only:
             q = q.filter(SpeedReport.is_deleted.is_(True))
         elif deleted_only:
             q = q.filter(SpeedReport.is_deleted.is_(True))
@@ -978,6 +2365,18 @@ def create_app() -> Flask:
         # State filter (2-letter code prefix)
         if filter_state:
             q = q.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+
+        # County filter (GEOID)
+        # If we're focused on a county in viewport mode, do NOT force the query to only that county.
+        # We'll color pins instead (inside vs outside).
+        if filter_county_geoid:
+            q = q.filter(SpeedReport.county_geoid == filter_county_geoid)
+
+        # Viewport filter
+
+        # Map pin filter (only tickets with a user-placed pin)
+        if filter_pin:
+            q = q.filter(SpeedReport.location_source.in_(("user_pin", "user_pin_snapped")))
 
         # Date filter
         if filter_date not in ("", "any"):
@@ -1003,7 +2402,13 @@ def create_app() -> Flask:
         if filter_speed_limit_list:
             sl_conds = []
             for v in filter_speed_limit_list:
-                if v == "25-35":
+                if v == "lte35":
+                    sl_conds.append(SpeedReport.posted_speed <= 35)
+                elif v == "40-55":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 55))
+                elif v == "gte60":
+                    sl_conds.append(SpeedReport.posted_speed >= 60)
+                elif v == "25-35":
                     sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
                 elif v == "40-50":
                     sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
@@ -1021,7 +2426,13 @@ def create_app() -> Flask:
         if filter_over_list:
             over_conds = []
             for v in filter_over_list:
-                if v == "5-9":
+                if v == "1-10":
+                    over_conds.append(and_(expr >= 1, expr <= 10))
+                elif v == "11-20":
+                    over_conds.append(and_(expr >= 11, expr <= 20))
+                elif v == "21+":
+                    over_conds.append(expr >= 21)
+                elif v == "5-9":
                     over_conds.append(and_(expr >= 5, expr <= 9))
                 elif v == "10-14":
                     over_conds.append(and_(expr >= 10, expr <= 14))
@@ -1090,10 +2501,14 @@ def create_app() -> Flask:
             rows = rq.distinct().order_by(SpeedReport.road_name.asc()).limit(40).all()
             road_suggestions = [rn for (rn,) in rows if rn]
         except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             road_suggestions = []
 
         # Compute per-post min/max percentiles using only group min/max (fast, stable meaning).
-        keys_a = {(r.state, r.road_key) for r in reports}  # Road + State group
+        keys_a = {(r.state, r.road_key) for r in reports if r.road_key}  # Road + State group
         keys_b = {(r.state, r.posted_speed) for r in reports}  # State + Posted Speed group
 
         expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
@@ -1314,6 +2729,37 @@ def create_app() -> Flask:
             except Exception:
                 continue
 
+        # Counts for the under-username metadata line (only for states/counties visible on this page).
+        state_ticket_counts: dict[str, int] = {}
+        county_ticket_counts: dict[str, int] = {}
+        try:
+            states_in_page = sorted({(r.state or '').strip() for r in reports if (r.state or '').strip()})
+            counties_in_page = sorted({(r.county_geoid or '').strip() for r in reports if (r.county_geoid or '').strip()})
+
+            if states_in_page:
+                rows = (
+                    db.session.query(SpeedReport.state, func.count(SpeedReport.id))
+                    .filter(SpeedReport.is_deleted == False)
+                    .filter(SpeedReport.state.in_(states_in_page))
+                    .group_by(SpeedReport.state)
+                    .all()
+                )
+                state_ticket_counts = {str(s): int(c) for (s, c) in rows if s is not None}
+
+            if counties_in_page:
+                rows = (
+                    db.session.query(SpeedReport.county_geoid, func.count(SpeedReport.id))
+                    .filter(SpeedReport.is_deleted == False)
+                    .filter(SpeedReport.county_geoid.in_(counties_in_page))
+                    .group_by(SpeedReport.county_geoid)
+                    .all()
+                )
+                county_ticket_counts = {str(g): int(c) for (g, c) in rows if g is not None}
+        except Exception:
+            # Never break the home page for counts.
+            state_ticket_counts = {}
+            county_ticket_counts = {}
+
         return render_template(
 
             "home_feed.html",
@@ -1326,6 +2772,8 @@ def create_app() -> Flask:
             enforced_b=enforced_b,
             a_counts=a_counts,
             user_ticket_counts=user_ticket_counts,
+            state_ticket_counts=state_ticket_counts,
+            county_ticket_counts=county_ticket_counts,
             like_counts=like_counts,
             user_liked=user_liked,
             comments_by_report=comments_by_report,
@@ -1336,6 +2784,8 @@ def create_app() -> Flask:
             state_filter_options=state_filter_options,
             filter_state=filter_state,
             filter_road=filter_road,
+            filter_county_geoid=filter_county_geoid,
+            filter_county_label=filter_county_label,
             speed_limit_buckets=speed_limit_buckets,
             filter_speed_limit_list=filter_speed_limit_list,
             over_buckets=over_buckets,
@@ -1343,6 +2793,7 @@ def create_app() -> Flask:
             filter_photo_only=filter_photo_only,
             verify_options=verify_options,
             filter_verify=filter_verify,
+            filter_pin=filter_pin,
             date_options=date_options,
             filter_date=filter_date,
             road_suggestions=road_suggestions,
@@ -1360,6 +2811,7 @@ def create_app() -> Flask:
     @app.get("/map")
     def map_view():
         """Map view of tickets that have lat/lng."""
+        filter_county_geoid, filter_county_label = _get_county_filter_from_request()
         hide_anon_requested = (request.args.get("hide_anon") == "1")
         if hide_anon_requested and not current_user.is_authenticated:
             flash("You must be logged in to hide anonymous posts.", "info")
@@ -1390,8 +2842,15 @@ def create_app() -> Flask:
 
         filter_photo_only = (request.args.get("photo_only") == "1")
         filter_verify = (request.args.get("verify") or "any").strip()
+        filter_pin = (request.args.get("pin") == "1")
         filter_date = (request.args.get("date") or "any").strip()
         filter_sort = (request.args.get("sort") or "new").strip()
+
+        # Back-compat: older UI used 'most_strict'/'least_strict' labels for overage sorting
+        if filter_sort == "most_strict":
+            filter_sort = "least_over"
+        elif filter_sort == "least_strict":
+            filter_sort = "most_over"
 
         if request.args.get("verified_photo") == "1":
             filter_photo_only = True
@@ -1399,7 +2858,14 @@ def create_app() -> Flask:
 
         # Options for filter rail (mirrors home).
         state_filter_options = []
-        rows = db.session.query(SpeedReport.state).distinct().all()
+        try:
+            rows = db.session.query(SpeedReport.state).distinct().all()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            rows = []
         seen = set()
         for (sv,) in rows:
             if not sv:
@@ -1446,21 +2912,28 @@ def create_app() -> Flask:
 
         filters_active = bool(
             filter_state
+            or filter_county_geoid
             or filter_road
             or bool(filter_speed_limit_list)
             or bool(filter_over_list)
+            or filter_pin
             or filter_photo_only
             or (filter_verify not in ("", "any"))
             or (filter_date not in ("", "any"))
+            or (deleted_mode not in ("", "hide"))
             or hide_anon
         )
 
         return render_template(
             "map_page.html",
             hide_anon=hide_anon,
+            is_admin=is_admin,
+            deleted_mode=deleted_mode,
             state_filter_options=state_filter_options,
             filter_state=filter_state,
             filter_road=filter_road,
+            filter_county_geoid=filter_county_geoid,
+            filter_county_label=filter_county_label,
             speed_limit_buckets=speed_limit_buckets,
             filter_speed_limit_list=filter_speed_limit_list,
             over_buckets=over_buckets,
@@ -1468,6 +2941,7 @@ def create_app() -> Flask:
             filter_photo_only=filter_photo_only,
             verify_options=verify_options,
             filter_verify=filter_verify,
+            filter_pin=filter_pin,
             date_options=date_options,
             filter_date=filter_date,
             filter_sort=filter_sort,
@@ -1476,7 +2950,6 @@ def create_app() -> Flask:
         )
 
 
-    
     def _admin_email_set() -> set[str]:
         raw = (os.environ.get("ADMIN_EMAILS") or os.environ.get("ADMIN_EMAIL") or "").strip()
         if not raw:
@@ -1509,7 +2982,6 @@ def create_app() -> Flask:
         return url_for(fallback_endpoint, **fallback_kwargs)
 
 
-    
     @app.post("/admin/report/<int:report_id>/delete")
     @login_required
     def admin_delete_report(report_id: int):
@@ -1651,563 +3123,344 @@ def create_app() -> Flask:
         return redirect(_safe_next_url())
 
 
-    @app.get("/submit")
-    def submit():
-        form = SpeedReportForm()
-        ticket_count = SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).count()
+    # Register /submit and related routes on the app instance
 
-        hide_anon_requested = (request.args.get("hide_anon") == "1")
+    @app.get("/submit", endpoint="submit")
+    @login_required
+    def submit_get():
+        """Single-page submit. County required. Pin optional."""
+        form = SubmitTicketForm()
 
-        if hide_anon_requested and not current_user.is_authenticated:
-            flash("You must be logged in to hide anonymous posts.", "info")
+        maps_api_key = app.config.get("GOOGLE_MAPS_API_KEY") or ""
 
-        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
-
-        is_admin = is_admin_user(current_user)
-        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
-        if not is_admin:
-            deleted_mode = "hide"
-        if deleted_mode not in ("hide", "include", "only"):
-            deleted_mode = "hide"
-        show_deleted = bool(is_admin and deleted_mode in ("include", "only"))
-        deleted_only = bool(is_admin and deleted_mode == "only")
-
-        strictness = strictness_rows(limit=5, exclude_anonymous=hide_anon)
-        most_strict = strictness["most_strict"]
-        least_strict = strictness["least_strict"]
-
+        # Default: no state selected unless explicitly prefilled via ?st=XX (optional).
+        default_st = (request.args.get("st") or "").strip().upper()
+        if default_st and default_st not in STATE_BY_ABBR:
+            default_st = ""
+        if default_st:
+            form.state.data = default_st
         return render_template(
-            "mvp_home.html",
+            "submit_ticket.html",
             form=form,
-            ticket_count=ticket_count,
-            most_strict=most_strict,
-            least_strict=least_strict,
-            hide_anon=hide_anon,
-            state_options=STATE_OPTIONS,
-            maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
+            states=STATE_PAIRS,
+            default_st=default_st,
+            maps_api_key=maps_api_key,
         )
 
 
     @app.post("/submit")
-    def submit_ticket():
-        form = SpeedReportForm()
+    @login_required
+    def submit_post():
+        form = SubmitTicketForm()
+
+        maps_api_key = app.config.get("GOOGLE_MAPS_API_KEY") or ""
+
+        # Preserve what the user picked (or blank if none yet) for re-render on errors.
+        default_st = (form.state.data or "").strip().upper()
+        if default_st and default_st not in STATE_BY_ABBR:
+            default_st = ""
 
         if not form.validate_on_submit():
-            # Make failure obvious (common case: photo format rejected by WTForms).
-            flash("Ticket not submitted. Please fix the highlighted errors below.", "warning")
-            return render_template(
-                "mvp_home.html",
-                form=form,
-                ticket_count=SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).count(),
-                most_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["most_strict"],
-                least_strict=strictness_rows(limit=5, exclude_anonymous=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"))["least_strict"],
-                hide_anon=bool(current_user.is_authenticated and request.args.get("hide_anon") == "1"),
-                state_options=STATE_OPTIONS,
-                maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
-            )
+            flash("Please fix the highlighted fields.", "error")
+            return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
 
+        st = (form.state.data or "").strip().upper()
+        if st not in STATE_BY_ABBR:
+            flash("Select a valid state.", "error")
+            return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
+
+        county_geoid = (form.county_geoid.data or "").strip()
+        if not county_geoid:
+            flash("County is required.", "error")
+            return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
+
+        # Enforce 2 tickets per calendar month (non-admin)
+        if current_user.is_authenticated and not is_admin_user(current_user):
+            from datetime import datetime
+            now = datetime.utcnow()
+            month_start = datetime(now.year, now.month, 1)
+            submitted_this_month = (
+                db.session.query(SpeedReport)
+                .filter(SpeedReport.user_id == current_user.id)
+                .filter(SpeedReport.created_at >= month_start)
+                .count()
+            )
+            if submitted_this_month >= 2:
+                flash("Limit reached: 2 tickets per month.", "error")
+                return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
+
+        # Fetch canonical county record (also enforces county belongs to state)
+        row = db.session.execute(
+            text(
+                """
+                SELECT geoid, name, namelsad, stusps
+                FROM counties
+                WHERE geoid = :geoid AND stusps = :st
+                LIMIT 1
+                """
+            ),
+            {"geoid": county_geoid, "st": st},
+        ).mappings().first()
+
+        if not row:
+            flash("Selected county is invalid for that state.", "error")
+            return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
+
+        county_name = row["namelsad"] or row["name"]
+
+        # Optional pin
+        lat = (getattr(form, 'lat', None).data or "") if getattr(form, 'lat', None) is not None else ""
+        lng = (getattr(form, 'lng', None).data or "") if getattr(form, 'lng', None) is not None else ""
+        lat = (lat or "").strip()
+        lng = (lng or "").strip()
+        # Backward compatibility: accept legacy field names if present
+        if not lat and getattr(form, 'latitude', None) is not None:
+            lat = (form.latitude.data or "").strip()
+        if not lng and getattr(form, 'longitude', None) is not None:
+            lng = (form.longitude.data or "").strip()
+        lat_f = lng_f = None
+        if lat or lng:
+            try:
+                lat_f = float(lat)
+                lng_f = float(lng)
+            except Exception:
+                flash("Invalid pin coordinates.", "error")
+                return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
+
+            inside = db.session.execute(
+                text(
+                    """
+                    SELECT CASE
+                        WHEN geom IS NULL THEN NULL
+                        ELSE ST_Covers(
+                            geom,
+                            ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+                        )
+                    END AS inside
+                    FROM counties
+                    WHERE geoid = :geoid
+                    LIMIT 1
+                    """
+                ),
+                {"geoid": county_geoid, "lat": lat_f, "lng": lng_f},
+            ).scalar()
+
+            if inside is False:
+                flash("Pin must be inside the selected county.", "error")
+                return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
+
+        # Save report
+        posted = int(form.posted_speed.data)
+        ticketed = int(form.ticketed_speed.data)
+        # If user entered them reversed (e.g., 84 as posted and 65 as ticketed), normalize.
+        if ticketed < posted:
+            posted, ticketed = ticketed, posted
+        overage = max(0, ticketed - posted)
+
+        state_full = STATE_BY_ABBR.get(st, st)
 
         report = SpeedReport(
-            state=form.state.data,
-            road_name=form.road_name.data,
-            posted_speed=form.posted_speed.data,
-            ticketed_speed=form.ticketed_speed.data,
-            notes=None,
-            user_id=(current_user.id if current_user.is_authenticated else None),
+            user_id=current_user.id,
+            state=state_full,
+            route_class=None,
+            road_name=form.road_name.data.strip(),
+            posted_speed=posted,
+            ticketed_speed=ticketed,
+            overage=overage,
+            caption=(form.caption.data or "").strip() or None,
+            raw_lat=lat_f,
+            raw_lng=lng_f,
+            lat=lat_f,
+            lng=lng_f,
+            location_hint=None,
+            location_source=("user_pin" if lat_f is not None else "none"),
+            location_accuracy_m=None,
+            # Hard defaults to satisfy NOT NULL constraints on evolved schemas
+            # (older DBs may have NOT NULL without DEFAULT).
+            ocr_status='none',
+            verification_status='none',
+            verify_attempts=0,
+            is_deleted=False,
+            county_geoid=county_geoid,
+            county_name=county_name,
+            county_state=st,
         )
-        report.refresh_road_key()
 
-        # Optional mapping fields (filled by client-side JS).
+        # Keep grouping/filter key in sync with the shared normalization logic.
         try:
-            report.location_hint = (getattr(form, "location_hint", None).data or "").strip() or None
+            report.refresh_road_key()
         except Exception:
-            report.location_hint = None
+            pass
 
-        def _to_float(val):
-            try:
-                if val is None:
-                    return None
-                s = str(val).strip()
-                if not s:
-                    return None
-                return float(s)
-            except Exception:
-                return None
-
-        raw_lat = _to_float(getattr(form, "raw_lat", None).data if getattr(form, "raw_lat", None) else None)
-        raw_lng = _to_float(getattr(form, "raw_lng", None).data if getattr(form, "raw_lng", None) else None)
-        lat = _to_float(getattr(form, "lat", None).data if getattr(form, "lat", None) else None)
-        lng = _to_float(getattr(form, "lng", None).data if getattr(form, "lng", None) else None)
-
-        report.raw_lat = raw_lat
-        report.raw_lng = raw_lng
-        report.lat = lat
-        report.lng = lng
-        if lat is not None and lng is not None:
-            report.lat_lng_source = "user_pin"
-
-            # If a server key is configured, snap to the nearest road before saving.
-            slat, slng = snap_to_nearest_road(lat, lng)
-            if slat is not None and slng is not None:
-                # Preserve raw pin if missing.
-                if report.raw_lat is None:
-                    report.raw_lat = lat
-                if report.raw_lng is None:
-                    report.raw_lng = lng
-                report.lat = slat
-                report.lng = slng
-                report.lat_lng_source = "user_pin_snapped"
-
-        try:
-            report.google_place_id = (getattr(form, "google_place_id", None).data or "").strip() or None
-        except Exception:
-            report.google_place_id = None
+        # Photo (optional)
+        if form.photo.data:
+            # Mark that a photo was submitted immediately, even before upload completes.
+            report.photo_key = f"pending:{uuid.uuid4().hex}"
+            report.ocr_status = "processing"
+            report.verification_status = "submitted"
+        else:
+            # No photo submitted
+            report.ocr_status = "none"
+            report.verification_status = "none"
 
         db.session.add(report)
         db.session.commit()
 
-        
-        def _normalize_upload_to_jpeg_bytes(raw_bytes: bytes, filename: str | None, content_type: str | None) -> bytes:
-            """Normalize a user upload (image or PDF) into a sanitized JPEG.
-
-            - Strips metadata by re-encoding.
-            - Converts to RGB.
-            - Resizes to max 2000px.
-            - If PDF: renders page 1 to an image first.
-            """
-            fname = (filename or "").lower()
-            ctype = (content_type or "").lower()
-
-            is_pdf = fname.endswith(".pdf") or ("application/pdf" in ctype)
-
-            if is_pdf:
-                if fitz is None:
-                    raise ValueError("pdf_support_missing")
-                doc = fitz.open(stream=raw_bytes, filetype="pdf")
-                if doc.page_count < 1:
-                    raise ValueError("empty_pdf")
-                page = doc.load_page(0)
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
-                # Render to PNG bytes, then load with Pillow to normalize like images.
-                raw_bytes = pix.tobytes("png")
-
-            im = Image.open(io.BytesIO(raw_bytes))
-            im = im.convert("RGB")
-            im.thumbnail((2000, 2000))
-            out = io.BytesIO()
-            im.save(out, format="JPEG", quality=80, optimize=True)
-            return out.getvalue()
-
-        # Optional photo upload -> quarantine in R2 + async OCR verification (fail closed).
-        photo_fs = getattr(form, "photo", None)
-        file_obj = photo_fs.data if photo_fs is not None else None
-        if file_obj and getattr(file_obj, "filename", ""):
+        # Kick off photo upload + OCR/verification if a photo was included
+        if form.photo.data:
             try:
-                # Mark pending first so the feed can show status immediately.
-                report.verification_status = "pending"
-                report.ocr_status = "pending"
+                # Sanitize + standardize the uploaded image (strip metadata, normalize format)
+                img = Image.open(form.photo.data.stream)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                # Resize down to a safe max edge (keeps OCR costs predictable)
+                max_edge = 2000
+                w, h = img.size
+                if max(w, h) > max_edge:
+                    scale = max_edge / float(max(w, h))
+                    img = img.resize((int(w * scale), int(h * scale)))
+
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=85, optimize=True)
+                buf.seek(0)
+
+                # Bucket name: prefer dedicated tickets bucket; fall back to legacy quarantine bucket name
+                bucket = (
+                    os.environ.get("R2_TICKETS_BUCKET")
+                    or os.environ.get("R2_QUARANTINE_BUCKET")
+                    or os.environ.get("R2_BUCKET")
+                )
+                if not bucket:
+                    raise RuntimeError("R2_TICKETS_BUCKET (or legacy R2_QUARANTINE_BUCKET / R2_BUCKET) is not set")
+
+                photo_key = f"tickets/{report.id}/{uuid.uuid4().hex}.jpg"
+                put_bytes(bucket, photo_key, buf.read(), content_type="image/jpeg")
+
+                # Persist the real key and enqueue OCR/verification
+                report.photo_key = photo_key
+                report.ocr_status = "processing"
+                report.verification_status = "submitted"
                 report.ocr_error = None
                 report.verify_reason = None
                 db.session.commit()
 
-                # Load + normalize + strip metadata by re-encoding.
-                raw = file_obj.read()
-                try:
-                    jpg_bytes = _normalize_upload_to_jpeg_bytes(
-                        raw,
-                        getattr(file_obj, "filename", None),
-                        getattr(file_obj, "content_type", None),
-                    )
-                except Exception:
-                    report.verification_status = "unverified"
-                    report.ocr_status = "not_verified"
-                    report.ocr_error = "unsupported_or_unreadable_upload"
-                    report.verify_reason = "unsupported_format"
-                    db.session.commit()
-                    flash("Photo upload failed: please upload a clear image (JPG/PNG/WebP/HEIC) or a PDF.", "warning")
-                    return redirect(url_for("result", report_id=report.id))
-
-
-                # Ensure required R2 env vars exist (local dev often forgets these).
-                missing = [k for k in ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY") if not (os.environ.get(k) or "").strip()]
-                if missing:
-                    report.verification_status = "unverified"
-                    report.ocr_status = "not_verified"
-                    report.ocr_error = "missing_r2_env: " + ",".join(missing)
-                    report.verify_reason = "upload_failed"
-                    db.session.commit()
-                    flash("Photo upload failed: missing local R2 settings: " + ", ".join(missing), "warning")
-                    return redirect(url_for("result", report_id=report.id))
-
-                bucket = os.environ.get("R2_QUARANTINE_BUCKET", "enforcedspeed-ticket-quarantine").strip() or "enforcedspeed-ticket-quarantine"
-                prefix = os.environ.get("R2_PREFIX", "tickets/").strip()
-                if prefix and not prefix.endswith("/"):
-                    prefix = prefix + "/"
-                key = f"{prefix}{report.id}/{uuid.uuid4().hex}.jpg"
-
-                ok = put_bytes(bucket=bucket, key=key, data=jpg_bytes, content_type="image/jpeg")
-                if not ok:
-                    report.verification_status = "unverified"
-                    report.ocr_status = "not_verified"
-                    report.ocr_error = "upload_failed"
-                    report.verify_reason = "upload_failed"
-                    db.session.commit()
-                else:
-                    # Persist where the photo lives so the worker (and UI) can find it later.
-                    report.photo_key = key
-                    report.photo_uploaded_at = datetime.utcnow()
-
-                    q = get_queue()
-                    job = q.enqueue(
-                        "ocr_verify.verify_ticket_from_r2",
-                        report.id,
-                        bucket,
-                        key,
-                        job_timeout=120,
-                    )
-                    report.ocr_job_id = job.id
-                    db.session.commit()
-            except Exception as e:
-                # Store a debuggable error string (truncated) instead of a generic placeholder.
-                try:
-                    app.logger.exception("Photo upload/OCR enqueue failed for report_id=%s", report.id)
-                except Exception:
-                    pass
-                report.verification_status = "unverified"
-                report.ocr_status = "not_verified"
-                err = f"{type(e).__name__}: {e}"
-                report.ocr_error = (err[:500] if err else "exception")
-                report.verify_reason = "exception"
+                q = get_queue()
+                job = q.enqueue(
+                    "ocr_verify.verify_ticket_from_r2",
+                    report.id,
+                    bucket,
+                    photo_key,
+                    job_timeout=120,
+                )
+                report.ocr_job_id = job.id
                 db.session.commit()
 
-        return redirect(url_for("result", report_id=report.id))
+            except Exception:
+                app.logger.exception("Photo/OCR enqueue failed")
+                report.ocr_status = "failed"
+                # Keep verification in 'pending' so UI can show status pill clearly
+                report.verification_status = "pending"
+                # Preserve the fact a photo was submitted even if upload/enqueue fails.
+                if report.photo_key and str(report.photo_key).startswith("pending:"):
+                    report.photo_key = f"failed:{str(report.photo_key).split(':',1)[1]}"
+                else:
+                    report.photo_key = f"failed:{uuid.uuid4().hex}"
+                report.ocr_error = "enqueue_failed"
+                report.verify_reason = "upload_failed"
+                db.session.commit()
+                flash("Ticket saved, but photo processing failed.", "error")
 
-    def compute_distribution_stats(values: List[float], user_value: float | None) -> Dict:
-        """Return distribution stats + a min-max percentile (0–100).
+        flash("Ticket submitted!", "success")
+        return redirect(url_for("home"))
 
-        Percentile definition used here:
-          0%  -> lowest value in group
-          100%-> highest value in group
-        This matches the product meaning for 'strictness score' comparisons.
-        """
-        vals = [v for v in values if v is not None]
-        n = len(vals)
-        if n == 0:
-            return {"n": 0, "min": None, "max": None, "median": None, "percentile": None}
+    @app.post("/api/confirm_location")
+    def api_confirm_location():
+        """Snap pin -> road name (server-side) for consistent web/mobile behavior."""
+        try:
+            payload = request.get_json(silent=True) or {}
+        except Exception:
+            payload = {}
 
-        vals_sorted = sorted(vals)
-        vmin = vals_sorted[0]
-        vmax = vals_sorted[-1]
-        med = float(median(vals_sorted))
+        try:
+            raw_lat = float(payload.get("lat"))
+            raw_lng = float(payload.get("lng"))
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_lat_lng"}), 400
 
-        if user_value is None:
-            pct = None
-        else:
-            if vmax == vmin:
-                pct = 100.0
-            else:
-                pct = round(((user_value - vmin) / (vmax - vmin)) * 100, 1)
-                # clamp
-                pct = max(0.0, min(100.0, pct))
+        # New: route_class selection (web + mobile parity)
+        route_class = payload.get('route_class')
+        if route_class is None:
+            route_class = payload.get('routeClass')
+        route_class = (str(route_class).strip().lower() if route_class is not None else '')
 
-        return {"n": n, "min": vmin, "max": vmax, "median": round(med, 1), "percentile": pct}
+        # Backward compatibility: older clients send prefer_highway Yes/No.
+        prefer_raw = payload.get('prefer_highway')
+        if prefer_raw is None:
+            prefer_raw = payload.get('preferHighway')
+        prefer_s = str(prefer_raw).strip().lower() if prefer_raw is not None else ''
+        prefer_highway = prefer_raw is True or prefer_s in ('1', 'true', 'yes', 'y', 'on')
 
+        snapped_lat = raw_lat
+        snapped_lng = raw_lng
+        road = None
+        snapped_source = 'nearest'
 
-    @app.get("/strictness")
-    def strictness():
-        hide_anon_requested = (request.args.get("hide_anon") == "1")
+        # Normalize older route_class values (us_route/other) to the new buckets.
+        if route_class == 'us_route':
+            route_class = 'numbered'
+        elif route_class == 'other':
+            route_class = 'local'
 
-        if hide_anon_requested and not current_user.is_authenticated:
-            flash("You must be logged in to hide anonymous posts.", "info")
+        if route_class in ('interstate', 'numbered', 'local'):
+            best = _confirm_location_route_class(raw_lat, raw_lng, route_class=route_class, max_radius_m=2500)
+            if not best:
+                err = {
+                    'interstate': ('no_interstate_found', 'Could not find an Interstate near that pin. Zoom out and drop closer to the Interstate.'),
+                    'numbered': ('no_numbered_found', 'Could not find a numbered route/highway near that pin. Zoom out and drop closer to the route.'),
+                    'local': ('no_local_found', 'Could not find a street/road (non-interstate, non-numbered route) near that pin. Move the pin, or pick a different road type.'),
+                }
+                code, msg = err.get(route_class, ('no_match', 'Could not match that road type near the pin.'))
+                return jsonify({"ok": False, "error": code, "message": msg}), 400
 
-        hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+            snapped_lat = float(best['snapped_lat'])
+            snapped_lng = float(best['snapped_lng'])
+            road = best.get('road_name')
+            snapped_source = f'route_class:{route_class}'
 
-        is_admin = is_admin_user(current_user)
-        deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
-        if not is_admin:
-            deleted_mode = "hide"
-        if deleted_mode not in ("hide", "include", "only"):
-            deleted_mode = "hide"
+        elif prefer_highway:
+            # Old behavior (Yes/No): try to find a major route-ish road.
+            best = _confirm_location_prefer_highway(raw_lat, raw_lng, max_radius_m=2500)
+            if not best:
+                return jsonify({
+                    "ok": False,
+                    "error": "no_highway_found",
+                    "message": "Could not find a major route near that pin. Zoom out and drop closer to the highway/route.",
+                }), 400
 
-        # --- Filters (GET) — used to render the shared filter rail UI ---
-        filter_state = (request.args.get("state") or "").strip().upper()
-        filter_road = (request.args.get("road") or "").strip()
+            snapped_lat = float(best['snapped_lat'])
+            snapped_lng = float(best['snapped_lng'])
+            road = best.get('road_name')
+            snapped_source = 'prefer_highway'
 
-        # Speed limit buckets (posted_speed) — multi-select via repeated speed_limit= values
-        filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
-        filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
-        filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
+        if not road:
+            slat, slng = snap_to_nearest_road(raw_lat, raw_lng)
+            snapped_lat = float(slat) if slat is not None else raw_lat
+            snapped_lng = float(slng) if slng is not None else raw_lng
+            road = _reverse_geocode_route(snapped_lat, snapped_lng)
 
-        # Overage buckets (ticketed_speed - posted_speed) — multi-select via repeated overage= values
-        filter_over_list = [v.strip() for v in request.args.getlist("overage") if (v or "").strip()]
-        legacy_over = (request.args.get("over") or "").strip()
-        if legacy_over and legacy_over not in ("all", ""):
-            filter_over_list = list(dict.fromkeys(filter_over_list + [legacy_over]))
+        road = road or "Map pin"
 
-        # Evidence filters (kept for UI consistency; strictness calculation is already limited to ticketed > posted)
-        filter_photo_only = (request.args.get("photo_only") == "1")
-        filter_verify = (request.args.get("verify") or "any").strip()
-
-        # Date filter (created_at)
-        filter_date = (request.args.get("date") or "any").strip()
-
-        # Back-compat: old ?verified_photo=1 means 'verified photos only'
-        if request.args.get("verified_photo") == "1":
-            filter_photo_only = True
-            filter_verify = "verified"
-
-        # Sort (UI only on this page)
-        filter_sort = (request.args.get("sort") or "new").strip()
-
-        # State dropdown options (2-letter codes)
-        state_filter_options = []
-        rows = db.session.query(SpeedReport.state).distinct().all()
-        seen = set()
-        for (sv,) in rows:
-            if not sv:
-                continue
-            code = sv.split(' - ')[0].strip().upper()
-            if len(code) != 2 or not code.isalpha():
-                continue
-            if code in seen:
-                continue
-            seen.add(code)
-            state_filter_options.append({"code": code})
-        state_filter_options.sort(key=lambda d: d["code"])
-
-        speed_limit_buckets = [
-            {"value": "any", "label": "Any"},
-            {"value": "25-35", "label": "25–35 mph"},
-            {"value": "40-50", "label": "40–50 mph"},
-            {"value": "55", "label": "55 mph"},
-            {"value": "65", "label": "65 mph"},
-            {"value": "70+", "label": "70+ mph"},
-        ]
-
-        over_buckets = [
-            {"value": "all", "label": "Any"},
-            {"value": "5-9", "label": "5–9 mph"},
-            {"value": "10-14", "label": "10–14 mph"},
-            {"value": "15-19", "label": "15–19 mph"},
-            {"value": "20+", "label": "20+ mph"},
-        ]
-
-        date_options = [
-            {"value": "any", "label": "Any"},
-            {"value": "7", "label": "Last 7 days"},
-            {"value": "30", "label": "Last 30 days"},
-            {"value": "90", "label": "Last 90 days"},
-            {"value": "365", "label": "Last year"},
-        ]
-
-        filters_active = bool(
-            filter_state
-            or filter_road
-            or bool(filter_speed_limit_list)
-            or bool(filter_over_list)
-            or filter_photo_only
-            or (filter_verify not in ("", "any"))
-            or (filter_date not in ("", "any"))
-            or (filter_sort not in ("", "new"))
-            or hide_anon
-            or (is_admin and deleted_mode != "hide")
-        )
-
-        strictness = strictness_rows(
-            limit=20,
-            exclude_anonymous=hide_anon,
-            state_filter=(filter_state or None),
-            road_filter=(filter_road or None),
-            speed_limit_list=filter_speed_limit_list,
-            over_list=filter_over_list,
-            photo_only=filter_photo_only,
-            verify=filter_verify,
-            date=filter_date,
-            deleted_mode=deleted_mode,
-        )
-        most_strict = strictness["most_strict"]
-        least_strict = strictness["least_strict"]
-
-        return render_template(
-            "strictness.html",
-            most_strict=most_strict,
-            least_strict=least_strict,
-            hide_anon=hide_anon,
-            # filter rail context
-            filter_state=filter_state,
-            filter_road=filter_road,
-            filter_speed_limit_list=filter_speed_limit_list,
-            filter_over_list=filter_over_list,
-            filter_photo_only=filter_photo_only,
-            filter_verify=filter_verify,
-            filter_date=filter_date,
-            filter_sort=filter_sort,
-            state_filter_options=state_filter_options,
-            speed_limit_buckets=speed_limit_buckets,
-            over_buckets=over_buckets,
-            date_options=date_options,
-            filters_active=filters_active,
-            is_admin=is_admin,
-            deleted_mode=deleted_mode,
-        )
-
-
-    @app.get("/tickets")
-    def bucket_tickets():
-        """Show up to 50 tickets for a given (state, road) combo."""
-        state = (request.args.get("state") or "").strip().upper()
-        road_key = (request.args.get("road") or "").strip()
-
-        if not state or not road_key:
-            flash("Missing state or road.", "error")
-            return redirect(url_for("home"))
-
-        # Match stored state strings like "KS - Kansas" using the two-letter prefix
-        rows = (
-            db.session.query(
-                SpeedReport.state,
-                SpeedReport.road_key,
-                SpeedReport.posted_speed,
-                SpeedReport.ticketed_speed,
-                SpeedReport.created_at,
-                User.username.label("username"),
-                SpeedReport.user_id,
-            )
-            .outerjoin(User, User.id == SpeedReport.user_id)
-            .filter(SpeedReport.is_deleted.is_(False))
-            .filter(SpeedReport.state.ilike(f"{state}%"))
-            .filter(SpeedReport.road_key == road_key)
-            .order_by(SpeedReport.ticketed_speed.desc())
-            .limit(50)
-            .all()
-        )
-
-        total_tickets = len(rows)
-        member_count = sum(1 for r in rows if getattr(r, "username", None))
-        anon_count = total_tickets - member_count
-        if total_tickets > 0:
-            member_pct = int(round((member_count / total_tickets) * 100))
-            # Keep the two-part pill readable and always summing to 100
-            member_pct = max(0, min(100, member_pct))
-            anon_pct = 100 - member_pct
-        else:
-            member_pct = 0
-            anon_pct = 0
-
-        return render_template(
-            "bucket_tickets.html",
-            state=state,
-            road_key=road_key,
-            rows=rows,
-            total_tickets=total_tickets,
-            member_pct=member_pct,
-            anon_pct=anon_pct,
-        )
-
-    @app.get("/result/<int:report_id>")
-    def result(report_id: int):
-        report = SpeedReport.query.get_or_404(report_id)
-        state_group = normalize_state_group(report.state)
-
-        # Strictness score is "how many mph over posted" the ticketed speed is.
-        user_strictness = int(report.ticketed_speed) - int(report.posted_speed)
-
-        rows = (
-            db.session.query(
-                SpeedReport.state,
-                SpeedReport.road_key,
-                SpeedReport.posted_speed,
-                SpeedReport.ticketed_speed,
-            )
-            .filter(SpeedReport.state.ilike(f"{state_group}%"))
-            .all()
-        )
-
-        strict_state_road: List[float] = []
-        strict_state_posted: List[float] = []
-
-        for st, road_key, posted, ticketed in rows:
-            if normalize_state_group(st) != state_group:
-                continue
-            strictness = float(int(ticketed) - int(posted))
-            if road_key == report.road_key:
-                strict_state_road.append(strictness)
-            if int(posted) == int(report.posted_speed):
-                strict_state_posted.append(strictness)
-
-        stats_a = compute_distribution_stats(strict_state_road, float(user_strictness))
-        stats_b = compute_distribution_stats(strict_state_posted, float(user_strictness))
-
-        return render_template(
-            "thank_you.html",
-            report=report,
-            stats_a=stats_a,
-            stats_b=stats_b,
-            state_group=state_group,
-            user_strictness=user_strictness,
-        )
-
-    @app.get("/api/road_preview")
-    def road_preview():
-        state_raw = request.args.get("state", "", type=str)
-        road_raw = request.args.get("road", "", type=str)
-
-        predicted_key = normalize_road(road_raw, state_raw) if road_raw.strip() else ""
-        base_key = base_road_key(predicted_key) if predicted_key else ""
-        state_code = state_code_from_value(state_raw)
-
-        # ambiguity helper: number-only input -> routeNN
-        ambiguity_options = []
-        m_num = re.fullmatch(r"\s*(\d+)\s*", re.sub(r"[^0-9]", "", road_raw.strip()) if road_raw else "")
-        if predicted_key.startswith("route") and m_num:
-            n = m_num.group(1)
-            if n:
-                if n.isdigit():
-                    ambiguity_options = [
-                        f"I-{int(n)}",
-                        f"US-{int(n)}",
-                        f"{state_code}-{int(n)}" if state_code else f"State Route {int(n)}",
-                    ]
-
-        # suggestions: similar buckets seen in this state
-        suggestions = []
-        if state_raw and predicted_key:
-            suggestion_rows = (
-                db.session.query(SpeedReport.road_key)
-                .filter(SpeedReport.state == state_raw)
-                .distinct()
-                .all()
-            )
-            suggestion_keys = [r[0] for r in suggestion_rows]
-            matches = [k for k in suggestion_keys if base_road_key(k) == base_key]
-            matches = sorted(set(matches))[:10]
-            suggestions = [{"key": k, "label": format_road_bucket(k)} for k in matches]
-
-        return jsonify(
-            {
-                "predicted_road_key": predicted_key,
-                "predicted_road_label": format_road_bucket(predicted_key),
-                "base_key": base_key,
-                "suggestions": suggestions,
-                "ambiguity_options": ambiguity_options,
-            }
-        )
-
-    @app.get("/api/snap_road")
-    def api_snap_road():
-        """Snap a lat/lng to the nearest road (server-side).
-
-        This endpoint is optional; if GOOGLE_MAPS_SERVER_KEY is not configured, it returns the input.
-        """
-        lat = request.args.get("lat", type=float)
-        lng = request.args.get("lng", type=float)
-        if lat is None or lng is None:
-            return jsonify({"ok": False, "error": "missing_lat_lng"}), 400
-
-        slat, slng = snap_to_nearest_road(lat, lng)
-        if slat is None or slng is None:
-            return jsonify({"ok": True, "snapped": False, "lat": lat, "lng": lng})
-        return jsonify({"ok": True, "snapped": True, "lat": slat, "lng": slng})
+        return jsonify({
+            "ok": True,
+            "raw_lat": raw_lat,
+            "raw_lng": raw_lng,
+            "snapped_lat": snapped_lat,
+            "snapped_lng": snapped_lng,
+            "road_name": road,
+            "snapped_source": snapped_source,
+            "route_class": route_class,
+            "prefer_highway": bool(prefer_highway),
+        })
 
     @app.post("/api/update_ticket_pin")
     @login_required
@@ -2244,17 +3497,229 @@ def create_app() -> Flask:
         if slat is None or slng is None:
             r.lat = lat
             r.lng = lng
-            r.lat_lng_source = "user_pin"
+            r.location_source = "user_pin"
             snapped = False
         else:
             r.lat = float(slat)
             r.lng = float(slng)
-            r.lat_lng_source = "user_pin_snapped"
+            r.location_source = "user_pin_snapped"
             snapped = True
 
         db.session.commit()
         return jsonify({"ok": True, "snapped": snapped, "lat": r.lat, "lng": r.lng})
 
+    
+
+    # --- County autocomplete API ---
+    @app.get("/api/counties")
+    def api_counties():
+        """Autocomplete counties for a given state.
+
+        Query params:
+          - st: 2-letter state code (preferred)
+          - q:  user search text (prefix match on normalized county name)
+
+        Returns:
+          { ok: true, counties: [{geoid, name, namelsad, stusps, state_name}, ...] }
+        """
+        st = (request.args.get("st") or request.args.get("state") or "").strip()
+        q = (request.args.get("q") or request.args.get("query") or "").strip()
+
+        # Normalize state: accept "VA", "Virginia", "VA — Virginia"
+        st_up = (st or "").strip().upper()
+        if not st_up:
+            return jsonify({"ok": True, "counties": []})
+
+        # Extract 2-letter code if embedded
+        m = re.search(r"\b([A-Za-z]{2})\b", st_up)
+        if m:
+            cand = m.group(1).upper()
+            if cand in STATE_BY_ABBR:
+                st_up = cand
+
+        # If still not a 2-letter code, try exact name lookup
+        if st_up not in STATE_BY_ABBR:
+            st_low = (st or "").strip().lower()
+            st_low = re.sub(r"[^a-z\s]", " ", st_low)
+            st_low = re.sub(r"\s+", " ", st_low).strip()
+            found = None
+            for code, name in STATE_PAIRS:
+                if name.lower() == st_low:
+                    found = code
+                    break
+            if found:
+                st_up = found
+            else:
+                return jsonify({"ok": True, "counties": []})
+
+        # Normalize query to match name_norm built by import script
+        qn = (q or "").lower()
+        qn = re.sub(r"[^a-z0-9\s]", " ", qn)
+        qn = re.sub(r"\s+", " ", qn).strip()
+        if len(qn) < 2:
+            return jsonify({"ok": True, "counties": []})
+
+        try:
+            rows = db.session.execute(
+                text(
+                    """
+                    SELECT geoid, name, namelsad, stusps, state_name
+                    FROM counties
+                    WHERE stusps = :st
+                      AND name_norm LIKE :pat
+                    ORDER BY length(name_norm) ASC, namelsad ASC
+                    LIMIT 25
+                    """
+                ),
+                {"st": st_up, "pat": qn + "%"},
+            ).mappings().all()
+
+            # Fallback: contains match if prefix yields nothing
+            if not rows:
+                rows = db.session.execute(
+                    text(
+                        """
+                        SELECT geoid, name, namelsad, stusps, state_name
+                        FROM counties
+                        WHERE stusps = :st
+                          AND name_norm LIKE :pat
+                        ORDER BY length(name_norm) ASC, namelsad ASC
+                        LIMIT 25
+                        """
+                    ),
+                    {"st": st_up, "pat": "%" + qn + "%"},
+                ).mappings().all()
+
+            return jsonify({"ok": True, "counties": [dict(r) for r in rows]})
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                print(f"[COUNTY API ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "counties_unavailable", "counties": []}), 200
+
+    @app.get("/api/username_available")
+    def api_username_available():
+        u = (request.args.get("u") or "").strip()
+        if not u or len(u) < 3:
+            return jsonify({"ok": True, "available": False, "message": "Enter at least 3 characters."})
+
+        # mirror RegisterForm rules
+        if len(u) > 20:
+            return jsonify({"ok": True, "available": False, "message": "Keep it 20 characters or fewer."})
+
+        import re as _re
+        if not _re.match(r"^[A-Za-z0-9_]+$", u):
+            return jsonify({"ok": True, "available": False, "message": "Only letters, numbers, and underscores."})
+
+        taken = User.query.filter(func.lower(User.username) == u.lower()).first() is not None
+        if taken:
+            return jsonify({"ok": True, "available": False, "message": "That username is taken."})
+        return jsonify({"ok": True, "available": True, "message": "Username is available."})
+
+
+
+    @app.get("/api/county/<geoid>")
+    def api_county(geoid: str):
+        """Lookup a single county by GEOID."""
+        geoid = (geoid or "").strip()
+        if not geoid:
+            return jsonify({"ok": False, "error": "bad_geoid"}), 400
+        try:
+            row = db.session.execute(
+                text(
+                    """
+                    SELECT geoid, name, namelsad, stusps, state_name
+                    FROM counties
+                    WHERE geoid = :geoid
+                    LIMIT 1
+                    """
+                ),
+                {"geoid": geoid},
+            ).mappings().first()
+            if not row:
+                return jsonify({"ok": False, "error": "not_found"}), 404
+            return jsonify({"ok": True, "county": dict(row)})
+        except Exception as e:
+            try:
+                print(f"[COUNTY API ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "counties_unavailable"}), 200
+
+
+    @app.get("/api/county_geom/<geoid>")
+    def api_county_geom(geoid: str):
+        """Return GeoJSON geometry for a county (for the web submit pin picker)."""
+
+        geoid = (geoid or "").strip()
+        if not geoid:
+            return jsonify({"ok": False, "error": "bad_geoid"}), 400
+
+        try:
+            row = db.session.execute(
+                text(
+                    """
+                    SELECT
+                        geoid,
+                        name,
+                        namelsad,
+                        stusps,
+                        state_name,
+                        ST_AsGeoJSON(geom) AS geom_json,
+                        ST_Y(COALESCE(center, centroid, ST_PointOnSurface(geom))) AS centroid_lat,
+                        ST_X(COALESCE(center, centroid, ST_PointOnSurface(geom))) AS centroid_lng
+                    FROM counties
+                    WHERE geoid = :geoid
+                    LIMIT 1
+                    """
+                ),
+                {"geoid": geoid},
+            ).mappings().first()
+
+            if not row or not row.get("geom_json"):
+                return jsonify({"ok": False, "error": "not_found"}), 404
+
+            try:
+                geom = json.loads(row["geom_json"])
+            except Exception:
+                geom = None
+            if not geom:
+                return jsonify({"ok": False, "error": "geom_unavailable"}), 200
+
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "geoid": row.get("geoid"),
+                    "name": row.get("name"),
+                    "namelsad": row.get("namelsad"),
+                    "stusps": row.get("stusps"),
+                    "state_name": row.get("state_name"),
+                },
+                "geometry": geom,
+            }
+
+            return jsonify(
+                {
+                    "ok": True,
+                    "geoid": row.get("geoid"),
+                    "centroid": {
+                        "lat": float(row.get("centroid_lat")) if row.get("centroid_lat") is not None else None,
+                        "lng": float(row.get("centroid_lng")) if row.get("centroid_lng") is not None else None,
+                    },
+                    "geojson": {"type": "FeatureCollection", "features": [feature]},
+                }
+            )
+        except Exception as e:
+            try:
+                print(f"[COUNTY GEOM API ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "counties_unavailable"}), 200
     @app.get("/api/map_pins")
     def api_map_pins():
         """Return map pins filtered like the feed, but only tickets with lat/lng."""
@@ -2273,6 +3738,29 @@ def create_app() -> Flask:
         # --- same filter semantics as /home ---
         filter_state = (request.args.get("state") or "").strip().upper()
         filter_road = (request.args.get("road") or "").strip()
+        filter_county_geoid, _ = _get_county_filter_from_request()
+
+        # Focus params (used for inside/outside coloring without forcing a filter)
+        focus_state = (request.args.get("focus_state") or "").strip().upper()
+        focus_county_geoid = (request.args.get("focus_county_geoid") or "").strip()
+        selected_ticket_id = (request.args.get("ticket_id") or "").strip()
+
+        # Optional viewport bounds (when present, filter pins to the visible map)
+        def _f(name: str):
+            v = (request.args.get(name) or "").strip()
+            if not v:
+                return None
+            try:
+                return float(v)
+            except Exception:
+                return None
+
+        north = _f("north")
+        south = _f("south")
+        east = _f("east")
+        west = _f("west")
+        viewport_mode = (north is not None and south is not None and east is not None and west is not None)
+
 
         filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
         filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
@@ -2285,8 +3773,15 @@ def create_app() -> Flask:
 
         filter_photo_only = (request.args.get("photo_only") == "1")
         filter_verify = (request.args.get("verify") or "any").strip()
+        filter_pin = (request.args.get("pin") == "1")
         filter_date = (request.args.get("date") or "any").strip()
         filter_sort = (request.args.get("sort") or "new").strip()
+
+        # Back-compat: older UI used 'most_strict'/'least_strict' labels for overage sorting
+        if filter_sort == "most_strict":
+            filter_sort = "least_over"
+        elif filter_sort == "least_strict":
+            filter_sort = "most_over"
         if request.args.get("verified_photo") == "1":
             filter_photo_only = True
             filter_verify = "verified"
@@ -2310,6 +3805,14 @@ def create_app() -> Flask:
         if filter_state:
             q = q.filter(SpeedReport.state.ilike(f"{filter_state}%"))
 
+        # County filter (GEOID)
+        if filter_county_geoid:
+            q = q.filter(SpeedReport.county_geoid == filter_county_geoid)
+
+        # Map pin filter (only tickets with a user-placed pin)
+        if filter_pin:
+            q = q.filter(SpeedReport.location_source.in_(("user_pin", "user_pin_snapped")))
+
         if filter_date not in ("", "any"):
             try:
                 days = int(filter_date)
@@ -2331,7 +3834,13 @@ def create_app() -> Flask:
         if filter_speed_limit_list:
             sl_conds = []
             for v in filter_speed_limit_list:
-                if v == "25-35":
+                if v == "lte35":
+                    sl_conds.append(SpeedReport.posted_speed <= 35)
+                elif v == "40-55":
+                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 55))
+                elif v == "gte60":
+                    sl_conds.append(SpeedReport.posted_speed >= 60)
+                elif v == "25-35":
                     sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
                 elif v == "40-50":
                     sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
@@ -2348,7 +3857,13 @@ def create_app() -> Flask:
         if filter_over_list:
             over_conds = []
             for v in filter_over_list:
-                if v == "5-9":
+                if v == "1-10":
+                    over_conds.append(and_(expr >= 1, expr <= 10))
+                elif v == "11-20":
+                    over_conds.append(and_(expr >= 11, expr <= 20))
+                elif v == "21+":
+                    over_conds.append(expr >= 21)
+                elif v == "5-9":
                     over_conds.append(and_(expr >= 5, expr <= 9))
                 elif v == "10-14":
                     over_conds.append(and_(expr >= 10, expr <= 14))
@@ -2380,8 +3895,40 @@ def create_app() -> Flask:
 
         rows = q.limit(1500).all()
 
+        # Determine focus for inside/outside coloring.
+        focus_type = None
+        focus_value = None
+        if focus_county_geoid:
+            focus_type = "county"
+            focus_value = focus_county_geoid
+        elif focus_state and len(focus_state) == 2:
+            focus_type = "state"
+            focus_value = focus_state
+        elif filter_county_geoid:
+            focus_type = "county"
+            focus_value = filter_county_geoid
+        elif filter_state and len(filter_state) == 2:
+            focus_type = "state"
+            focus_value = filter_state
+
+        selected_id_norm = None
+        try:
+            if selected_ticket_id:
+                selected_id_norm = str(int(selected_ticket_id))
+        except Exception:
+            selected_id_norm = None
+
         pins = []
         for r in rows:
+            inside_focus = True
+            try:
+                if focus_type == "county" and focus_value:
+                    inside_focus = (r.county_geoid == focus_value)
+                elif focus_type == "state" and focus_value:
+                    inside_focus = (normalize_state_group(r.state) == focus_value)
+            except Exception:
+                inside_focus = True
+
             pins.append(
                 {
                     "id": r.id,
@@ -2393,12 +3940,79 @@ def create_app() -> Flask:
                     "ticketed": r.ticketed_speed,
                     "created_at": r.created_at.isoformat() if r.created_at else None,
                     "username": (r.user.username if getattr(r, "user", None) else None),
+                    "inside_focus": bool(inside_focus),
                 }
             )
 
-        return jsonify({"ok": True, "count": len(pins), "pins": pins})
+        return jsonify({"ok": True, "count": len(pins), "pins": pins, "selected_id": selected_id_norm})
 
-    
+
+
+    @app.get("/api/state_geom/<stusps>")
+    def api_state_geom(stusps: str):
+        """Return GeoJSON geometry for a state (cached from counties)."""
+        st = (stusps or "").strip().upper()
+        if len(st) != 2 or not st.isalpha():
+            return jsonify({"ok": False, "error": "bad_state"}), 400
+
+        try:
+            # Slight simplification for state outlines to keep payloads reasonable.
+            row = db.session.execute(
+                text(
+                    """
+                    SELECT
+                        stusps,
+                        state_name,
+                        ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, :tol)) AS geom_json,
+                        ST_Y(ST_PointOnSurface(geom)) AS centroid_lat,
+                        ST_X(ST_PointOnSurface(geom)) AS centroid_lng
+                    FROM states
+                    WHERE stusps = :st
+                    LIMIT 1
+                    """
+                ),
+                {"st": st, "tol": 0.005},
+            ).mappings().first()
+
+            if not row or not row.get("geom_json"):
+                return jsonify({"ok": False, "error": "not_found"}), 404
+
+            try:
+                geom = json.loads(row["geom_json"])
+            except Exception:
+                geom = None
+            if not geom:
+                return jsonify({"ok": False, "error": "geom_unavailable"}), 200
+
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "stusps": row.get("stusps"),
+                    "state_name": row.get("state_name"),
+                },
+                "geometry": geom,
+            }
+
+            return jsonify(
+                {
+                    "ok": True,
+                    "stusps": row.get("stusps"),
+                    "centroid": {
+                        "lat": float(row.get("centroid_lat")) if row.get("centroid_lat") is not None else None,
+                        "lng": float(row.get("centroid_lng")) if row.get("centroid_lng") is not None else None,
+                    },
+                    "geojson": {"type": "FeatureCollection", "features": [feature]},
+                }
+            )
+        except Exception as e:
+            try:
+                print(f"[STATE GEOM API ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "states_unavailable"}), 200
+
+
+
     @app.get("/api/search_suggest")
     def search_suggest():
         q = (request.args.get("q") or "").strip()
@@ -2462,7 +4076,6 @@ def create_app() -> Flask:
 
         # Keep top 5, users first, then states, then roads (current order)
         return jsonify(suggestions[:5])
-
 
 
     @app.get("/api/tickets")
@@ -2660,8 +4273,13 @@ def create_app() -> Flask:
         state_in = str(first('state', 'state_code') or '').strip()
         road_in = str(first('road', 'road_name') or '').strip()
 
+        location_hint = str(first('location_hint', 'locationHint', 'city_name', 'cityName', 'city') or '').strip() or None
+
         posted_in = first('posted_speed', 'postedMph', 'posted_mph', 'posted')
         cited_in = first('cited_speed', 'ticketed_speed', 'ticketedMph', 'ticketed_mph', 'cited')
+
+        raw_lat_in = first('raw_lat', 'rawLat', 'rawLatitude', 'raw_latitude')
+        raw_lng_in = first('raw_lng', 'rawLng', 'rawLongitude', 'raw_longitude')
 
         lat_in = first('lat', 'latitude')
         lng_in = first('lng', 'longitude', 'lon')
@@ -2696,6 +4314,9 @@ def create_app() -> Flask:
         if cited_speed <= 0 or cited_speed > 200:
             return jsonify({'error': 'cited_speed must be between 1 and 200'}), 400
 
+        if cited_speed <= posted_speed:
+            return jsonify({'error': 'cited_speed must be greater than posted_speed'}), 400
+
         # Optional, but if provided should be plausible.
         def to_float(v):
             try:
@@ -2708,6 +4329,9 @@ def create_app() -> Flask:
             except Exception:
                 return None
 
+        raw_lat = to_float(raw_lat_in)
+        raw_lng = to_float(raw_lng_in)
+
         lat = to_float(lat_in)
         lng = to_float(lng_in)
         if lat is not None and (lat < -90 or lat > 90):
@@ -2716,6 +4340,8 @@ def create_app() -> Flask:
             return jsonify({'error': 'lng must be between -180 and 180'}), 400
 
         # Road is preferred, but allow pin-only submissions (road OR lat/lng required).
+        road_in = _normalize_road_label(road_in) or road_in
+
         if not road_in or len(road_in) < 2:
             if lat is None or lng is None:
                 return jsonify({'error': 'road is required unless a map pin (lat/lng) is provided'}), 400
@@ -2723,22 +4349,28 @@ def create_app() -> Flask:
 
         api_u = _api_user_from_request()
 
+
         report = SpeedReport(
             state=state_value,
             road_name=road_in,
             posted_speed=posted_speed,
             ticketed_speed=cited_speed,
-            notes=None,
+            overage=max(0, cited_speed - posted_speed),
+            caption=None,
             user_id=(api_u.id if api_u else None),
+            location_hint=location_hint,
         )
-        report.refresh_road_key()
+        try:
+            report.refresh_road_key()
+        except Exception:
+            pass
 
         if lat is not None and lng is not None:
-            report.raw_lat = lat
-            report.raw_lng = lng
+            report.raw_lat = raw_lat if raw_lat is not None else lat
+            report.raw_lng = raw_lng if raw_lng is not None else lng
             report.lat = lat
             report.lng = lng
-            report.lat_lng_source = 'user_pin'
+            report.location_source = 'user_pin_snapped' if (raw_lat is not None or raw_lng is not None) else 'user_pin'
 
         db.session.add(report)
         db.session.commit()
@@ -2768,8 +4400,9 @@ def create_app() -> Flask:
                     im.save(out, format="JPEG", quality=80, optimize=True)
                     return out.getvalue()
 
-                # Mark pending first so the feed can show status immediately.
-                report.verification_status = "pending"
+                # Mark submitted immediately so the feed can show status even if upload fails.
+                report.photo_key = report.photo_key or f"pending:{uuid.uuid4().hex}"
+                report.verification_status = "submitted"
                 report.ocr_status = "pending"
                 report.ocr_error = None
                 report.verify_reason = None
@@ -2779,10 +4412,18 @@ def create_app() -> Flask:
                 try:
                     jpg_bytes = _normalize_upload_to_jpeg_bytes_api(raw, getattr(file_obj, "filename", None), getattr(file_obj, "content_type", None))
                 except Exception:
+                    # Upload exists but could not be normalized for OCR (e.g., unsupported or unreadable).
                     report.verification_status = "unverified"
                     report.ocr_status = "not_verified"
                     report.ocr_error = "unsupported_or_unreadable_upload"
                     report.verify_reason = "unsupported_format"
+                    try:
+                        if report.photo_key and str(report.photo_key).startswith("pending:"):
+                            report.photo_key = str(report.photo_key).replace("pending:", "failed:", 1)
+                        elif not report.photo_key:
+                            report.photo_key = f"failed:{uuid.uuid4().hex}"
+                    except Exception:
+                        pass
                     db.session.commit()
                     jpg_bytes = None
 
@@ -2793,6 +4434,11 @@ def create_app() -> Flask:
                         report.ocr_status = "not_verified"
                         report.ocr_error = "missing_r2_env: " + ",".join(missing)
                         report.verify_reason = "upload_failed"
+                        try:
+                            if report.photo_key and str(report.photo_key).startswith('pending'):
+                                report.photo_key = f"failed:{__import__('uuid').uuid4().hex}"
+                        except Exception:
+                            pass
                         db.session.commit()
                     else:
                         bucket = os.environ.get("R2_QUARANTINE_BUCKET", "enforcedspeed-ticket-quarantine").strip() or "enforcedspeed-ticket-quarantine"
@@ -2807,6 +4453,13 @@ def create_app() -> Flask:
                             report.ocr_status = "not_verified"
                             report.ocr_error = "upload_failed"
                             report.verify_reason = "upload_failed"
+                            try:
+                                if getattr(report, 'photo_key', None) and str(report.photo_key).startswith('pending:'):
+                                    report.photo_key = str(report.photo_key).replace('pending:', 'failed:')
+                                elif not getattr(report, 'photo_key', None):
+                                    report.photo_key = f"failed:{__import__('uuid').uuid4().hex}"
+                            except Exception:
+                                pass
                             db.session.commit()
                         else:
                             report.photo_key = key
@@ -2830,6 +4483,8 @@ def create_app() -> Flask:
                 report.verification_status = "unverified"
                 report.ocr_status = "not_verified"
                 report.ocr_error = "upload_failed"
+                report.photo_key = (report.photo_key.replace('pending:', 'failed:') if (getattr(report, 'photo_key', None) and str(report.photo_key).startswith('pending:')) else 'failed')
+
                 report.verify_reason = "upload_failed"
                 db.session.commit()
 
@@ -2943,19 +4598,84 @@ def create_app() -> Flask:
             abort(404)
 
         center = f"{lat:.6f},{lng:.6f}"
+        base_url = request.url_root.rstrip('/')
+        icon_url = f"{base_url}/static/img/pins/pin_inside_deepred.png"
+
         params = {
             "center": center,
             "zoom": str(int(zoom)),
             "size": f"{int(w)}x{int(h)}",
             "scale": "2",
             "maptype": "roadmap",
-            "markers": f"color:red|{center}",
+            "markers": f"icon:{icon_url}|{center}",
             "key": key,
         }
         upstream = "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params)
 
         try:
             req = urllib.request.Request(upstream, headers={"User-Agent": "EnforcedSpeedMobile/1.0"})
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = resp.read()
+                content_type = resp.headers.get("Content-Type") or "image/png"
+        except Exception:
+            abort(502)
+
+        out = Response(data, mimetype=content_type)
+        out.headers["Cache-Control"] = "public, max-age=86400"
+        return out
+
+
+    @app.get("/api/county_staticmap")
+    def api_county_staticmap():
+        """Proxy a Google Static Maps image that includes a county boundary overlay and optional pin.
+
+        Keeps the Google Maps API key server-side.
+
+        Query params:
+          - geoid: optional (county GEOID). If omitted, returns a default US preview map.
+          - pin_lat, pin_lng: optional floats (only used when geoid is provided)
+          - center_on_pin: optional (1/0). When 1 and a pin is provided, center the map on the pin.
+          - w, h: optional ints (default 640x640)
+        """
+        geoid = (request.args.get("geoid") or "").strip()
+
+        try:
+            w = int(request.args.get("w", "640"))
+            h = int(request.args.get("h", "640"))
+        except Exception:
+            w, h = 640, 640
+
+        w = max(120, min(1024, w))
+        h = max(120, min(1024, h))
+
+        upstream = ""
+        if geoid:
+            pin_lat = pin_lng = None
+            if (request.args.get("pin_lat") or '').strip() and (request.args.get("pin_lng") or '').strip():
+                try:
+                    pin_lat = float(request.args.get("pin_lat", ""))
+                    pin_lng = float(request.args.get("pin_lng", ""))
+                except Exception:
+                    abort(400)
+
+            center_on_pin = (request.args.get("center_on_pin") == "1")
+
+            upstream = county_static_map_url(
+                geoid,
+                pin_lat,
+                pin_lng,
+                width=w,
+                height=h,
+                center_on_pin=center_on_pin
+            )
+        else:
+            upstream = us_static_map_url(width=w, height=h)
+
+        if not upstream:
+            abort(404)
+
+        try:
+            req = urllib.request.Request(upstream, headers={"User-Agent": "EnforcedSpeedWeb/1.0"})
             with urllib.request.urlopen(req, timeout=12) as resp:
                 data = resp.read()
                 content_type = resp.headers.get("Content-Type") or "image/png"
@@ -3171,6 +4891,74 @@ def create_app() -> Flask:
     def api_toggle_ticket_like(report_id: int):
         return api_toggle_like(report_id)
 
+    @app.get("/api/tickets/<int:report_id>/insights")
+    def api_ticket_insights(report_id: int):
+        """Return the same percentile stats shown on the web thank-you page.
+
+        Used by mobile after submit to show the 'thermometer' bars with identical math.
+        """
+        report = SpeedReport.query.get_or_404(report_id)
+        if getattr(report, "is_deleted", False):
+            abort(404)
+
+        # strictness = ticketed - posted (mph)
+        try:
+            user_strictness = int(report.ticketed_speed) - int(report.posted_speed)
+        except Exception:
+            user_strictness = None
+
+        state_group = normalize_state_group(report.state)
+
+        # Pull all rows for the state (prefix match) and bucket them by road_key + posted_speed.
+        rows = (
+            db.session.query(
+                SpeedReport.state,
+                SpeedReport.road_key,
+                SpeedReport.posted_speed,
+                SpeedReport.ticketed_speed,
+                SpeedReport.is_deleted,
+            )
+            .filter(SpeedReport.state.ilike(f"{state_group}%"))
+            .all()
+        )
+
+        strict_state_road: List[float] = []
+        strict_state_posted: List[float] = []
+
+        for st, road_key, posted, ticketed, is_deleted in rows:
+            if is_deleted:
+                continue
+            if normalize_state_group(st) != state_group:
+                continue
+            try:
+                strictness = float(int(ticketed) - int(posted))
+            except Exception:
+                continue
+
+            if road_key == report.road_key:
+                strict_state_road.append(strictness)
+            if int(posted) == int(report.posted_speed):
+                strict_state_posted.append(strictness)
+
+        stats_a = compute_distribution_stats(strict_state_road, float(user_strictness) if user_strictness is not None else None)
+        stats_b = compute_distribution_stats(strict_state_posted, float(user_strictness) if user_strictness is not None else None)
+
+        return jsonify({
+            "ok": True,
+            "state_group": state_group,
+            "report": {
+                "id": report.id,
+                "state": report.state,
+                "road_name": report.road_name,
+                "posted_speed": report.posted_speed,
+                "ticketed_speed": report.ticketed_speed,
+                "photo_submitted": bool(report.photo_key),
+            },
+            "stats_a": stats_a,
+            "stats_b": stats_b,
+        })
+
+
     @app.get("/api/users/<int:user_id>")
     def api_user_public_profile(user_id: int):
         u = User.query.get_or_404(user_id)
@@ -3242,20 +5030,36 @@ def create_app() -> Flask:
 
         return render_template("search_results.html", q=q, users=users, states=states, roads=roads)
 
+    @app.route("/privacy")
+    def privacy():
+        return render_template("privacy.html")
+
+    @app.route("/terms")
+    def terms():
+        return render_template("terms.html")
+
+    @app.route("/cookies")
+    def cookies():
+        return render_template("cookies.html")
+
+
     @app.get("/health")
     def health():
         return {"status": "ok"}
 
+    # Schema bootstrap for dev/local databases (additive, no destructive changes).
+    with app.app_context():
+        try:
+            ensure_counties_schema()
+            ensure_states_schema()
+        except Exception as e:
+            # Keep app running even if counties are unavailable; submit page will degrade gracefully.
+            print(f"[COUNTY INIT ERROR] failed to ensure counties schema: {e}")
+
+
     return app
 
-
 app = create_app()
-@app.route("/privacy")
-def privacy():
-    return render_template("privacy.html", last_updated="2026-01-25", contact_email="support@enforcedspeed.com")
-@app.route("/terms")
-def terms():
-    return render_template("terms.html", last_updated="2026-01-25", contact_email="support@enforcedspeed.com")
 
 
 if __name__ == "__main__":

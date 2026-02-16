@@ -30,28 +30,202 @@
         </div>
       {% endif %}
 
-      <form method="post" action="{{ url_for('register', next=request.args.get('next')) }}">
+            <form method="post" action="{{ url_for('register', next=request.args.get('next')) }}" novalidate>
         {{ form.hidden_tag() }}
         <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
 
-        <label for="email">{{ form.email.label.text }}</label>
+        <label for="email" class="es-label">{{ form.email.label.text }}</label>
         {{ form.email(id="email", autocomplete="email") }}
 
-        <label for="username">{{ form.username.label.text }}</label>
+        <label for="username" class="es-label">{{ form.username.label.text }}</label>
         {{ form.username(id="username", autocomplete="username") }}
+        <div id="username-status" class="subtle" style="margin-top:6px;"></div>
 
-        <label for="password">{{ form.password.label.text }}</label>
-        {{ form.password(id="password", autocomplete="new-password") }}
+        <label class="es-label">
+  {{ form.birth_month.label.text }}
+  <span class="es-tip">
+    <button type="button" class="info-dot es-tip-btn" aria-label="Birthday info">i</button>
+    <span class="es-tooltip">You must be at least 18 years old to create an account.</span>
+  </span>
+</label>
+        <div class="row-3">
+          {{ form.birth_month(id="birth_month", class_="filterbar-select") }}
+          {{ form.birth_day(id="birth_day", class_="filterbar-select") }}
+          {{ form.birth_year(id="birth_year", class_="filterbar-select") }}
+        </div>
+        <div id="birth-status" class="subtle" style="margin-top:6px;"></div>
+        <div class="row-2">
+          <div>
+            <label for="password" class="es-label">
+  {{ form.password.label.text }}
+  <span class="es-tip">
+    <button type="button" class="info-dot es-tip-btn" aria-label="Password requirements">i</button>
+    <span class="es-tooltip">Password must be at least 8 characters.</span>
+  </span>
+</label>
+            {{ form.password(id="password", autocomplete="new-password") }}
+          </div>
+          <div>
+            <label for="confirm_password" class="es-label">{{ form.confirm_password.label.text }}</label>
+            {{ form.confirm_password(id="confirm_password", autocomplete="new-password") }}
+          </div>
+        </div>
 
-        <label for="confirm_password">{{ form.confirm_password.label.text }}</label>
-        {{ form.confirm_password(id="confirm_password", autocomplete="new-password") }}
+        <div class="subtle" style="margin-top:10px;">
+          By clicking Create Account, you agree to our
+          <a href="{{ url_for('terms') }}">Terms</a>,
+          <a href="{{ url_for('privacy') }}">Privacy Policy</a>, and
+          <a href="{{ url_for('cookies') }}">Cookie Policy</a>.
+        </div>
 
-        {{ form.submit(class_="btn") }}
+        <div style="display:flex; justify-content:center; margin-top:14px;">
+          <button id="create-account-btn" type="submit" class="es-btn" style="width:52%; height:44px; font-weight:600;" disabled>Create Account</button>
+        </div>
       </form>
 
-      <div class="subtle">
+      <script>
+      (function(){
+        const u = document.getElementById('username');
+        const out = document.getElementById('username-status');
+        const bm = document.getElementById('birth_month');
+        const bd = document.getElementById('birth_day');
+        const by = document.getElementById('birth_year');
+        const bout = document.getElementById('birth-status');
+        const btn = document.getElementById('create-account-btn');
+
+        let usernameAvailable = false;
+        let dobValid = false;
+        let t = null;
+
+        function updateBtn(){
+          if(!btn) return;
+          btn.disabled = !(usernameAvailable && dobValid);
+        }
+
+        function setOut(el, msg, state){
+          if(!el) return;
+          el.textContent = msg || '';
+          el.classList.remove('ok','bad');
+          if(state === 'ok') el.classList.add('ok');
+          if(state === 'bad') el.classList.add('bad');
+        }
+
+        async function checkUsername(){
+          if(!u || !out) return;
+          const val = (u.value || '').trim();
+          usernameAvailable = false;
+
+          if(val.length < 3){
+            setOut(out, '', null);
+            updateBtn();
+            return;
+          }
+          if(val.length > 12){
+            setOut(out, 'Max 12 characters.', 'bad');
+            updateBtn();
+            return;
+          }
+
+          try{
+            const r = await fetch(`/api/username_available?u=${encodeURIComponent(val)}`, {headers: {'Accept':'application/json'}});
+            if(!r.ok) throw new Error('bad');
+            const j = await r.json();
+            usernameAvailable = !!j.available;
+            setOut(out, j.message || (j.available ? 'Username is available.' : 'That username is taken.'), j.available ? 'ok' : 'bad');
+          }catch(e){
+            // Strict gating: if we cannot confirm availability, keep the button disabled.
+            usernameAvailable = false;
+            setOut(out, 'Unable to check username right now. Try again.', 'bad');
+          }
+          updateBtn();
+        }
+
+        function scheduleUsername(){
+          clearTimeout(t);
+          t = setTimeout(checkUsername, 250);
+        }
+
+        function validateDOB(){
+          if(!bm || !bd || !by) return;
+          dobValid = false;
+
+          const mm = parseInt(bm.value, 10);
+          const dd = parseInt(bd.value, 10);
+          const yy = parseInt(by.value, 10);
+
+          if(!mm || !dd || !yy){
+            setOut(bout, '', null);
+            updateBtn();
+            return;
+          }
+
+          // Construct date and ensure it is real
+          const dob = new Date(yy, mm - 1, dd);
+          if(dob.getFullYear() !== yy || (dob.getMonth()+1) !== mm || dob.getDate() !== dd){
+            setOut(bout, 'Please select a valid date.', 'bad');
+            updateBtn();
+            return;
+          }
+
+          const today = new Date();
+          let age = today.getFullYear() - yy;
+          const mDiff = (today.getMonth()+1) - mm;
+          if(mDiff < 0 || (mDiff === 0 && today.getDate() < dd)) age--;
+
+          if(age < 18){
+            setOut(bout, 'You must be at least 18 years old.', 'bad');
+            dobValid = false;
+          }else{
+            setOut(bout, 'Looks good.', 'ok');
+            dobValid = true;
+          }
+          updateBtn();
+        }
+
+        if(u && out){
+          u.addEventListener('input', scheduleUsername);
+          u.addEventListener('blur', checkUsername);
+        }
+        if(bm && bd && by){
+          bm.addEventListener('change', validateDOB);
+          bd.addEventListener('change', validateDOB);
+          by.addEventListener('change', validateDOB);
+        }
+
+        // Initialize
+        validateDOB();
+        checkUsername();
+        updateBtn();
+      })();
+// Tooltips (hover + tap)
+      (function(){
+        function closeAll(except){
+          document.querySelectorAll('.es-tip.open').forEach(el=>{
+            if(except && el === except) return;
+            el.classList.remove('open');
+          });
+        }
+        document.addEventListener('click', function(){ closeAll(null); });
+        document.addEventListener('keydown', function(e){
+          if(e.key === 'Escape') closeAll(null);
+        });
+        document.querySelectorAll('.es-tip-btn').forEach(btn=>{
+          btn.addEventListener('click', function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            const tip = btn.closest('.es-tip');
+            const isOpen = tip.classList.contains('open');
+            closeAll(tip);
+            if(!isOpen) tip.classList.add('open');
+          });
+        });
+      })();
+
+      </script>
+
+      <div class="subtle" style="text-align:center; margin-top:14px;">
         Already have an account? <a href="{{ url_for('login', next=request.args.get('next')) }}">Log in</a>.
-        · <a href="{{ url_for('home') }}">Back home</a>
+        &nbsp;·&nbsp; <a href="{{ url_for('home') }}">Back home</a>
       </div>
     </div>
   </div>

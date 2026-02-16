@@ -1,0 +1,38 @@
+ENFORCEDSPEED — CHANGELOG (v221–v230)
+
+v221 — 2026-02-05
+- Fix: county import PowerShell script now uses System.Uri constructor (hard-fails on bad URLs) instead of a cast that could yield null.
+- Fix: import script now errors clearly if DatabaseUrl is missing.
+- No functional changes to web app runtime; this is an import-script reliability patch.
+
+v222 — 2026-02-05
+- Fix: county import PowerShell script TrimStart now uses a proper char[] (prevents "String must be exactly one character long" on Windows paths).
+
+
+v223 (2026-02-05)
+- County import: fix GDAL docker image reference (use ghcr.io/osgeo/gdal:alpine-small-latest).
+
+
+v224 — 2026-02-05
+- County import: PowerShell-safe docker invocation (no bash line continuations).
+
+v225 — 2026-02-05
+- County import: treat host.docker.internal as local and default sslmode=disable unless explicitly provided in URL.
+- County import: honor sslmode from DatabaseUrl (?sslmode=...) and fail hard if GDAL/psql steps fail.
+
+v226 — 2026-02-05
+- County import: fix sslmode=auto default — treat 'auto' as a sentinel and compute effective sslmode (disable for localhost/127/host.docker.internal; require for remote).
+- County import: pgConn and psql merge now consistently use the computed effective sslmode.
+
+v227 — 2026-02-05
+- County import: fix psql merge step by writing SQL to a temp file and running psql -f (avoids Windows/PowerShell quoting causing "invalid command \").
+
+
+v228 — 2026-02-05
+- County import: script now creates PostGIS extension + canonical counties table + indexes before merge (fixes "relation counties does not exist" on fresh local DB).
+
+v229 — 2026-02-05
+- Submit: began the move to a single-page submit flow (no multi-step pages) and started wiring county selection toward the counties table.
+
+v230 — 2026-02-06
+- Hotfix: restored the missing Like model so the app boots (fixes `ImportError: cannot import name 'Like' from models`).

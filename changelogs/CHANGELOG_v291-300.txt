@@ -1,0 +1,67 @@
+CHANGELOG (v291–v300)
+
+v291 — 2026-02-08
+- Home feed: for user-pin tickets (location_source=user_pin/user_pin_snapped), center the Static Maps preview on the pin so the speed pill can be positioned deterministically above the marker.
+- Home feed: speed pill overage text (+XX mph) is now orange.
+- Home feed: county name is now clickable and links to the interactive Map filtered to that county (state + county_geoid), matching the Statistics page behavior.
+
+v292 — 2026-02-08
+- Home feed: replace fractional-zoom size-scaling hack with integer zoom + consistent padding; always request full-size retina Static Maps and rely on CSS downscaling for sharper roads/labels and less “oversized” attribution.
+- Home feed: request 4:3 Static Maps images (640x480) to match the feed preview container and avoid object-fit cropping artifacts.
+- Static Maps markers: revert to default Google marker (remove size:small/tiny) so the standard white-dot marker renders correctly.
+
+
+v293 — 2026-02-08
+- Fix: resolve an IndentationError in app.py (county_static_map_url) introduced in v292; no intended behavior changes beyond restoring valid syntax.
+
+v294 (2026-02-08)
+- templates/home_feed.html: feed static map now requests square 640x640 (with scale=2 still) to match the square media frame (removes letterboxing/blank area).
+- templates/home_feed.html: pinmode speed pill offset increased so it clears the default-size Google marker.
+- templates/home_feed.html: center the static map image within the frame (object-position center) so marker/pill alignment is consistent.
+
+v295 — 2026-02-14
+- Submit Ticket: state starts blank (no default) unless prefilled via ?st=XX.
+- Submit Ticket: removed “(plain text)” from the Road label; moved intro copy inside the main card container.
+- Submit Ticket: once a county is selected, show an immediate static county-outline preview; if a pin is set, update the same preview to include the pin and center on it.
+- Submit Ticket: rename pin controls to “Place pin on map” and update helper text to explain the “Pin ✓” and “Photo ✓” pills.
+- Home: update the disclaimer copy to the new wording.
+- General: add consolidated HANDOFF_v291-300.txt (future handoffs should append here, like changelogs).
+v296 — 2026-02-14
+- Submit Ticket: remove extra helper lines (“County is required…”, “Pin is optional…”, and the state/county instruction prompts).
+- Submit Ticket: center the page header and use the standard page H1 styling so it matches Map/Statistics.
+- Submit Ticket: fix Caption textarea overflow (box-sizing + max-width).
+- Pin modal: county outline styling now matches the site (black outline + subtle fill) and fitBounds uses padding for more consistent framing.
+- Static map previews: when centering on a user pin, keep zoom based on the county bbox (prevents zooming out when the pin is near a county edge).
+
+v297 — 2026-02-14
+- Submit Ticket: tightened layout (State+County on one row; Road+Posted+Ticketed on one row).
+- Submit Ticket: Pin and Photo sections now share one row; buttons moved to the right of their labels.
+- Submit Ticket: removed “(optional)” from Pin/Photo/Caption labels.
+- Submit Ticket: Caption textarea is non-resizable and stays contained; Submit button moved to the right of Caption and aligned to the bottom (Cancel removed).
+- Submit Ticket: replaced the native file input UI with a custom “Choose file” button (styled to match the pin button) and a filename line.
+- Submit Ticket: static county/pin preview image now appears below the Pin/Photo row (above Caption).
+
+v298 — 2026-02-14
+- Submit Ticket: changed State+County row to 50/50 for a more balanced layout.
+- Submit Ticket: added a subtle divider under the required fields (State/County + Road/Posted/Ticketed) to visually separate optional items.
+- Submit Ticket: removed the long Pin/Photo helper sentences; kept only the Pin ✓ / Photo ✓ pills.
+- Submit Ticket: renamed “Place pin on map” → label “Pin” with a “Map” button; kept Clear button.
+- Submit Ticket: made Caption a compact 2-line box and ensured it is non-resizable; Submit matches the Caption height.
+- Submit Ticket: introduced a reusable “elevated outline” button style (Option A) and applied it to Map / Choose file / Submit.
+- Styles: added .es-btn (Option A) to templates/_mvp_styles.html for future reuse.
+
+v299 (2026-02-14)
+- Submit Ticket: kept State/County 50/50 and confirmed Road/Posted/Ticketed aligns as 50/25/25.
+- Submit Ticket: moved Pin ✓ and Photo ✓ pills inline to the right of the “Pin” / “Photo” labels.
+- Submit Ticket: renamed the pin button to “Map location”.
+- Submit Ticket: show a default US static map preview before a county is selected; preview updates to county/pin once selected.
+- Submit Ticket: replaced the plain divider with a subtle “Optional items below” divider label.
+- Submit Ticket: made Caption + Submit single-line height (matches other controls).
+- app.py: /api/county_staticmap now supports no geoid (returns US preview map).
+
+v300 (2026-02-14)
+- Submit Ticket: standardized layout with a single 12-column grid so State/County (50/50) and Road/Posted/Ticketed (50/25/25) align perfectly across rows.
+- Submit Ticket: renamed pin button to “Set location” and moved Pin ✓ / Photo ✓ pills to the left of their corresponding buttons.
+- Submit Ticket: updated Posted/Ticketed placeholders to include “e.g.” + “mph” (so fields don’t look prefilled).
+- Handoff logs: de-cluttered project root by bundling HANDOFF notes into handoffs/HANDOFF_v251-300.txt.
+

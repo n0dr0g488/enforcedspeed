@@ -36,26 +36,13 @@
       <div style="margin-top:22px;border-top:1px solid rgba(0,0,0,.08);padding-top:18px;">
         <div style="font-weight:700;font-size:16px;">Photo OCR verification</div>
         <div class="muted" style="margin-top:6px;">
-          You’ll see two photo pills on your ticket while we verify your upload.
+          You’ll see a single Photo status pill on your ticket while we process your upload.
         </div>
 
         <ul class="muted" style="margin:10px 0 0 0;padding-left:18px;line-height:1.35;">
-          <li style="margin:6px 0;">
-            <span class="pill pill-photo pill-photo-submitted">Photo Submitted</span>
-            We received your photo and queued it for OCR.
-          </li>
-          <li style="margin:6px 0;">
-            <span class="pill pill-ocr pill-ocr-pending">Photo OCR Processing</span>
-            Our system is reading the image now (usually ~10 seconds). If you still see processing after that, refresh once.
-          </li>
-          <li style="margin:6px 0;">
-            <span class="pill pill-ocr pill-ocr-verified">Auto-Extracted ✓</span>
-            We extracted and validated key fields automatically.
-          </li>
-          <li style="margin:6px 0;">
-            <span class="pill pill-ocr pill-ocr-unverified">Not Auto-Extracted</span>
-            We couldn’t confidently validate this photo. Your ticket still posts.
-          </li>
+          <li style="margin:6px 0;"><span class="pill pill-photo pill-photo-processing">Photo …</span> Processing (usually ~10 seconds). If it stays stuck, refresh once.</li>
+          <li style="margin:6px 0;"><span class="pill pill-photo pill-photo-ok">Photo ✓</span> Processed / extracted successfully.</li>
+          <li style="margin:6px 0;"><span class="pill pill-photo pill-photo-fail">Photo !</span> We couldn’t confidently extract key fields. Your ticket still posts.</li>
         </ul>
 
         <div class="muted" style="margin-top:10px;">

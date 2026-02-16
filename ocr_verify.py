@@ -316,6 +316,14 @@ def verify_ticket_from_r2(report_id: int, bucket: str, key: str) -> None:
 
     # Final: choose best pair using the submitted values, then set verified/unverified.
     def _final_update(r: SpeedReport) -> None:
+        # Normalize swapped submitted speeds (prevents negative overage and false mismatches)
+        try:
+            if r.posted_speed is not None and r.ticketed_speed is not None and int(r.ticketed_speed) < int(r.posted_speed):
+                r.posted_speed, r.ticketed_speed = int(r.ticketed_speed), int(r.posted_speed)
+                r.overage = max(0, int(r.ticketed_speed) - int(r.posted_speed))
+        except Exception:
+            pass
+
         # Choose the best pair *using the submitted values* (primary success path).
         best_posted, best_ticketed, score, reason = _best_speed_pair(
             full_text,

@@ -63,6 +63,17 @@
         box-shadow:none;
         padding:14px 14px 12px;
       }
+
+/* v310: Unify filter rail control typography (multi-select summaries + selects) */
+.filters-rail select,
+.filters-rail .filterbar-select,
+.filters-rail .multi-summary{
+  font-size:15px !important;
+  font-weight:400 !important;
+  line-height:1.2 !important;
+}
+
+
       .filters-rail .filterbox{padding:0;margin:0;}
 
       /* v140: Right rail map should match left rail (built-in, straight edges). */
@@ -156,6 +167,33 @@
       .btn-primary-modern{ background:#eaf2ff; border:1px solid #cddbf7; color:#111827; box-shadow:none; font-weight:600; }
       .btn-primary-modern:hover{ background:#dfeaff; opacity:1; }
       .btn-pin-inline{ height: 43px; padding: 12px 14px; border-radius: 10px;  font-weight:400;  width:100%; }
+
+      .submit-inline-row__road{ position:relative; }
+      .road-suggest{
+        position:absolute;
+        top: calc(100% + 6px);
+        left:0; right:0;
+        z-index:50;
+        background:#fff;
+        border:1px solid #e5e7eb;
+        border-radius:12px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        padding:6px;
+        max-height:260px;
+        overflow:auto;
+      }
+      .road-suggest-item{
+        width:100%;
+        text-align:left;
+        background:transparent;
+        border:0;
+        padding:10px 10px;
+        border-radius:10px;
+        cursor:pointer;
+      }
+      .road-suggest-item:hover{ background:#f1f5f9; }
+      .road-suggest-main{ font-weight:600; color:#0f172a; font-size:14px; line-height:1.15; }
+      .road-suggest-sub{ font-weight:400; color:#475569; font-size:12px; line-height:1.15; margin-top:4px; }
       
       .submit-inline-row{
         display:grid;
@@ -388,7 +426,7 @@
   padding:10px 12px;
   border:1px solid #d6d9dd;
   border-radius:10px;
-  font-size:14px;
+  font-size:15px;
   background:#fff;
 }
 .filterbar-button{
@@ -545,8 +583,8 @@
   list-style:none;
   cursor:pointer;
   padding:10px 12px;
-  font-size:13px;
-  font-weight:800;
+  font-size:15px;
+  font-weight: 400;
   color:#111827;
 }
 .multi-summary::-webkit-details-marker{ display:none; }
@@ -631,18 +669,20 @@
       .ticket-staticmap-wrap{
         width:100%;
         margin-top:10px;
-        border:0;
-        border-right:1px solid #e5e7eb;
+        border:1px solid #e5e7eb;
         border-radius:12px;
         overflow:hidden;
         background:#f3f4f6;
-              position:relative;
-}
-      
-      .ticket-pin-refine{
+        position:relative;
+        /* Default ratio (media wrapper can override) */
+        aspect-ratio: 4 / 3;
+      }
+
+.ticket-pin-refine{
         position:absolute;
-        left:10px;
-        bottom:10px;
+        left:12px;
+        top:12px;
+        z-index:5;
         border:1px solid #e5e7eb;
         background:rgba(255,255,255,0.92);
         padding:6px 10px;
@@ -650,16 +690,15 @@
         font-size:13px;
         font-weight:500;
         cursor:pointer;
-      
-  z-index: 5;}
-      .ticket-pin-refine:hover{
-        background:rgba(255,255,255,0.98);
+        box-shadow:0 8px 18px rgba(0,0,0,0.12);
       }
+      .ticket-pin-refine:hover{ background:rgba(255,255,255,0.98); }
 
-.ticket-staticmap{
+      .ticket-staticmap{
         width:100%;
-        height:auto;
+        height:100%;
         display:block;
+        object-fit:cover;
       }
 
 
@@ -721,6 +760,163 @@
 }
 .btn-submit-ticket:hover {
   background: #dbe9f8;
+}
+
+/* v250: photo/pin status pills */
+.pill-photo { border: 1px solid #e5e7eb; background: #fff; }
+.pill-photo-processing { color: #1f2937; }
+.pill-photo-ok { color: #166534; border-color: #86efac; background: #f0fdf4; }
+.pill-photo-fail { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.pill-pin { color: #166534; border-color: #86efac; background: #f0fdf4; }
+
+
+
+/* County filter autocomplete */
+.filter-autocomplete-wrap{ position:relative; }
+.filter-suggestions{
+  position:absolute; left:0; right:0; top:calc(100% + 6px);
+  background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+  max-height:260px; overflow:auto; z-index:50;
+}
+.filter-suggestion-item{
+  padding:10px 12px; cursor:pointer; font-size:14px; color:#111827;
+}
+.filter-suggestion-item:hover{ background:#f3f4f6; }
+.filter-suggestion-muted{ color:#6b7280; font-size:12px; }
+
+/* Ticket header right column */
+.ticket-head-right{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.ticket-date-right{ font-size:12px; color:#6b7280; }
+
+.ticket-ocr{ display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; }
+.ticket-date-right{ flex-basis:100%; text-align:right; font-size:12px; color:#6b7280; }
+
+
+
+      /* Shared elevated-outline button (Option A) — v298 */
+      .es-btn{
+        appearance: none;
+        -webkit-appearance: none;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-weight: 600;
+        cursor: pointer;
+        line-height: 1;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: #111827;
+        text-decoration: none;
+        user-select: none;
+      }
+      .es-btn:hover{ background: #f9fafb; }
+      .es-btn:active{ transform: translateY(0.5px); }
+      .es-btn:focus{ outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,0.14), 0 1px 2px rgba(0,0,0,0.06); }
+      .es-btn[disabled]{ opacity: .55; cursor: not-allowed; }
+      .es-btn--danger{ border-color:#fecaca; color:#b91c1c; }
+      .es-btn--danger:hover{ background:#fff1f2; }
+
+
+
+/* Filter rail: green checkmark inline (Photo ✓) */
+.filter-check{
+  color:#16a34a;
+  font-weight:700;
+}
+
+
+/* v319: Register page layout helpers */
+.row-2{display:flex;gap:14px;align-items:flex-start;}
+.row-2 > div{flex:1;min-width:0;}
+.row-3{display:flex;gap:10px;align-items:flex-start;}
+.row-3 > *{flex:1;min-width:0;}
+@media (max-width: 720px){
+  .row-2,.row-3{flex-direction:column;}
+}
+
+/* Username availability */
+#username-status.ok{color:#15803d;font-weight:500;}
+#username-status.bad{color:#b91c1c;font-weight:500;}
+
+/* Tiny info dot (matches site's simple "i" affordance) */
+.info-dot{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:16px;
+  height:16px;
+  margin-left:6px;
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:999px;
+  font-size:12px;
+  line-height:1;
+  color:#6b7280;
+  cursor:help;
+  vertical-align:middle;
+  background:#fff;
+}
+
+
+/* Submit-style label (matches submit_ticket page) */
+.es-label{
+  display:block;
+  margin: 14px 0 6px;
+  font-weight: 600;
+}
+
+/* Tooltip popover */
+.es-tip{ position: relative; display:inline-flex; align-items:center; }
+.es-tip .info-dot{ margin-left:6px; }
+.es-tooltip{
+  display:none;
+  position:absolute;
+  left:50%;
+  transform: translateX(-50%);
+  top: calc(100% + 8px);
+  background:#111827;
+  color:#fff;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:12px;
+  line-height:1.35;
+  width: 260px;
+  max-width: 70vw;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  z-index: 40;
+}
+.es-tooltip:before{
+  content:'';
+  position:absolute;
+  top:-6px;
+  left:50%;
+  transform: translateX(-50%);
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-bottom:6px solid #111827;
+}
+.es-tip:hover .es-tooltip,
+.es-tip:focus-within .es-tooltip,
+.es-tip.open .es-tooltip{
+  display:block;
+}
+
+/* Create Account button — half width, centered */
+.btn.btn-half{
+  width: 52%;
+  max-width: 360px;
+  min-width: 220px;
+  display:block;
+  margin: 18px auto 0;
+  padding: 10px 14px;
+  font-size: 15px;
+}
+@media (max-width: 520px){
+  .btn.btn-half{ width: 100%; min-width: 0; }
 }
 
 </style>

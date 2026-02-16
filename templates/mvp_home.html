@@ -19,579 +19,635 @@
 
 <form method="post" action="{{ url_for('submit_ticket') }}" id="ticketForm" enctype="multipart/form-data">
           {{ form.hidden_tag() }}
-          <div class="submit-inline-row">
-            <div class="submit-inline-row__state">
-              <label for="state">{{ form.state.label.text }}</label>
-              {{ form.state(id="state", list="state_list") }}
-              <datalist id="state_list">
-                {% for s in state_options %}
-                  <option value="{{ s }}"></option>
-                {% endfor %}
-              </datalist>
-            </div>
-            <div class="submit-inline-row__road">
-              <label for="road_name">{{ form.road_name.label.text }}</label>
-              {{ form.road_name(id="road_name") }}
-            </div>
-            <div class="submit-inline-row__pin">
-              <label style="visibility:hidden;">&nbsp;</label>
-              <button type="button" id="openPinModal" class="btn btn-secondary btn-pin-inline" style="white-space:nowrap;">Refine pin on map</button>
-            </div>
 
+          <input type="hidden" id="city_place_id" name="city_place_id" value="" />
+
+          <div class="stepper">
+            <div class="stepper-row">
+              <div class="stepper-item" id="stepLabel1"><span class="stepper-num">1</span> Location</div>
+              <div class="stepper-item" id="stepLabel2"><span class="stepper-num">2</span> Pin & Road</div>
+              <div class="stepper-item" id="stepLabel3"><span class="stepper-num">3</span> Photo (optional)</div>
+            </div>
           </div>
-<div class="subtle" style="margin-top:6px;">
-            If Google Maps is enabled, choose the real road from autocomplete.
-          </div>
-          <div class="subtle" id="roadAutoError" style="margin-top:6px; color:#991b1b; display:none;"></div>
-          {# Nearest exit/city temporarily hidden #}
 
-
-
-          <div class="preview" id="roadPreview" style="display:none;">
-            <div class="row">
-              <div class="subtle">Road bucket preview</div>
-              <div class="badge" id="bucketKeyBadge"></div>
+          <!-- STEP 1 -->
+          <div class="step" id="step1">
+            <div class="submit-inline-row" style="grid-template-columns: 1fr 260px; align-items:start;">
+              <div>
+                <label for="city_query">Nearest city / town</label>
+                <!-- Anchor the autocomplete dropdown to this relative wrapper (matches road autocomplete styling) -->
+                <div class="submit-inline-row__road">
+                  <input id="city_query" type="text" autocomplete="off" placeholder="Start typing a city…" />
+                  <div id="citySuggest" class="road-suggest" style="display:none;"></div>
+                </div>
+                <div class="subtle" style="margin-top:6px;">
+                  Pick the nearest city/town to the ticket location. This helps us auto-fill the state and center the map.
+                </div>
+              </div>
+              <div>
+                <label for="state_display">State</label>
+                <input id="state_display" type="text" disabled placeholder="Auto-filled from city" />
+                <!-- Keep the real state field hidden but populated -->
+                <div style="display:none;">
+                  {{ form.state(id="state", list="state_list") }}
+                  <datalist id="state_list">
+                    {% for s in state_options %}
+                      <option value="{{ s }}"></option>
+                    {% endfor %}
+                  </datalist>
+                </div>
+              </div>
             </div>
-            <div class="subtle" id="bucketHint" style="margin-top:8px;"></div>
-            <div class="subtle" id="bucketAmbiguity" style="margin-top:10px;"></div>
-          </div>
-          <div class="subtle" id="pinStatus" style="margin-top:6px; display:none;"></div>
 
-<!-- Pin refine modal (Google Maps, optional) -->
+
+            <div class="submit-inline-row" style="grid-template-columns: 1fr 1fr;">
+              <div>
+                <label for="posted_speed">{{ form.posted_speed.label.text }}</label>
+                {{ form.posted_speed(id="posted_speed", placeholder="e.g., 65") }}
+              </div>
+              <div>
+                <label for="ticketed_speed">{{ form.ticketed_speed.label.text }}</label>
+                {{ form.ticketed_speed(id="ticketed_speed", placeholder="e.g., 77") }}
+              </div>
+            </div>
+
+            <input type="hidden" id="route_class" name="route_class" value="" />
+
+<div class="submit-inline-row" style="grid-template-columns: 1fr;">
+  <label>Road type</label>
+
+  <div class="route-class-grid" id="routeClassGrid">
+    <button type="button" class="route-card" data-val="interstate" aria-pressed="false">
+      <img class="route-icon-img" src="{{ url_for('static', filename='img/route_interstate.png') }}" alt="Interstate shield">
+      <div class="route-title">Interstate</div>
+</button>
+
+    <button type="button" class="route-card" data-val="numbered" aria-pressed="false">
+      <img class="route-icon-img" src="{{ url_for('static', filename='img/route_numbered.png') }}" alt="Numbered route shield">
+      <div class="route-title">Route / Highway</div>
+</button>
+
+    <button type="button" class="route-card" data-val="local" aria-pressed="false">
+      <img class="route-icon-img" src="{{ url_for('static', filename='img/route_local.png') }}" alt="Local street sign">
+      <div class="route-title">Street</div>
+</button>
+  </div>
+</div>
+
+
+            <div class="subtle" id="step1Err" style="margin-top:10px; color:#991b1b; display:none;"></div>
+
+            <div class="submit-inline-row" style="grid-template-columns: 1fr; margin-top:14px;">
+              <button type="button" class="btn" id="step1Next">Next: place pin on map</button>
+            </div>
+          </div>
+
+          <!-- STEP 2 -->
+          <div class="step" id="step2" style="display:none;">
+<div class="submit-inline-row" style="grid-template-columns: 1fr;">
+  <div class="subtle">Preview your pin and road. Use “Edit pin” if you need to adjust.</div>
+</div>
+
+<div id="pinPreviewWrap" class="pin-preview-wrap" style="display:none;">
+  <img id="pinPreviewImg" class="pin-preview-img" src="" alt="Location preview">
+  <div class="subtle" style="margin-top:6px;"><a href="#" id="editPinLink">Edit pin</a></div>
+</div>
+
+<div class="subtle" id="pinStatus" style="margin-top:10px; display:none;"></div>
+
+<div id="roadWrap" style="display:none;">
+
+            <div class="submit-inline-row" style="grid-template-columns: 1fr;">
+              <label for="road_name">Road (auto-detected)</label>
+              {{ form.road_name(id="road_name", autocomplete="off", readonly=True) }}
+              <div class="subtle" style="margin-top:6px;">
+                Road is auto-detected from the pin. <a href="#" id="editRoadLink">Edit</a>
+              </div>
+            </div>
+            </div>
+
+
+            <div class="subtle" id="step2Err" style="margin-top:10px; color:#991b1b; display:none;"></div>
+
+            <div class="submit-inline-row" style="grid-template-columns: 1fr 1fr; gap:12px;">
+              <button type="button" class="btn btn-secondary" id="step2Back">Back</button>
+              <button type="button" class="btn" id="step2Next">Looks good: add photo (optional)</button>
+            </div>
+          </div>
+
+          <!-- STEP 3 -->
+          <div class="step" id="step3" style="display:none;">
+            <div class="submit-inline-row" style="grid-template-columns: 1fr;">
+              <label for="photo">{{ form.photo.label.text }}</label>
+              {{ form.photo(id="photo") }}
+              <div class="subtle" style="margin-top:8px;">
+                Uploaded photos are used only to attempt OCR verification and are automatically deleted shortly after processing (and always within 24 hours).
+              </div>
+            </div>
+
+            <div class="submit-inline-row" style="grid-template-columns: 1fr 1fr; gap:12px;">
+              <button type="button" class="btn btn-secondary" id="step3Back">Back</button>
+              <button type="submit" class="btn">Submit ticket</button>
+            </div>
+          </div>
+
+<!-- Pin confirm modal (Google Maps) -->
 <div id="pinModal" class="modal" style="display:none;">
   <div class="modal-backdrop" id="pinModalBackdrop"></div>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
-    <div class="modal-title" id="pinModalTitle">Refine pin on map</div>
+    <div class="modal-title" id="pinModalTitle">Confirm location</div>
     <div class="subtle" style="margin-top:6px;">
-      Drag the pin to the closest spot on the road. We'll snap it to the nearest road line.
+      Drag the pin to the closest spot on the road, then confirm. We'll snap it to the nearest road line.
     </div>
     <div id="pinMap" style="width:100%; height:340px; margin-top:12px; border:1px solid #e5e7eb; border-radius:12px;"></div>
     <div class="modal-actions">
       <button type="button" class="btn btn-secondary" id="cancelPin">Cancel</button>
-      <button type="button" class="btn" id="savePin">Save pin</button>
+      <button type="button" class="btn" id="savePin">Confirm location</button>
     </div>
     <div class="subtle" id="pinModalMsg" style="margin-top:8px;"></div>
   </div>
 </div>
 
 <style>
+  .stepper{margin: 14px 0 18px;}
+  .stepper-row{display:flex; gap:14px; flex-wrap:wrap;}
+  .stepper-item{display:flex; align-items:center; gap:8px; font-weight:600; color:#0f172a;}
+  .stepper-num{display:inline-flex; width:22px; height:22px; border-radius:999px; align-items:center; justify-content:center; background:#0f172a; color:#fff; font-size:12px;}
   .modal{position:fixed;inset:0;z-index:2000;}
   .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.35);}
-  .modal-card{position:relative;max-width:720px;width:calc(100% - 24px);margin:60px auto 0 auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:16px;}
-  .modal-title{font-weight:600;font-size:18px;}
+  .modal-card
+  {position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(92vw,720px);background:#fff;border-radius:14px;padding:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.2);}
+  .modal-title{font-weight:700;font-size:18px;}
   .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:12px;}
-  .btn-secondary{background:#f3f4f6;color:#111827;border:1px solid #e5e7eb;}
+
+  .route-class-grid{display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-top:8px;}
+  @media (max-width: 640px){
+    .route-class-grid{grid-template-columns: 1fr;}
+  }
+  .route-card{display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px; border-radius:14px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; text-align:center;}
+  .route-card[aria-pressed="true"]{border-color:#0f172a; box-shadow:0 0 0 2px rgba(15,23,42,0.15);}
+  .route-icon-img{width:84px; height:64px; object-fit:contain; display:block; margin:0 auto;}
+  .route-card[data-val="interstate"] .route-icon-img{transform:scale(1.35); transform-origin:center;}
+.route-card[data-val="local"] .route-icon-img{transform:scale(1.2); transform-origin:center;}
+
+.pin-preview-wrap{margin-top:12px;}
+.pin-preview-img{width:100%; max-width:100%; height:auto; display:block; border-radius:12px; border:1px solid #e5e7eb;}
+
+  .route-title{font-weight:800; color:#0f172a;}
+  .route-subtle{font-size:12px; color:#475569;}
 </style>
 
-<label for="posted_speed">{{ form.posted_speed.label.text }}</label>
-          {{ form.posted_speed(id="posted_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
-
-          <label for="ticketed_speed">{{ form.ticketed_speed.label.text }}</label>
-          {{ form.ticketed_speed(id="ticketed_speed", type="text", inputmode="numeric", autocomplete="off", spellcheck="false") }}
-
-          <label for="photo">Photo (optional for OCR ticket verification)</label>
-          <div class="photo-field">
-            {{ form.photo(id="photo", accept="image/jpeg,image/png") }}
-            <div class="subtle" id="photoHint" style="margin-top:6px;">
-              JPG/JPEG or PNG only for now. iPhone HEIC is not supported yet.
-            </div>
-            <div class="subtle" style="margin-top:4px;">
-              Photo privacy: Uploaded photos are used only to attempt OCR verification and are automatically deleted shortly after processing (and always within 24 hours).
-            </div>
-            <div class="subtle" id="photoSelected" style="margin-top:4px;"></div>
-          </div>
-
-          {{ form.submit(class_="btn btn-primary-modern") }}
-
-          <div class="subtle right" style="margin-top: 8px;">
-            Total tickets submitted: <strong>{{ ticket_count }}</strong>
-          </div>
         </form>
+
       </div>
     </div>
 
-    <script>
-      const stateEl = document.getElementById("state");
-      const roadEl = document.getElementById("road_name");
-      const previewEl = document.getElementById("roadPreview");
-      const badgeEl = document.getElementById("bucketKeyBadge");
-      const hintEl = document.getElementById("bucketHint");
-      const ambEl = document.getElementById("bucketAmbiguity");
+    
+<script defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&v=weekly"></script>
 
-      // --- Google Maps (optional) ---
-      const mapsKey = "{{ maps_api_key|e }}";
-      const openPinBtn = document.getElementById("openPinModal");
-      const pinStatusEl = document.getElementById("pinStatus");
-      const pinModal = document.getElementById("pinModal");
-      const pinBackdrop = document.getElementById("pinModalBackdrop");
-      const cancelPin = document.getElementById("cancelPin");
-      const savePin = document.getElementById("savePin");
-      const pinModalMsg = document.getElementById("pinModalMsg");
-      const rawLatEl = document.getElementById("raw_lat");
-      const rawLngEl = document.getElementById("raw_lng");
-      const latEl = document.getElementById("lat");
-      const lngEl = document.getElementById("lng");
-      const placeIdEl = document.getElementById("google_place_id");
+<script>
+  // Elements
+  const formEl = document.getElementById("ticketForm");
+  const step1 = document.getElementById("step1");
+  const step2 = document.getElementById("step2");
+  const step3 = document.getElementById("step3");
 
-      let _mapsLoaded = false;
-      let _map = null;
-      let _marker = null;
-      let _autocomplete = null;
+  const cityInput = document.getElementById("city_query");
+  const citySuggest = document.getElementById("citySuggest");
+  const cityPlaceIdEl = document.getElementById("city_place_id");
 
-      function setPinStatus(text) {
-        if (!pinStatusEl) return;
-        pinStatusEl.style.display = text ? "block" : "none";
-        pinStatusEl.textContent = text || "";
-      }
+  const stateHidden = document.getElementById("state");
+  const stateDisplay = document.getElementById("state_display");
 
-      function loadGoogleMaps(callback) {
-        if (_mapsLoaded && window.google && window.google.maps) {
-          callback();
+  const postedEl = document.getElementById("posted_speed");
+  const ticketedEl = document.getElementById("ticketed_speed");
+
+  const step1Err = document.getElementById("step1Err");
+  const step2Err = document.getElementById("step2Err");
+
+  const step1Next = document.getElementById("step1Next");
+  const step2Back = document.getElementById("step2Back");
+  const step2Next = document.getElementById("step2Next");
+  const step3Back = document.getElementById("step3Back");
+
+  const roadEl = document.getElementById("road_name");
+  const editRoadLink = document.getElementById("editRoadLink");
+  const routeClassGrid = document.getElementById("routeClassGrid");
+  const pinModal = document.getElementById("pinModal");
+  const pinModalBackdrop = document.getElementById("pinModalBackdrop");
+  const cancelPinBtn = document.getElementById("cancelPin");
+  const savePinBtn = document.getElementById("savePin");
+  const pinStatus = document.getElementById("pinStatus");
+  const pinModalMsg = document.getElementById("pinModalMsg");
+
+const editPinLink = document.getElementById("editPinLink");
+const pinPreviewWrap = document.getElementById("pinPreviewWrap");
+const pinPreviewImg = document.getElementById("pinPreviewImg");
+const roadWrap = document.getElementById("roadWrap");
+const routeExInterstate = document.getElementById("routeExInterstate");
+const routeExNumbered = document.getElementById("routeExNumbered");
+const routeExLocal = document.getElementById("routeExLocal");
+
+  const rawLatEl = document.getElementById("raw_lat");
+  const rawLngEl = document.getElementById("raw_lng");
+  const latEl = document.getElementById("lat");
+  const lngEl = document.getElementById("lng");
+  const googlePlaceIdEl = document.getElementById("google_place_id");
+
+  // State
+  let selectedCity = null;   // { place_id, description }
+  let cityCenter = null;     // { lat, lng }
+  let pinConfirmed = false;
+  let map = null;
+  let marker = null;
+  let cityDebounce = null;
+
+  function showStep(n) {
+    step1.style.display = (n === 1) ? "" : "none";
+    step2.style.display = (n === 2) ? "" : "none";
+    step3.style.display = (n === 3) ? "" : "none";
+  }
+
+  function showErr(el, msg) {
+    el.textContent = msg;
+    el.style.display = msg ? "" : "none";
+  }
+
+  function parseIntSafe(v) {
+    const n = parseInt(String(v || "").trim(), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function validateStep1() {
+    showErr(step1Err, "");
+    const posted = parseIntSafe(postedEl?.value);
+    const ticketed = parseIntSafe(ticketedEl?.value);
+
+    if (!selectedCity || !selectedCity.place_id) {
+      showErr(step1Err, "Select a city/town from the suggestions.");
+      return false;
+    }
+    if (!stateHidden || !stateHidden.value) {
+      showErr(step1Err, "State did not auto-fill. Pick a different city/town.");
+      return false;
+    }
+    if (posted == null || posted <= 0) {
+      showErr(step1Err, "Enter a valid posted speed.");
+      return false;
+    }
+    if (ticketed == null || ticketed <= 0) {
+      showErr(step1Err, "Enter a valid ticketed speed.");
+      return false;
+    }
+    if (ticketed <= posted) {
+      showErr(step1Err, "Ticketed speed must be greater than posted speed.");
+      return false;
+    }
+    return true;
+  }
+
+  function validateStep2() {
+    showErr(step2Err, "");
+    const rcEl = document.getElementById("route_class");
+    const rcVal = (rcEl?.value || "").trim();
+    if (!rcVal) {
+      showErr(step2Err, "Pick a road type first: Interstate, US Route, or Other.");
+      return false;
+    }
+    if (!pinConfirmed) {
+      showErr(step2Err, "Confirm a pin on the map first.");
+      return false;
+    }
+    if (!roadEl || !roadEl.value || roadEl.value.trim().length < 2) {
+      showErr(step2Err, "Road is required. Edit the road name if auto-detection was wrong.");
+      return false;
+    }
+    if (!latEl || !lngEl || !latEl.value || !lngEl.value) {
+      showErr(step2Err, "Missing coordinates. Confirm the pin again.");
+      return false;
+    }
+    return true;
+  }
+
+  function closeCitySuggest() {
+    citySuggest.style.display = "none";
+    citySuggest.innerHTML = "";
+  }
+
+  async function fetchCitySuggest(q) {
+    const url = `/api/city_autocomplete?q=${encodeURIComponent(q)}`;
+    const r = await fetch(url, { credentials: "same-origin" });
+    return await r.json();
+  }
+
+  async function fetchCityDetails(placeId) {
+    const url = `/api/city_details?place_id=${encodeURIComponent(placeId)}`;
+    const r = await fetch(url, { credentials: "same-origin" });
+    return await r.json();
+  }
+async function fetchRouteExamples(stateCode) {
+  const url = `/api/route_examples?state=${encodeURIComponent(stateCode)}`;
+  const r = await fetch(url, { credentials: "same-origin" });
+  return await r.json();
+}
+
+
+  function renderCitySuggest(predictions) {
+    if (!predictions || predictions.length === 0) {
+      closeCitySuggest();
+      return;
+    }
+    citySuggest.innerHTML = predictions.map(p => {
+      const main = p.main_text || p.description || "";
+      const sec = p.secondary_text || "";
+      return `<div class="road-suggest-item" data-place-id="${p.place_id}" data-desc="${encodeURIComponent(p.description || "")}">
+                <div class="road-suggest-main">${main}</div>
+                <div class="road-suggest-sub">${sec}</div>
+              </div>`;
+    }).join("");
+    citySuggest.style.display = "";
+  }
+
+  cityInput?.addEventListener("input", () => {
+    const q = (cityInput.value || "").trim();
+    selectedCity = null;
+    cityPlaceIdEl.value = "";
+    if (googlePlaceIdEl) googlePlaceIdEl.value = "";
+    stateDisplay.value = "";
+    if (stateHidden) stateHidden.value = "";
+    cityCenter = null;
+    pinConfirmed = false;
+    pinStatus.style.display = "none";
+    roadEl.value = "";
+    roadEl.readOnly = true;
+    if (roadWrap) roadWrap.style.display = "none";
+    if (pinPreviewWrap) pinPreviewWrap.style.display = "none";
+    if (pinPreviewImg) pinPreviewImg.removeAttribute("src");
+    if (step2Next) step2Next.textContent = "Next: place pin on map";
+    const rcEl = document.getElementById("route_class");
+    if (rcEl) rcEl.value = "";
+    routeClassGrid?.querySelectorAll?.("button.route-card")?.forEach?.((b) => b.setAttribute("aria-pressed","false"));
+    if (routeExInterstate) routeExInterstate.textContent = "Examples: —";
+    if (routeExNumbered) routeExNumbered.textContent = "Examples: —";
+    if (routeExLocal) routeExLocal.textContent = "Examples: —";
+
+    if (q.length < 2) {
+      closeCitySuggest();
+      return;
+    }
+    clearTimeout(cityDebounce);
+    cityDebounce = setTimeout(async () => {
+      try {
+        const data = await fetchCitySuggest(q);
+        if (!data.ok) {
+          closeCitySuggest();
           return;
         }
-        if (!mapsKey) {
-          callback();
-          return;
-        }
-        const existing = document.getElementById("gmapScript");
-        if (existing) {
-          // Script already requested; wait for it.
-          const iv = setInterval(() => {
-            if (window.google && window.google.maps) {
-              clearInterval(iv);
-              _mapsLoaded = true;
-              callback();
-            }
-          }, 50);
-          return;
-        }
-        window.__esMapsInit = () => {
-          _mapsLoaded = true;
-          callback();
-        };
-        const s = document.createElement("script");
-        s.id = "gmapScript";
-        s.async = true;
-        s.defer = true;
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&libraries=places&callback=__esMapsInit`;
-        document.head.appendChild(s);
+        renderCitySuggest(data.predictions || []);
+      } catch (e) {
+        closeCitySuggest();
+      }
+    }, 250);
+  });
+
+  citySuggest?.addEventListener("click", async (e) => {
+    const item = e.target?.closest?.(".road-suggest-item");
+    if (!item) return;
+
+    const placeId = item.getAttribute("data-place-id");
+    const desc = decodeURIComponent(item.getAttribute("data-desc") || "");
+    selectedCity = { place_id: placeId, description: desc };
+    cityPlaceIdEl.value = placeId || "";
+    if (googlePlaceIdEl) googlePlaceIdEl.value = placeId || "";
+    cityInput.value = desc;
+    closeCitySuggest();
+
+    try {
+      const data = await fetchCityDetails(placeId);
+      if (!data.ok) {
+        showErr(step1Err, "Couldn't resolve that city. Try another.");
+        return;
+      }
+      if (data.state_value) {
+        stateDisplay.value = data.state_value;
+        if (stateHidden) stateHidden.value = data.state_value;
+      } else if (data.state_code) {
+        stateDisplay.value = data.state_code;
+        if (stateHidden) stateHidden.value = data.state_code;
       }
 
-      function openModal() {
-        if (!pinModal) return;
-        pinModal.style.display = "block";
-        document.body.style.overflow = "hidden";
+      // Populate route examples for this state
+if (typeof data.lat === "number" && typeof data.lng === "number") {
+        cityCenter = { lat: data.lat, lng: data.lng };
       }
+      showErr(step1Err, "");
+    } catch (e) {
+      showErr(step1Err, "Couldn't resolve that city. Try another.");
+    }
+  });
 
-      function closeModal() {
-        if (!pinModal) return;
-        pinModal.style.display = "none";
-        document.body.style.overflow = "";
-      }
+  document.addEventListener("click", (e) => {
+    if (!citySuggest.contains(e.target) && e.target !== cityInput) {
+      closeCitySuggest();
+    }
+  });
 
-      function ensureMap(center) {
-        if (!_mapsLoaded || !window.google || !window.google.maps) return;
-        const c = center || { lat: 39.8283, lng: -98.5795 }; // US center
-        if (!_map) {
-          _map = new google.maps.Map(document.getElementById("pinMap"), {
-            center: c,
-            zoom: center ? 11 : 5,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-          });
-          _marker = new google.maps.Marker({
-            position: c,
-            map: _map,
-            draggable: true,
-          });
-        } else {
-          _map.setCenter(c);
-          _map.setZoom(center ? 11 : 5);
-          _marker.setPosition(c);
-        }
-      }
+  step1Next?.addEventListener("click", () => {
+    if (!validateStep1()) return;
+    showStep(2);
+    openPinModal();
+  });
 
-      async function snapAndStore(lat, lng) {
-        // Always store the raw pin.
-        if (rawLatEl) rawLatEl.value = String(lat);
-        if (rawLngEl) rawLngEl.value = String(lng);
+  step2Back?.addEventListener("click", () => showStep(1));
+  step2Next?.addEventListener("click", () => {
+    if (!pinConfirmed) {
+      openPinModal();
+      return;
+    }
+    if (!validateStep2()) return;
+    showStep(3);
+  });
+  step3Back?.addEventListener("click", () => showStep(2));
 
-        // Default to raw.
-        if (latEl) latEl.value = String(lat);
-        if (lngEl) lngEl.value = String(lng);
+  editRoadLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    roadEl.readOnly = false;
+    roadEl.focus();
+  });
 
-        if (!mapsKey) return { lat, lng, snapped: false };
+  // Pin modal
+  function openPinModal() {
+    showErr(step2Err, "");
+    if (!validateStep1()) {
+      showStep(1);
+      return;
+    }
 
-        try {
-          const url = `/api/snap_road?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`;
-          const res = await fetch(url, { credentials: "same-origin" });
-          const data = await res.json();
-          if (data && data.ok && data.lat != null && data.lng != null) {
-            if (latEl) latEl.value = String(data.lat);
-            if (lngEl) lngEl.value = String(data.lng);
-            return { lat: data.lat, lng: data.lng, snapped: !!data.snapped };
-          }
-        } catch (e) {
-          // fall back silently
-        }
-        return { lat, lng, snapped: false };
-      }
+    const rc = (document.getElementById('route_class')?.value || '').trim();
+    if (!rc) {
+      showErr(step2Err, "Pick a road type in Step 1 first.");
+      showStep(1);
+      return;
+    }
+    pinModal.style.display = "";
+    pinModalMsg.textContent = "";
+    setTimeout(initMap, 50);
+  }
 
+  function closePinModal() {
+    pinModal.style.display = "none";
+  }
 
-      // --- State-bounded road autocomplete (bias + optional strict bounds) ---
-      // Bounding boxes sourced from 2017 US Census shapefile extents (NAD83) published by Anthony Louis D'Agostino.
-      // (xmin,ymin,xmax,ymax) per state: https://anthonylouisdagostino.com/bounding-boxes-for-all-us-states/
-      const _STATE_BOUNDS = {"AL":{"w":-88.473227,"s":30.223334,"e":-84.88908,"n":35.008028},"AK":{"w":-179.148909,"s":51.214183,"e":179.77847,"n":71.365162},"AZ":{"w":-114.81651,"s":31.332177,"e":-109.045223,"n":37.00426},"AR":{"w":-94.617919,"s":33.004106,"e":-89.644395,"n":36.4996},"CA":{"w":-124.409591,"s":32.534156,"e":-114.131211,"n":42.009518},"CO":{"w":-109.060253,"s":36.992426,"e":-102.041524,"n":41.003444},"CT":{"w":-73.727775,"s":40.980144,"e":-71.786994,"n":42.050587},"DE":{"w":-75.788658,"s":38.451013,"e":-75.048939,"n":39.839007},"DC":{"w":-77.119759,"s":38.791645,"e":-76.909395,"n":38.99511},"FL":{"w":-87.634938,"s":24.523096,"e":-80.031362,"n":31.000888},"GA":{"w":-85.605165,"s":30.357851,"e":-80.839729,"n":35.000659},"HI":{"w":-178.334698,"s":18.910361,"e":-154.806773,"n":28.402123},"ID":{"w":-117.243027,"s":41.988057,"e":-111.043564,"n":49.001146},"IL":{"w":-91.513079,"s":36.970298,"e":-87.494756,"n":42.508481},"IN":{"w":-88.09776,"s":37.771742,"e":-84.784579,"n":41.760592},"IA":{"w":-96.639704,"s":40.375501,"e":-90.140061,"n":43.501196},"KS":{"w":-102.051744,"s":36.993016,"e":-94.588413,"n":40.003162},"KY":{"w":-89.571509,"s":36.497129,"e":-81.964971,"n":39.147458},"LA":{"w":-94.043147,"s":28.928609,"e":-88.817017,"n":33.019457},"ME":{"w":-71.083924,"s":42.977764,"e":-66.949895,"n":47.459686},"MD":{"w":-79.487651,"s":37.911717,"e":-75.048939,"n":39.723043},"MA":{"w":-73.508142,"s":41.237964,"e":-69.928393,"n":42.886589},"MI":{"w":-90.418136,"s":41.696118,"e":-82.413474,"n":48.2388},"MN":{"w":-97.239209,"s":43.499356,"e":-89.491739,"n":49.384358},"MS":{"w":-91.655009,"s":30.173943,"e":-88.097888,"n":34.996052},"MO":{"w":-95.774704,"s":35.995683,"e":-89.098843,"n":40.61364},"MT":{"w":-116.050003,"s":44.358221,"e":-104.039138,"n":49.00139},"NE":{"w":-104.053514,"s":39.999998,"e":-95.30829,"n":43.001708},"NV":{"w":-120.005746,"s":35.001857,"e":-114.039648,"n":42.002207},"NH":{"w":-72.557247,"s":42.69699,"e":-70.610621,"n":45.305476},"NJ":{"w":-75.559614,"s":38.928519,"e":-73.893979,"n":41.357423},"NM":{"w":-109.050173,"s":31.332301,"e":-103.001964,"n":37.000232},"NY":{"w":-79.762152,"s":40.496103,"e":-71.856214,"n":45.01585},"NC":{"w":-84.321869,"s":33.842316,"e":-75.460621,"n":36.588117},"ND":{"w":-104.0489,"s":45.935054,"e":-96.554507,"n":49.000574},"OH":{"w":-84.820159,"s":38.403202,"e":-80.518693,"n":41.977523},"OK":{"w":-103.002565,"s":33.615833,"e":-94.430662,"n":37.002206},"OR":{"w":-124.566244,"s":41.991794,"e":-116.463504,"n":46.292035},"PA":{"w":-80.519891,"s":39.7198,"e":-74.689516,"n":42.26986},"RI":{"w":-71.862772,"s":41.146339,"e":-71.12057,"n":42.018798},"SC":{"w":-83.35391,"s":32.0346,"e":-78.54203,"n":35.215402},"SD":{"w":-104.057698,"s":42.479635,"e":-96.436589,"n":45.94545},"TN":{"w":-90.310298,"s":34.982972,"e":-81.6469,"n":36.678118},"TX":{"w":-106.645646,"s":25.837377,"e":-93.508292,"n":36.500704},"UT":{"w":-114.052962,"s":36.997968,"e":-109.041058,"n":42.001567},"VT":{"w":-73.43774,"s":42.726853,"e":-71.464555,"n":45.016659},"VA":{"w":-83.675395,"s":36.540738,"e":-75.242266,"n":39.466012},"WA":{"w":-124.763068,"s":45.543541,"e":-116.915989,"n":49.002494},"WV":{"w":-82.644739,"s":37.201483,"e":-77.719519,"n":40.638801},"WI":{"w":-92.888114,"s":42.491983,"e":-86.805415,"n":47.080621},"WY":{"w":-111.056888,"s":40.994746,"e":-104.05216,"n":45.005904}};
-      const _STATE_NAME_TO_CODE = {"alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO","connecticut":"CT","delaware":"DE","district of columbia":"DC","florida":"FL","georgia":"GA","hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA","kansas":"KS","kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA","michigan":"MI","minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT","nebraska":"NE","nevada":"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK","oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD","tennessee":"TN","texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY"};
+  function initMap() {
+    if (!window.google || !google.maps) return;
 
-      function _normalizeStateToCode(raw) {
-        if (!raw) return "";
-        const v = String(raw).trim();
-        const m = v.match(/^\s*([A-Za-z]{2})\b/);
-        if (m) return m[1].toUpperCase();
+    // If the user already confirmed a pin (static preview exists), start the edit-map
+    // at that exact location instead of snapping back to the city-center (e.g., Richmond).
+    const latEl = document.getElementById("lat");
+    const lngEl = document.getElementById("lng");
+    const rawLatEl = document.getElementById("raw_lat");
+    const rawLngEl = document.getElementById("raw_lng");
 
-        // Normalize full name (strip punctuation, collapse spaces).
-        let name = v.toLowerCase().trim();
-        name = name.replace(/[^a-z\s]/g, " ");
-        name = name.replace(/\s+/g, " ").trim();
-        return _STATE_NAME_TO_CODE[name] || "";
-      }
+    const existingLat = parseFloat((rawLatEl?.value || latEl?.value || "").trim());
+    const existingLng = parseFloat((rawLngEl?.value || lngEl?.value || "").trim());
 
-      function _applyStateBiasToRoadAutocomplete() {
-        if (!_autocomplete || !stateEl) return;
+    const hasExisting = Number.isFinite(existingLat) && Number.isFinite(existingLng);
+    const center = hasExisting
+      ? { lat: existingLat, lng: existingLng }
+      : (cityCenter || { lat: 39.8283, lng: -98.5795 }); // US center fallback
 
-        const code = _normalizeStateToCode(stateEl.value);
-        const b = code ? _STATE_BOUNDS[code] : null;
+    // Slightly zoomed out when editing an existing pin so you can see nearby roads.
+    const zoom = hasExisting ? 13 : (cityCenter ? 8 : 4);
 
-        if (!b || !window.google || !window.google.maps) {
-          // If state is empty or unknown, remove strict bounds but keep US restriction.
-          try {
-            _autocomplete.setOptions({ strictBounds: false, componentRestrictions: { country: "us" } });
-          } catch (e) {}
-          return;
-        }
-
-        try {
-          const sw = new google.maps.LatLng(b.s, b.w);
-          const ne = new google.maps.LatLng(b.n, b.e);
-          const bounds = new google.maps.LatLngBounds(sw, ne);
-          _autocomplete.setBounds(bounds);
-
-          // Constrain suggestions to the selected state bounds.
-          _autocomplete.setOptions({ strictBounds: true, componentRestrictions: { country: "us" } });
-        } catch (e) {
-          // If anything goes sideways, fall back gracefully.
-          try {
-            _autocomplete.setOptions({ strictBounds: false, componentRestrictions: { country: "us" } });
-          } catch (e2) {}
-        }
-      }
-
-      function initAutocomplete() {
-        const errEl = document.getElementById("roadAutoError");
-
-        function showErr(msg){
-          if(!errEl) return;
-          errEl.textContent = msg;
-          errEl.style.display = "block";
-        }
-
-        function clearErr(){
-          if(!errEl) return;
-          errEl.textContent = "";
-          errEl.style.display = "none";
-        }
-
-        function _placeStateCode(place){
-          try {
-            const comps = (place && place.address_components) ? place.address_components : [];
-            for (const c of comps) {
-              const types = c && c.types ? c.types : [];
-              if (types.includes("administrative_area_level_1")) {
-                return (c.short_name || "").toUpperCase();
-              }
-            }
-          } catch (e) {}
-          return "";
-        }
-
-        // Google renders predictions into a .pac-container. Even with strictBounds,
-        // interstate queries can still surface out-of-state matches. To meet our UX
-        // requirement ("narrow the dropdown to the selected state"), we hide any
-        // predictions that don't include the chosen state code.
-        function _filterPacDropdownToState(){
-          const chosen = stateEl ? _normalizeStateToCode(stateEl.value) : "";
-          if (!chosen) return;
-
-          try {
-            const containers = document.querySelectorAll(".pac-container");
-            containers.forEach((c) => {
-              const items = c.querySelectorAll(".pac-item");
-              if (!items || !items.length) return;
-              items.forEach((it) => {
-                const t = (it.textContent || "").toUpperCase();
-                // Common formats include ", ME, USA" or " ME " within the line.
-                const ok = t.includes(`, ${chosen},`) || t.includes(` ${chosen} `) || t.endsWith(` ${chosen}, USA`);
-                it.style.display = ok ? "" : "none";
-              });
-            });
-          } catch (e) {
-            // silent
-          }
-        }
-
-        if (!mapsKey) return;
-        if (!_mapsLoaded || !window.google || !window.google.maps) return;
-        if (!window.google.maps.places || !window.google.maps.places.Autocomplete) {
-          // Map can load without Places; autocomplete requires Places library + key permission.
-          showErr("Road autocomplete is unavailable (Places API not authorized). Check key restrictions + Places API.");
-          return;
-        }
-        try {
-                    // Build initial bounds/strictness from current state selection (so Google applies it from the start).
-          let _initialBounds = null;
-          let _initialStrict = false;
-          try {
-            const _code0 = stateEl ? _normalizeStateToCode(stateEl.value) : "";
-            const _b0 = _code0 ? _STATE_BOUNDS[_code0] : null;
-            if (_b0) {
-              const _sw0 = new google.maps.LatLng(_b0.s, _b0.w);
-              const _ne0 = new google.maps.LatLng(_b0.n, _b0.e);
-              _initialBounds = new google.maps.LatLngBounds(_sw0, _ne0);
-              _initialStrict = true;
-            }
-          } catch (e) {}
-
-          _autocomplete = new google.maps.places.Autocomplete(roadEl, {
-            types: ["geocode"],
-            componentRestrictions: { country: "us" },
-            fields: ["name", "place_id", "geometry", "address_components", "formatted_address"],
-            ...( _initialBounds ? { bounds: _initialBounds, strictBounds: _initialStrict } : {} )
-          });
-
-          // Bias/limit suggestions to the selected state (if provided).
-          _applyStateBiasToRoadAutocomplete();
-          if (stateEl && !stateEl.dataset.roadBiasBound) {
-            stateEl.dataset.roadBiasBound = "1";
-            stateEl.addEventListener("change", _applyStateBiasToRoadAutocomplete);
-            stateEl.addEventListener("input", _applyStateBiasToRoadAutocomplete);
-            // Also re-filter the dropdown when state changes.
-            stateEl.addEventListener("change", () => setTimeout(_filterPacDropdownToState, 0));
-            stateEl.addEventListener("input", () => setTimeout(_filterPacDropdownToState, 0));
-          }
-
-          // Filter suggestions as the user types.
-          if (!roadEl.dataset.pacFilterBound) {
-            roadEl.dataset.pacFilterBound = "1";
-            roadEl.addEventListener("input", () => setTimeout(_filterPacDropdownToState, 0));
-            roadEl.addEventListener("focus", () => setTimeout(_filterPacDropdownToState, 0));
-          }
-
-
-          _autocomplete.addListener("place_changed", () => {
-            const p = _autocomplete.getPlace();
-            if (!p) return;
-
-            // Enforce that the selected road belongs to the chosen state.
-            const chosen = stateEl ? _normalizeStateToCode(stateEl.value) : "";
-            if (chosen) {
-              const ps = _placeStateCode(p);
-              if (ps && ps !== chosen) {
-                showErr(`That result is in ${ps}, not ${chosen}. Please pick a road in ${chosen}.`);
-                roadEl.value = "";
-                if (placeIdEl) placeIdEl.value = "";
-                if (latEl) latEl.value = "";
-                if (lngEl) lngEl.value = "";
-                setPinStatus("No pin yet.");
-                return;
-              }
-            }
-
-            clearErr();
-            if (p.name) roadEl.value = p.name;
-            if (placeIdEl && p.place_id) placeIdEl.value = p.place_id;
-            if (p.geometry && p.geometry.location) {
-              const loc = p.geometry.location;
-              // Pre-fill pin to the selected road geometry for convenience.
-              snapAndStore(loc.lat(), loc.lng()).then(r => {
-                if (r && r.lat != null && r.lng != null) {
-                  setPinStatus(`Pinned: ${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`);
-                }
-              });
-            }
-          });
-        } catch (e) {
-          showErr("Road autocomplete failed to initialize. Check your Google Maps key + Places API.");
-        }
-      }
-
-      if (openPinBtn) {
-        if (!mapsKey) {
-          openPinBtn.disabled = true;
-          openPinBtn.title = "Maps is not configured yet (missing GOOGLE_MAPS_API_KEY).";
-        }
-        openPinBtn.addEventListener("click", () => {
-          if (!mapsKey) return;
-          loadGoogleMaps(() => {
-            initAutocomplete();
-            const lat0 = parseFloat((latEl && latEl.value) || "");
-            const lng0 = parseFloat((lngEl && lngEl.value) || "");
-            const has = Number.isFinite(lat0) && Number.isFinite(lng0);
-            ensureMap(has ? { lat: lat0, lng: lng0 } : null);
-            pinModalMsg.textContent = "";
-            openModal();
-          });
-        });
-      }
-
-      if (pinBackdrop) pinBackdrop.addEventListener("click", closeModal);
-      if (cancelPin) cancelPin.addEventListener("click", closeModal);
-
-      if (savePin) {
-        savePin.addEventListener("click", async () => {
-          if (!_marker) return;
-          const pos = _marker.getPosition();
-          if (!pos) return;
-          const lat = pos.lat();
-          const lng = pos.lng();
-          pinModalMsg.textContent = "Saving...";
-          const r = await snapAndStore(lat, lng);
-          pinModalMsg.textContent = r.snapped ? "Saved (snapped to road)." : "Saved.";
-          setPinStatus(`Pinned: ${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`);
-          setTimeout(() => closeModal(), 200);
-        });
-      }
-
-      // If maps is configured, load script lazily and attach autocomplete to the road field.
-      if (mapsKey) {
-        loadGoogleMaps(() => {
-          initAutocomplete();
-        });
-      }
-
-      const postedEl = document.getElementById("posted_speed");
-      const ticketedEl = document.getElementById("ticketed_speed");
-      const formEl = document.getElementById("ticketForm");
-
-      const photoEl = document.getElementById("photo");
-      const photoSelectedEl = document.getElementById("photoSelected");
-      const allowedPhotoExts = ["jpg", "jpeg", "png"];
-
-      let t = null;
-
-      async function refreshPreview() {
-        const state = (stateEl.value || "").trim();
-        const road = (roadEl.value || "").trim();
-
-        if (!road) {
-          previewEl.style.display = "none";
-          return;
-        }
-
-        const params = new URLSearchParams({ state, road });
-        const res = await fetch(`/api/road_preview?${params.toString()}`);
-        const data = await res.json();
-
-        if (!data.predicted_road_key) {
-          previewEl.style.display = "none";
-          return;
-        }
-
-        previewEl.style.display = "block";
-        badgeEl.textContent = data.predicted_road_label || data.predicted_road_key;
-
-        if (data.suggestions && data.suggestions.length) {
-          const labels = data.suggestions.map(s => s.label || s.key);
-          hintEl.textContent = `Similar buckets seen: ${labels.join(", ")}`;
-        } else {
-          hintEl.textContent = "";
-        }
-
-        ambEl.innerHTML = "";
-        if (data.ambiguity_options && data.ambiguity_options.length) {
-          const btns = data.ambiguity_options
-            .map(opt =>
-              `<button type="button" data-opt="${opt}"
-                style="margin-right:8px; padding:6px 10px; border-radius:999px; border:1px solid #d1d5db; background:#fff; cursor:pointer; font-weight:700;">
-                ${opt}
-              </button>`
-            )
-            .join("");
-
-          ambEl.innerHTML = `Did you mean: ${btns}`;
-
-          ambEl.querySelectorAll("button[data-opt]").forEach(b => {
-            b.addEventListener("click", () => {
-              roadEl.value = b.getAttribute("data-opt") || roadEl.value;
-              refreshPreview();
-            });
-          });
-        }
-      }
-
-      function schedulePreview() {
-        if (t) clearTimeout(t);
-        t = setTimeout(refreshPreview, 200);
-      }
-
-      // Visual formatting (safe because inputs are type="text")
-      function stripToNumeric(str) {
-        return (str || "").replace(/[^\d.]/g, "");
-      }
-
-      function applyMph(el) {
-        const v = stripToNumeric(el.value);
-        if (v) el.value = `${v} mph`;
-      }
-
-      function applyDollar(el) {
-        const v = stripToNumeric(el.value);
-        if (v) el.value = `$${v}`;
-      }
-
-      function stripField(el) {
-        el.value = stripToNumeric(el.value);
-      }
-
-      postedEl.addEventListener("blur", () => applyMph(postedEl));
-      ticketedEl.addEventListener("blur", () => applyMph(ticketedEl));
-
-      [postedEl, ticketedEl].forEach(el => {
-        el.addEventListener("focus", () => stripField(el));
+    if (!map) {
+      map = new google.maps.Map(document.getElementById("pinMap"), {
+        center,
+        zoom,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
       });
-
-      // Before submit: strip formatting so Flask validators receive clean numbers
-      formEl.addEventListener("submit", (e) => {
-        stripField(postedEl);
-        stripField(ticketedEl);
-
-        // Client-side guard to prevent confusing "grey/no photo" results.
-        // Server still validates, this just gives immediate feedback.
-        if (photoEl && photoEl.files && photoEl.files.length) {
-          const name = (photoEl.files[0].name || "").toLowerCase();
-          const ext = name.includes(".") ? name.split(".").pop() : "";
-          if (!allowedPhotoExts.includes(ext)) {
-            e.preventDefault();
-            alert(`Unsupported photo format: .${ext || "?"}. Please upload JPG/JPEG or PNG (iPhone HEIC not supported yet).`);
-          }
-        }
+      marker = new google.maps.Marker({
+        position: center,
+        map,
+        draggable: true,
       });
+    } else {
+      map.setCenter(center);
+      map.setZoom(zoom);
+      marker.setPosition(center);
+    }
+  }
+  editPinLink?.addEventListener("click", (e) => { e.preventDefault(); openPinModal(); });
 
-      if (photoEl) {
-        photoEl.addEventListener("change", () => {
-          if (!photoSelectedEl) return;
-          if (!photoEl.files || !photoEl.files.length) {
-            photoSelectedEl.textContent = "";
-            return;
-          }
-          const f = photoEl.files[0];
-          const name = f.name || "(selected)";
-          photoSelectedEl.textContent = `Selected: ${name}`;
-        });
+  pinModalBackdrop?.addEventListener("click", closePinModal);
+  cancelPinBtn?.addEventListener("click", closePinModal);
+
+  routeClassGrid?.addEventListener('click', (e) => {
+    const btn = e.target?.closest?.('button.route-card');
+    if (!btn) return;
+    const val = (btn.getAttribute('data-val') || '').trim();
+    const hid = document.getElementById('route_class');
+    if (hid) hid.value = val;
+
+    routeClassGrid.querySelectorAll('button.route-card').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+  });
+
+
+  async function fetchJsonWithTimeout(url, options, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const r = await fetch(url, { ...options, signal: controller.signal });
+      const text = await r.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+
+      if (!r.ok) {
+        const msg = (data && (data.error || data.message)) || text || `HTTP ${r.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  async function confirmLocation(lat, lng) {
+    return await fetchJsonWithTimeout(
+      "/api/confirm_location",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          lat,
+          lng,
+          route_class: (document.getElementById('route_class')?.value || '').trim()
+        }),
+      },
+      15000
+    );
+  }
+
+  savePinBtn?.addEventListener("click", async () => {
+    if (!marker) return;
+
+    const pos = marker.getPosition();
+    const rawLat = pos.lat();
+    const rawLng = pos.lng();
+
+    savePinBtn.disabled = true;
+    pinModalMsg.textContent = "Confirming…";
+    try {
+      const data = await confirmLocation(rawLat, rawLng);
+      if (!data.ok) {
+        pinModalMsg.textContent = "Could not confirm location. Try again.";
+        savePinBtn.disabled = false;
+        return;
       }
 
-      stateEl.addEventListener("input", schedulePreview);
-      roadEl.addEventListener("input", schedulePreview);
-    </script>
+      // Hidden fields (WTForms hidden_tag)
+      if (rawLatEl) rawLatEl.value = String(data.raw_lat ?? rawLat);
+      if (rawLngEl) rawLngEl.value = String(data.raw_lng ?? rawLng);
+      if (latEl) latEl.value = String(data.snapped_lat ?? rawLat);
+      if (lngEl) lngEl.value = String(data.snapped_lng ?? rawLng);
+
+      if (roadEl) roadEl.value = data.road_name || "Map pin";
+      roadEl.readOnly = true;
+
+pinConfirmed = true;
+if (pinStatus) {
+  pinStatus.style.display = "";
+  pinStatus.textContent = `Location confirmed. Road: ${roadEl.value}`;
+}
+if (roadWrap) roadWrap.style.display = "";
+if (pinPreviewWrap && pinPreviewImg) {
+  const z = cityCenter ? 12 : 5;
+  pinPreviewImg.src = `/api/staticmap?lat=${encodeURIComponent(latEl.value)}&lng=${encodeURIComponent(lngEl.value)}&zoom=${z}&w=700&h=360`;
+  pinPreviewWrap.style.display = "";
+}
+if (step2Next) step2Next.textContent = "Looks good: add photo (optional)";
+
+closePinModal();
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : "";
+      pinModalMsg.textContent = `Could not confirm location. ${msg}`.trim();
+    } finally {
+      savePinBtn.disabled = false;
+    }
+  });
+
+  // Final guard on submit
+  formEl?.addEventListener("submit", (e) => {
+    if (!validateStep1()) { e.preventDefault(); showStep(1); return; }
+    if (!validateStep2()) { e.preventDefault(); showStep(2); return; }
+  });
+
+  showStep(1);
+</script>
+
 {% endblock %}

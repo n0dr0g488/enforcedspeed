@@ -1,8 +1,9 @@
 # forms.py
 import re
+import datetime
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
-from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField, HiddenField
+from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField, HiddenField, SelectField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError, Email, EqualTo, Regexp
 
 US_STATE_CODES = {
@@ -128,26 +129,72 @@ class SpeedReportForm(FlaskForm):
 
 class RegisterForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email(), Length(max=255)])
+
     username = StringField(
-        "Username",
+        "Desired username",
         validators=[
             DataRequired(),
-            Length(min=3, max=20),
+            # Keep usernames short and consistent across the site.
+            Length(min=3, max=12, message="Username must be 3–12 characters."),
             Regexp(r"^[A-Za-z0-9_]+$", message="Username can only use letters, numbers, and underscores."),
         ],
-        render_kw={"placeholder": "e.g., fastticketguy"},
+        # No placeholder example (per UX standardization).
+        render_kw={"maxlength": "12"},
     )
-    password = PasswordField("Password", validators=[DataRequired(), Length(min=8, max=128)])
+
+    # Birthday (FB-style dropdowns)
+    birth_month = SelectField("Birthday", choices=[], validators=[DataRequired(message="Please select your birth month.")])
+    birth_day = SelectField("", choices=[], validators=[DataRequired(message="Please select your birth day.")])
+    birth_year = SelectField("", choices=[], validators=[DataRequired(message="Please select your birth year.")])
+
+    password = PasswordField("New password", validators=[DataRequired(), Length(min=8, max=128)])
     confirm_password = PasswordField(
         "Confirm Password",
         validators=[DataRequired(), EqualTo("password", message="Passwords must match.")],
     )
     submit = SubmitField("Create Account")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Choices + defaults (today's date prefilled, like FB)
+        today = datetime.date.today()
+        month_choices = [(str(i), datetime.date(2000, i, 1).strftime("%b")) for i in range(1, 13)]
+        self.birth_month.choices = month_choices
+
+        self.birth_day.choices = [(str(i), str(i)) for i in range(1, 32)]
+
+        # 120-year range, newest first
+        this_year = today.year
+        self.birth_year.choices = [(str(y), str(y)) for y in range(this_year, this_year - 121, -1)]
+
+        # Prefill today's date so users understand the layout
+        if not self.birth_month.data:
+            self.birth_month.data = str(today.month)
+        if not self.birth_day.data:
+            self.birth_day.data = str(today.day)
+        if not self.birth_year.data:
+            self.birth_year.data = str(today.year)
+
+    def validate_birth_year(self, field):
+        # Validate age >= 18
+        try:
+            y = int(self.birth_year.data)
+            m = int(self.birth_month.data)
+            d = int(self.birth_day.data)
+            dob = datetime.date(y, m, d)
+        except Exception:
+            raise ValidationError("Please select a valid birth date.")
+
+        today = datetime.date.today()
+        age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if age < 18:
+            raise ValidationError("You must be at least 18 years old to create an account.")
+
 
 class LoginForm(FlaskForm):
     email = StringField("Username or Email", validators=[DataRequired(), Length(max=255)])
-    password = PasswordField("Password", validators=[DataRequired()])
+    password = PasswordField("New password", validators=[DataRequired()])
     submit = SubmitField("Log In")
 
 
@@ -188,3 +235,29 @@ class CommentForm(FlaskForm):
 class DeleteCommentForm(FlaskForm):
     """CSRF-protected empty form for deleting a comment."""
     submit = SubmitField("Delete")
+
+
+# County-first single-page submit (v229+)
+class SubmitTicketForm(FlaskForm):
+    state = HiddenField("State", validators=[DataRequired()])  # STUSPS
+
+    county_query = StringField("County", validators=[DataRequired()], render_kw={"autocomplete": "off"})
+    county_geoid = HiddenField("County GEOID", validators=[DataRequired()])
+
+    road_name = StringField("Road", validators=[DataRequired()])
+
+    posted_speed = IntegerField("Posted Speed", validators=[DataRequired(), NumberRange(min=1, max=200)])
+    ticketed_speed = IntegerField("Ticketed Speed", validators=[DataRequired(), NumberRange(min=1, max=200)])
+
+    # Optional pin (validated server-side to be within the selected county polygon)
+    # NOTE: Template + submit handler use lat/lng; keep latitude/longitude for backward compatibility.
+    lat = HiddenField("Latitude")
+    lng = HiddenField("Longitude")
+    latitude = HiddenField("Latitude (legacy)")
+    longitude = HiddenField("Longitude (legacy)")
+
+    caption = TextAreaField("Caption", validators=[Length(max=500)])
+
+    photo = FileField("Photo")
+
+    submit = SubmitField("Submit Ticket")

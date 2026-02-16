@@ -1,0 +1,12 @@
+ENFORCEDSPEED CHANGELOG — v261–v270
+
+v270 (2026-02-07)
+- Fix filter rail HTML corruption that rendered raw CSS/HTML text in the sidebar and at page top.
+- Fix State dropdown crash (25P02) by validating county GEOID inputs and adding db.session.rollback() on caught DB exceptions (prevents poisoned sessions).
+- Make County filter behave correctly: submit on suggestion click, clear county when State changes, and apply county_geoid filter to /home + /api/map_pins + strictness calculations.
+- Polish ticket card date: ensure it renders once, right-aligned under pills via flex-wrap/justify fixes.
+
+v269 (2026-02-07)
+- Fix CSS accidentally rendering as text at the top of the page (style tag placement).
+- Remove duplicated bottom-of-card timestamp; show timestamp right-aligned under pills in the header.
+- Keeps county filter sidebar markup clean (was being broken by the CSS spill).

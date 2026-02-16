@@ -1,0 +1,56 @@
+CHANGELOG v241–v250
+
+v241 (2026-02-07)
+- Fix Flask BuildError: restore canonical endpoint name 'submit' for /submit GET so templates using url_for('submit') work.
+- No UX/layout changes; submit POST endpoint remains submit_post.
+
+v242 — 2026-02-07
+- Fixed BuildError for missing 'strictness' endpoint by restoring server-rendered /strictness page (endpoint name preserved).
+- Added compatibility endpoints: bucket_tickets (/bucket), result (/result/<id>), submit_ticket (/submit-ticket) to prevent template/url_for crashes.
+- Added minimal report_detail.html for legacy profile "View report" links.
+
+v243 — 2026-02-07
+- Fix submit page crash: submit_ticket.html expects (code, name) tuples but app was passing a list of strings.
+- Added STATE_PAIRS [("MO", "Missouri"), ...] and pass it to submit templates; also pass default_st for hidden field fallback.
+
+v244 — 2026-02-07
+- Fix submit page Jinja error: SubmitTicketForm lacked form.lat/form.lng fields expected by submit_ticket.html.
+- Added lat/lng hidden fields (kept legacy latitude/longitude for backward compatibility) and aligned caption length validator to 500 (matches DB + template).
+- Submit POST now falls back to legacy latitude/longitude if present.
+
+v245 — 2026-02-07
+- Web submit page: replaced horizontal state chip rail with a state autocomplete input (accepts 2-letter code or full state name; normalizes to STUSPS).
+- Fixed submit state drift: removed duplicate hidden fields caused by form.hidden_tag() + manual <input name="state">; now render CSRF token only and keep one authoritative hidden state field.
+- Improved county UX: county search now respects selected state reliably; Enter key no longer accidentally submits the form and instead selects the top county suggestion when available.
+- Layout: submit page is centered in the standard "wrap" column to align with the site’s centered feed width.
+
+v246 — 2026-02-07
+- Restored missing county API endpoints required by the county autocomplete UI: /api/counties (st + q) and /api/county/<geoid>.
+- /api/counties performs fast name_norm prefix search scoped to the selected state (STUSPS) with a contains-match fallback.
+- County autocomplete now returns results like "Prince William County" when state=VA.
+
+v247 — 2026-02-07
+- Added web “Place a pin” modal using Google Maps JS on the submit page.
+- Added /api/county_geom/<geoid> to return county GeoJSON + centroid for centering.
+- Added server-side PostGIS validation (ST_Covers) when a pin is provided.
+
+v248 — 2026-02-07
+- Fix county boundary/centering in pin picker: counties import script uses `center` column but API expected `centroid`.
+- ensure_counties_schema now supports BOTH `center` and legacy `centroid` columns and keeps them in sync.
+- /api/county_geom now centers using COALESCE(center, centroid, ST_PointOnSurface(geom)).
+- Pin validation is now NULL-safe: if geom is missing for a county, we don’t falsely reject pins.
+
+v249 — 2026-02-07
+- Pin picker UX: enable mouse-wheel zoom without holding Ctrl (Google Maps gestureHandling=greedy).
+- Pin picker UX: allow click-to-move pin and drag-to-adjust pin (marker draggable + dragend updates; clicks on county polygon also move pin).
+- Fix submit POST DB error on evolved schemas: set hard defaults for verify_attempts/ocr_status/verification_status/is_deleted on insert.
+- Schema bootstrap hardening: enforce DEFAULT + NOT NULL for verify_attempts/is_deleted/ocr_status/verification_status when possible (best-effort).
+
+
+v250 — 2026-02-07
+- Ticket card map: switch feed hero map to a county-bounds static map (always fits full county) with blue county outline, plus optional user pin marker.
+- Photo pill UX: implement Option 2 single-pill status on the feed (Photo … / Photo ✓ / Photo !) and remove the old “Photo Submitted/Unsubmitted” + extra OCR pills.
+- Photo pipeline robustness: store a placeholder photo_key immediately on submit when a file is provided so the feed shows Photo … even if upload/queue is still in-flight; mark failed uploads as failed:<id>.
+- Ticket card: display caption text when present.
+- Refine pin modal (feed): enable mouse-wheel zoom without Ctrl (gestureHandling=greedy) and support both click-to-move and drag-to-adjust pin.
+- Thank-you page copy updated to match the single Photo status pill.

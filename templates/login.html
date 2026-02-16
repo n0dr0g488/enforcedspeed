@@ -39,10 +39,10 @@
         <label for="password">{{ form.password.label.text }}</label>
         {{ form.password(id="password", autocomplete="current-password") }}
 
-        {{ form.submit(class_="btn") }}
+        <button type="submit" class="es-btn" style="width:50%; max-width:320px; min-width:200px; height:44px; display:block; margin:14px auto 0; font-weight:600;">Log In</button>
       </form>
 
-      <div class="subtle">
+      <div class="subtle" style="margin-top:18px; text-align:center;">
         New here? <a href="{{ url_for('register', next=request.args.get('next')) }}">Create an account</a>.
         · <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
         · <a href="{{ url_for('home') }}">Back home</a>

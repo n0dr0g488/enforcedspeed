@@ -41,3 +41,13 @@ v192 — 2026-01-31 — Mobile comments + public profiles API parity
 v191 — 2026-01-31 — JWT iat timestamp fix (mobile auth unblocks)
 - Fix JWT "iat" generation to use timezone-aware UTC (prevents tokens being rejected as "not yet valid" on non-UTC machines).
 - Add small JWT decode leeway (30s) to tolerate minor clock skew.
+
+
+v200 — 2026-01-31
+- Road autocomplete proxy: treat bounds as strong bias (no strictbounds unless strict=1).
+- Normalize interstate shorthand (I-95 / I 95) to improve suggestions.
+- Keep Places status/error surfacing for faster debugging.
+
+
+v223 (2026-02-05)
+- County import: fix GDAL docker image reference (use ghcr.io/osgeo/gdal:alpine-small-latest).

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="wrap">
+  <div class="card">
+    <div class="toprow">
+      <div>
+        <div class="subtle">Report #{{ report.id }}</div>
+        <div style="margin-top:6px;">
+          {% if state_code %}<span class="pill">{{ state_code }}</span>{% endif %}
+          {% if road_label %}<span class="pill">{{ format_road_bucket(road_label) }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div style="margin-top: 10px;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div style="margin-top: 16px;">
+      <div class="subtle">Posted speed</div>
+      <div style="font-weight:600; font-size:18px;">{{ report.posted_speed }} mph</div>
+
+      <div class="subtle" style="margin-top:10px;">Ticketed speed</div>
+      <div style="font-weight:600; font-size:18px;">{{ report.ticketed_speed }} mph</div>
+
+      <div class="subtle" style="margin-top:10px;">Overage</div>
+      <div style="font-weight:600; font-size:18px;">
+        {% if report.ticketed_speed and report.posted_speed and report.ticketed_speed > report.posted_speed %}
+          +{{ (report.ticketed_speed - report.posted_speed) }} mph
+        {% else %}
+          0 mph
+        {% endif %}
+      </div>
+
+      <div class="subtle" style="margin-top:10px;">Submitted by</div>
+      <div>
+        {% if username %}
+          <a href="{{ url_for('profile', username=username) }}" style="color:inherit; text-decoration:none;">{{ username }}</a>
+        {% else %}
+          Anonymous
+        {% endif %}
+      </div>
+
+      <div class="subtle" style="margin-top:10px;">When</div>
+      <div class="subtle">
+        {{ report.created_at.strftime('%Y-%m-%d %H:%M') if report.created_at else "" }}
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-top:18px;">
+      <a href="{{ url_for('home') }}">Home</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,49 @@
+ENFORCEDSPEED — CHANGELOG v211–220
+
+v211 (2026-02-01)
+- Step 2 (Web UI): replaced the Yes/No interstate/highway toggle with 3 required road-type selections: Interstate (I-XX), US Route (US XX), Other (state + local roads).
+- Step 2 (Web UX): no default selection; user must pick one before opening the pin map or confirming location.
+- API: /api/confirm_location now accepts route_class (interstate / us_route / other) and strictly matches the snapped road type; returns a specific error if no matching road type is found.
+- Map modal: opens slightly more zoomed out to make it easier to place the pin.
+
+v212 (2026-02-01)
+- Route-type UI uses normalized PNG icons (Interstate / Route / Street) instead of letter badges.
+- Backend route_class buckets updated to: interstate | numbered | local (and automatically maps older us_route → numbered and other → local).
+
+
+v213 (2026-02-01)
+- Moved route type selection to Step 1 (after city/state).
+- Route cards now show state-specific example roads (fetched from /api/route_examples).
+- Step 2 flow updated: primary button opens map first ("Next: place pin on map"), then shows a static map preview and changes to "Looks good: add photo (optional)".
+- Added /api/route_examples endpoint (samples recent distinct roads per route bucket).
+
+v214 (2026-02-01)
+- Fix: /api/route_examples was incorrectly defined at module scope; moved/indented it inside create_app() so the app factory boots cleanly.
+
+v215 — 2026-02-02
+- Fix /api/route_examples indentation so app boots (route examples endpoint inside create_app).
+v216 (2026-02-02)
+- Submit (web): removed route examples text and /api/route_examples.
+- Submit (web): moved Road type selector to bottom of Step 1 (after speeds).
+- Submit (web): Step 1 Next now jumps straight to the pin modal; Step 2 button is now “Looks good: add photo (optional)”.
+- Submit (web): fixed pin preview image overflow (constrained inside card).
+- Submit (web): normalized route icon sizing (interstate + street slightly larger).
+
+
+v217 (2026-02-02)
+- Web submit: Step 1 “Next: place pin on map” now opens the pin map immediately (no redundant second click).
+- Web submit: Increased Interstate and Street icon scaling to improve legibility.
+
+v218 (2026-02-02)
+- Web pin edit: “Edit pin” now re-opens the map centered on the previously confirmed pin (instead of resetting to the city center).
+- Web pin confirm: added request timeout + better error handling so “Confirming…” won’t hang indefinitely on slow/blocked Google responses.
+
+v219 (2026-02-04)
+- ZIP 1 County GIS foundation: added PostGIS-backed counties table (geom + center point) with indexes and non-fatal boot-time schema ensure.
+- Added county API endpoints for autocomplete by state and lookup by GEOID: /api/counties and /api/county/<geoid>.
+- Added Docker-based import scripts (PowerShell + Bash) to load cb_2024_us_county_500k counties shapefile into Postgres/PostGIS.
+\n=== v220 (2026-02-05) — County import SSL mode fix (local PostGIS) ===\n- Fix: PowerShell county import script now supports local Postgres (sslmode=disable) and Render (sslmode=require) automatically.\n- No functional app changes.\n
+
+
+v223 (2026-02-05)
+- County import: fix GDAL docker image reference (use ghcr.io/osgeo/gdal:alpine-small-latest).

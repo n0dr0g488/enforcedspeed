@@ -73,7 +73,29 @@
     }
       .header-nav{justify-content:flex-start; flex-wrap:wrap; row-gap:8px;}
     }
-  </style>
+  
+/* v263: constrain feed card map + refine pin button */
+.ticket-staticmap-wrap{position:relative;width:100%;max-width:100%;overflow:hidden;border-radius:14px;}
+.ticket-staticmap{display:block;width:100%;max-width:100%;height:auto;}
+.ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:3;background:rgba(255,255,255,0.95);border:1px solid #e6e9ef;border-radius:999px;padding:6px 10px;font-size:13px;line-height:1;cursor:pointer;}
+.ticket-pin-refine:hover{background:#fff;}
+
+
+
+/* v271: statistics rows (county stats) */
+.stat-list{margin:0;padding-left:18px;}
+.stat-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #e5e7eb;}
+.stat-place{font-weight:600;color:#111;line-height:1.25;}
+.stat-place a{color:inherit;text-decoration:none;}
+.stat-place a:hover{text-decoration:underline;}
+.stat-metrics{white-space:nowrap;font-weight:600;color:#111;}
+.stat-tickets{font-weight:500;opacity:.75;margin-left:6px;}
+@media (max-width: 560px){
+  .stat-row{flex-direction:column;align-items:flex-start;}
+  .stat-metrics{white-space:normal;}
+}
+
+</style>
 </head>
 <body>
   <header class="site-header">
@@ -100,7 +122,7 @@
         <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">Home</a>
         <a href="{{ url_for('map_view') }}" class="{{ 'active' if request.endpoint=='map_view' else '' }}">Map</a>
         <a href="{{ url_for('submit') }}" class="{{ 'active' if request.endpoint=='submit' else '' }}">Submit a Ticket</a>
-        <a href="{{ url_for('strictness') }}" class="{{ 'active' if request.endpoint=='strictness' else '' }}">Rankings</a>
+        <a href="{{ url_for('strictness') }}" class="{{ 'active' if request.endpoint=='strictness' else '' }}">Statistics</a>
 
         {% if current_user.is_authenticated %}
           <a class="nav-user {{ 'active' if request.endpoint=='profile' else '' }}" href="{{ url_for('profile', username=current_user.username) }}">
@@ -121,13 +143,6 @@
       </nav>
     </div>
   </header>
-
-  <div class="global-legal-notice" role="note" aria-label="Legal notice">
-    <div class="global-legal-notice__inner">
-      LEGAL NOTICE: Posted speed limits are the law. Obey posted speed limits. EnforcedSpeed is informational only.
-    </div>
-  </div>
-
   {% block content %}{% endblock %}
 
   <footer class="footer">
@@ -172,5 +187,99 @@
       });
     })();
   </script>
+
+<script>
+(function(){
+  function setupCountyFilterAutocomplete(){
+    const input = document.getElementById('filter-county');
+    const hidden = document.getElementById('filter-county-geoid');
+    const box = document.getElementById('filter-county-suggestions');
+    const stateSel = document.getElementById('filter-state');
+
+    if(!input || !box) return;
+
+    function getStateAbbr(){
+      const v = stateSel ? (stateSel.value || '') : '';
+      // state value is like "VA - Virginia" or "" for all
+      return (v || '').split(' - ')[0].trim();
+    }
+
+    function clearSuggestions(){
+      box.style.display = 'none';
+      box.innerHTML = '';
+    }
+
+    function setSelected(item){
+      input.value = item.namelsad || item.name || '';
+      if(hidden) hidden.value = item.geoid || '';
+      clearSuggestions();
+      const form = input.closest('form');
+      if(form) form.submit();
+    }
+
+    let lastController = null;
+    input.addEventListener('input', async function(){
+      const q = (input.value || '').trim();
+      if(hidden) hidden.value = ''; // reset unless user clicks a suggestion
+      if(q.length < 2){
+        clearSuggestions();
+        return;
+      }
+      const st = getStateAbbr();
+      if(!st){
+        box.innerHTML = '<div class="filter-suggestion-item"><div>Select a state first.</div><div class="filter-suggestion-muted">County search requires a state.</div></div>';
+        box.style.display = 'block';
+        return;
+      }
+
+      try{
+        if(lastController) lastController.abort();
+        lastController = new AbortController();
+        const url = `/api/counties?st=${encodeURIComponent(st)}&q=${encodeURIComponent(q)}`;
+        const resp = await fetch(url, {signal:lastController.signal});
+        if(!resp.ok) throw new Error('bad response');
+        const data = await resp.json();
+        const counties = (data && data.counties) ? data.counties : [];
+        if(!counties.length){
+          box.innerHTML = '<div class="filter-suggestion-item">No matches</div>';
+          box.style.display = 'block';
+          return;
+        }
+        box.innerHTML = counties.map(c => {
+          const label = (c.namelsad || c.name || '').replace(/</g,'&lt;');
+          return `<div class="filter-suggestion-item" data-geoid="${c.geoid}" data-namelsad="${label}">${label}</div>`;
+        }).join('');
+        box.style.display = 'block';
+      }catch(e){
+        // ignore abort
+        if(String(e).includes('AbortError')) return;
+        clearSuggestions();
+      }
+    });
+
+    box.addEventListener('click', function(e){
+      const el = e.target.closest('.filter-suggestion-item');
+      if(!el) return;
+      setSelected({ geoid: el.getAttribute('data-geoid'), namelsad: el.getAttribute('data-namelsad') });
+    });
+
+    document.addEventListener('click', function(e){
+      if(e.target === input || box.contains(e.target)) return;
+      clearSuggestions();
+    });
+
+    if(stateSel){
+      stateSel.addEventListener('change', function(){
+        if(hidden) hidden.value = '';
+        input.value = '';
+        clearSuggestions();
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', setupCountyFilterAutocomplete);
+})();
+</script>
+
 </body>
 </html>

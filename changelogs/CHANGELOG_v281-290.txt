@@ -1,0 +1,37 @@
+CHANGELOG (v281–v290)
+
+v281 — 2026-02-08
+- Feed county static-map preview: zooms a bit closer so the county outline fills more of the square preview.
+- Feed county static-map preview: de-cluttered map (POI/transit off) so more roads/road detail is visible.
+
+v282 — 2026-02-08
+- Feed county static-map preview: switched zoom computation to emulate the interactive map’s fitBounds padding (+1 zoom nudge) so county outlines frame tighter (closer to edges) like the Map page.
+
+v283 — 2026-02-08
+- Fix: resolved Python syntax error in county_static_map_url() zoom nudge line (unmatched parenthesis) so app boots normally.
+v284 — 2026-02-08
+- Feed county static-map preview: guarded the “+1 zoom” nudge so it only applies when the county bbox still fits with padding (prevents the outline from getting slightly too tight / edge-clippy compared to interactive map).
+
+v285 — 2026-02-08
+- Feed county static-map preview: use a gentler county boundary simplification and a higher point budget so the blue outline matches the interactive map silhouette much more closely (still exterior ring only; no holes).
+- Feed county static-map preview: compute bbox from the same exterior ring we draw (so zoom framing matches the actual outline).
+- Feed county static-map preview: adjust zoom “nudge” logic to allow a tighter edge margin (pad=12) so the outline sits closer to the square edges without clipping.
+
+v286 — 2026-02-08
+- Feed county static-map preview: hard-nudge zoom +1 level (capped) from the current computed fit zoom for quick tuning toward edge-filling framing (per user request).
+
+v287 — 2026-02-08
+- Feed county static-map preview: compute a continuous (fractional) fit-to-frame zoom and simulate the fractional part by requesting a slightly smaller Static Maps image and scaling it up in the square container (maximizes the county outline without edge clipping).
+- Feed county static-map preview: match interactive map styling — black outline with very subtle interior fill (still exterior ring only; no holes).
+
+v288 — 2026-02-08
+- Feed county static-map preview: reduce county outline stroke weight to match interactive map thickness (Static Maps path weight 3 → 2). Zoom logic unchanged.
+
+
+v289 — 2026-02-08
+- Feed county static-map preview: reduce county outline stroke weight by 1 (2 → 1) to better match interactive map.
+- Feed county static-map preview: increase interior fill opacity by ~15% (alpha 0x14 → 0x17) for slightly more visible shading. Zoom logic unchanged.
+
+
+v290 — 2026-02-08
+- Static Maps red pin: reduce marker size to offset fractional-zoom upscaling (set markers size:small). Applies to feed static previews and /api/staticmap proxy.

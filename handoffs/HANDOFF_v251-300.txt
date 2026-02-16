@@ -1,0 +1,1187 @@
+ENFORCEDSPEED — HANDOFF LOG (Web)
+
+Bundled handoff archive for v251–v300.
+This file consolidates historical handoff notes/scripts to reduce root-folder clutter.
+Source files were moved from project root into /handoffs.
+
+
+================================================================================
+FILE: HANDOFF_v270.txt
+================================================================================
+
+ENFORCEDSPEED v270 HANDOFF (Web)
+
+SOURCE ZIP BASED ON: EnforcedSpeed_v269_2026-02-07_county_filter_css_date_fix
+
+What was fixed
+1) Filter rail “garbage text” regression
+- Root cause: malformed HTML in templates (broken <label> tag + missing wrapper close) caused the browser to render fragments of markup as visible text.
+- Fix: repaired the County filter block and restored the Posted speed limit block boundary.
+
+2) State dropdown crash: “current transaction is aborted… (25P02)”
+- Root cause: county label input was being submitted as ?county=... (not a GEOID). The server helper treated it as a GEOID and executed a SELECT that referenced a non-existent column (st), raising an exception and poisoning the SQLAlchemy session; subsequent DISTINCT state query then threw 25P02.
+- Fix:
+  - County GEOID validation (must match 5 digits) before querying.
+  - Correct counties table columns (namelsad/stusps).
+  - db.session.rollback() added on caught DB exceptions in helper + key routes/APIs.
+
+3) County filter behavior
+- Visible county input no longer submits a “label string” (it has no name attribute). Only county_geoid is submitted.
+- Selecting a county suggestion submits the form immediately.
+- Changing State clears county input + hidden county_geoid.
+- County filter now actually filters results:
+  - /home feed query
+  - /api/map_pins
+  - strictness calculations
+
+4) Ticket card date polish
+- Ensured date renders once and sits right-aligned under the pills (restored flex-wrap + justify-content on the pills container).
+
+Files changed
+- app.py
+- templates/base.html
+- templates/home_feed.html
+- templates/map_page.html
+- templates/strictness.html
+- CHANGELOG_v261-270.txt
+- VERSION.txt
+
+How to test (local)
+1) Home feed:
+- No raw CSS/HTML text at the top of the page.
+- No broken fragments under County.
+- Select a State => page loads normally (no 25P02).
+- Type 2+ letters in County (with a State selected) => suggestions appear; click one => filters apply.
+- Date appears once per card, top-right under pills.
+
+2) Map page:
+- Same filter rail: County autocomplete works; selecting a county changes pins (calls /api/map_pins with county_geoid).
+
+3) Strictness page:
+- County filter affects strictness rows (same county_geoid filter).
+
+Reminder
+- “Going live” = git add/commit/push → Render deploy.
+
+================================================================================
+FILE: HANDOFF_v271_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) — v271
+
+SOURCE OF TRUTH ZIP (base): EnforcedSpeed_v270_2026-02-07_filter_state_date_fix.zip
+This ZIP: EnforcedSpeed_v271_2026-02-07_statistics_map_legal_notice.zip
+
+What changed:
+1) Rankings → Statistics
+- Nav label updated to “Statistics”.
+- Added /statistics alias route that redirects to /strictness.
+- Route name and code endpoint remain strictness to avoid breaking links.
+
+2) Statistics page is now county-based
+- Title inside page: “County Statistics”.
+- Grouping is by (state, county_geoid), using median overage (ticketed-posted) for tickets where ticketed>posted.
+- Clean one-line rows (no pills): “Virginia, Fairfax County” → right-aligned “+X mph (N tickets)”.
+- County name links to /map with that county filter pre-applied.
+
+3) County click → Map focus
+- Map page now detects county_geoid in URL.
+- It attempts to load county geometry from /api/county_geom/<geoid> (requires counties.geom in DB).
+  - If geom exists: draws boundary overlay + fitBounds to county.
+  - If geom does not exist: still shows only county pins; fitBounds will be based on pins.
+
+4) Global notice only on Home
+- Notice removed from all pages except Home.
+- Text now: “Posted speed limits are the law. Obey posted speed limits.”
+
+How to test:
+- Home: confirm the notice appears only on Home and nowhere else.
+- Nav: confirm “Statistics” shows in header and opens the former Rankings page.
+- Statistics: lists counties (full state name + county). No pills.
+- Click a county: opens Map page filtered to that county.
+  - If counties.geom is populated, you should see the county outline + auto-zoom.
+
+Next likely work:
+- Improve Map page right column: show ticket list for pins currently in view / filtered.
+- Build a dedicated County page (optional) if you want more than Map focus.
+
+================================================================================
+FILE: HANDOFF_v272_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) — v272
+
+SOURCE OF TRUTH ZIP (base): EnforcedSpeed_v271_2026-02-07_statistics_map_legal_notice.zip
+This ZIP: EnforcedSpeed_v272_2026-02-07_map_square_flush_disclaimer_zoom.zip
+
+What changed:
+1) Feed card map preview: full-bleed + square
+- Static map on each ticket card is now flush with the card edges (no side padding).
+- Map preview is now square (requests 640x640 and uses aspect-ratio 1:1).
+
+2) Map page: full-bleed + square
+- The interactive map is now flush with its card edges (card padding removed; header kept padded).
+- Map container uses a square aspect ratio with max-height 72vh.
+
+3) County zoom: a little closer
+- When a county boundary is loaded, fitBounds now uses small padding and then nudges zoom +1 (tighter county framing).
+
+4) Legal notice merge
+- Removed the separate top banner “Posted speed limits are the law. Obey posted speed limits.”
+- Home page “Important” disclaimer now begins with:
+  “Posted speed limits are the law. Obey posted speed limits.: ...”
+
+How to test:
+- Home: confirm no separate top banner; Important line starts with the new sentence.
+- Feed: map preview is square + flush with the card edges.
+- Map: map canvas is square + flush; selecting a county zooms slightly tighter than before.
+
+Files changed:
+- templates/base.html
+- templates/home_feed.html
+- templates/map_page.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+- HANDOFF_v272_NEXT.txt
+
+================================================================================
+FILE: HANDOFF_v273_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) — v273
+
+Base ZIP (source of truth): v272
+This ZIP/version: v273
+
+What changed in v273
+- Reverted the feed static map preview from full-bleed back to the normal in-card container (padding + rounded border) while keeping a square aspect ratio.
+- Reverted the Map page interactive map from full-bleed back to the normal in-card container (padding + rounded border) while keeping a square aspect ratio.
+
+Files changed
+- templates/home_feed.html
+- templates/map_page.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+How to test
+1) Home feed:
+   - Each ticket’s map preview should be square.
+   - The map preview should NOT be flush to the card edges (should respect the card padding and have rounded corners).
+2) Map tab:
+   - The main interactive map should be square.
+   - The map should NOT be flush to the card edges (title + map both sit within the card padding; map canvas has rounded corners).
+3) County zoom behavior:
+   - Clicking a county from Statistics should still take you to Map, filter pins, and zoom into the county (and boundary highlight appears when geom exists).
+
+Reminders
+- County-based only (no road snapping, no road autocomplete).
+- Keep Pin/Photo checkmark conventions.
+- Do not reintroduce the removed “90% of submitted tickets occur ≥ X mph” sentence.
+
+================================================================================
+FILE: HANDOFF_v274_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF v274 (Web)
+
+SOURCE ZIP: EnforcedSpeed_v273_2026-02-07_map_square_not_flush.zip
+GOAL: Make feed map preview truly square.
+
+What was wrong:
+- Feed map preview was still not square because global CSS in templates/_mvp_styles.html forced .ticket-staticmap-wrap to height/max-height 320px.
+- Our aspect-ratio: 1/1 rule existed but could not apply while a fixed height was set.
+
+Fix:
+- templates/_mvp_styles.html: removed fixed height/max-height and added aspect-ratio: 1/1 + height:auto/max-height:none.
+- templates/home_feed.html: added height:auto/max-height:none to .ticket-staticmap-wrap rule as a belt-and-suspenders override.
+
+How to test:
+1) Open Home feed.
+2) Confirm the map preview is square (height equals width) while remaining inside the card padding (not full-bleed).
+
+================================================================================
+FILE: HANDOFF_v275_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web)
+Version: v275 (based ONLY on v274)
+Focus: Square *container* for feed static map preview; map image fits inside (not forced square)
+
+What changed
+- Feed static map preview now uses a square frame (ticket-staticmap-wrap stays aspect-ratio 1/1).
+- The map image itself is NOT forced square: it is requested as 640x480 and displayed with object-fit: contain.
+  Result: the container is square; the map scales to fit inside without cropping (letterbox background uses the frame background).
+
+Files changed
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+How to test
+1) Run site.
+2) Home feed: each ticket map preview frame should be square (same height as width).
+3) Map image inside should be fully visible (no cropping) and may show letterbox background top/bottom.
+
+================================================================================
+FILE: HANDOFF_v276_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v276
+Focus: FB-style media sizing — square *container* includes map + actions, map becomes shorter
+
+SOURCE OF TRUTH ZIP: EnforcedSpeed_v276_2026-02-08_square_media_container.zip
+
+What changed
+- Feed ticket “media” region is now a square block that includes:
+  - Static county map (top)
+  - Like/likes-count/Comment action row (bottom)
+  - Optional caption (bottom, clamped to 2 lines) when a map exists
+- This makes the map itself less tall (no longer forced square) while keeping the overall media area square.
+
+Files changed
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+How to test
+1) Run locally, open Home feed.
+2) On a ticket with a map:
+   - The “media” block (map + actions) should be square.
+   - The map itself should be shorter (not square).
+   - Like / 0 likes / Comment sits inside the square under the map.
+   - If the ticket has a caption, it appears inside the square under the actions (max 2 lines), and does NOT duplicate below.
+3) On a ticket without a map:
+   - Actions row and caption behavior should remain unchanged.
+
+Notes / constraints
+- County-based only (no road snapping, no road autocomplete).
+- Keep Pin/Photo checkmark conventions; Verified wording already fixed.
+- Do not reintroduce the old “90% of submitted tickets…” sentence.
+
+================================================================================
+FILE: HANDOFF_v277_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v277
+Focus: Make the FB-style “square media block” stay perfectly square (container never grows)
+
+SOURCE OF TRUTH ZIP: EnforcedSpeed_v277_2026-02-08_square_media_block_strict_square.zip
+
+What was wrong
+- In v276, the media container was set to aspect-ratio: 1/1, but the footer content could still force the element to grow taller than it was wide (so visually it was not square when measured by the outer edges).
+
+What changed
+- Switched the feed media block to a strict flex-column layout:
+  - The container stays square via aspect-ratio: 1/1.
+  - The map region uses flex: 1 and automatically shrinks to make room for the footer.
+- Clamped the footer height with overflow hidden so the square never expands.
+- Kept the map inside the normal card padding (not full-bleed).
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+How to test
+1) Run locally and open Home feed.
+2) Pick a ticket with a map + caption:
+   - Measure the *outer border* of the media block (map + action row + caption): it should be square.
+   - The map itself should be shorter (not square) to compensate.
+3) Confirm caption is not duplicated elsewhere.
+
+Notes / constraints
+- County-based only (no road snapping, no road autocomplete).
+- Keep Pin/Photo checkmark conventions; Verified wording already fixed.
+- Do not reintroduce the old “90% of submitted tickets…” sentence.
+
+================================================================================
+FILE: HANDOFF_v278_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v278
+Base: EnforcedSpeed_v277_2026-02-08_square_media_block_strict_square.zip
+Goal: FB-style square map frame without pulling Like/Comment into the frame
+
+What changed
+1) Feed map preview
+- The *frame/container around the map only* is now square (aspect-ratio 1:1).
+- Like / likes count / Comment + caption remain BELOW the map (outside the square), per user feedback.
+- The map image is allowed to be less tall inside the square (object-fit: contain), so it does not feel oversized/tall.
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+How to test
+- Home feed: measure the outer border of the MAP FRAME only — it should be square.
+- Like / Comment row should be below the map frame (not inside it).
+- Map itself should appear slightly shorter inside the square (letterboxing is expected).
+
+================================================================================
+FILE: HANDOFF_v279_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v279
+Focus: Feed map preview square frame fills correctly (remove gray gap)
+
+What was wrong
+- The feed map preview frame was square, but the static map image was requested at 640×480.
+- Because the image was 4:3 and rendered with object-fit: contain inside a 1:1 frame, it produced a large gray letterbox area at the bottom and made the "square" look broken.
+
+Fix
+- Request the static map image as 640×640 in the feed (home_feed.html), so the map fills the square frame cleanly.
+- Like/Comment stays below the map (not inside the map frame).
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v271-280.txt
+
+How to test
+1) Run locally, open Home feed.
+2) Confirm the map preview area has NO large gray blank region.
+3) Confirm the map preview frame measures square by outer edges.
+4) Confirm Like/Comment is below the map as before.
+
+================================================================================
+FILE: HANDOFF_v281_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web)
+Version shipped: v281 (based on v279)
+Focus: County preview map fills more + shows more roads, still square map preview.
+
+SOURCE OF TRUTH ZIP (base): EnforcedSpeed_v279_2026-02-08_square_mapframe_fill.zip
+
+What changed
+1) County feed static map preview zoom
+- Updated county_static_map_url() to compute center + zoom from the county bbox (instead of using Static Maps 'visible' corners).
+- Uses a small padding (1.03) so the county outline fills more of the square preview without clipping.
+
+2) Road visibility
+- Added Static Maps styles to hide POIs and transit layers so roads stand out more.
+
+Files changed
+- app.py
+- VERSION.txt
+- CHANGELOG_v281-290.txt (new)
+- HANDOFF_v281_NEXT.txt (this file)
+
+How to test
+- Home feed: the county outline should fill more of the square preview.
+- Home feed: more road detail/labels should be visible at this tighter zoom.
+
+Notes
+- The preview remains square because templates/home_feed.html still requests width=640,height=640.
+
+================================================================================
+FILE: HANDOFF_v282_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED v282 — COUNTY PREVIEW TIGHTER FRAMING (WEB)
+
+Goal
+- Make the Home feed county preview frame match the Map page county framing (fitBounds + 24px padding + zoom +1).
+- User observed Map page county outline (black) is framed perfectly; feed preview (blue) still had too much margin.
+
+Changes
+- app.py:
+  - Added _zoom_for_bbox_pxpad() to emulate Google Maps JS fitBounds padding in the static-map zoom math.
+  - county_static_map_url() now uses pad_px=24 and then nudges zoom +1 (capped at 18), matching map_page.html behavior.
+
+Files changed
+- app.py
+- VERSION.txt
+- CHANGELOG_v281-290.txt
+
+How to test
+- Home feed: county outline (blue) should sit much closer to the square preview edges.
+- Compare to Map page filtered to same county: framing should be very similar.
+
+================================================================================
+FILE: HANDOFF_v283_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED v283 — FIX v282 SYNTAX ERROR (WEB)
+
+Problem
+- v282 fails to boot with:
+  SyntaxError: unmatched ')'
+  app.py line ~556 inside county_static_map_url() zoom nudge.
+
+Root cause
+- A leftover fragment from the older _zoom_for_bbox(...) call was accidentally appended to the zoom nudge line, creating an unmatched parenthesis.
+
+Fix
+- app.py:
+  - Corrected the zoom nudge to a single valid line:
+    zoom = min(int(zoom) + 1, 18)
+
+Notes
+- No logic changes beyond the syntax fix; v282’s fitBounds-style zoom math remains intact.
+- County preview should now frame tighter like the interactive Map page.
+
+How to test
+1) Run locally (es-up / es-app).
+2) Load Home feed and confirm the app boots without syntax error.
+3) Verify feed county preview framing looks tighter (closer to edges) than before.
+
+================================================================================
+FILE: HANDOFF_v284_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) — v284
+
+Source ZIP: v283 (county preview fitBounds fix)
+Goal: Make feed county static-map preview match interactive map framing without being slightly too tight.
+
+Change:
+- app.py: county_static_map_url() now only applies the “+1 zoom” nudge if the bbox still fits inside the (width,height) viewport after fitBounds-style padding.
+  This mirrors the intent of interactive map (tight framing) but avoids edge-clipping/touching when integer zoom rounding would overshoot for the static image size.
+
+Files changed:
+- app.py
+- VERSION.txt (v284)
+- CHANGELOG_v281-290.txt
+- HANDOFF_v284_NEXT.txt
+
+How to test:
+- Home feed: county outline should sit close to edges but not touch/crop.
+- Compare with Map page filtered to same county: framing should be much closer.
+
+================================================================================
+FILE: HANDOFF_v285_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) — v285
+
+SOURCE OF TRUTH BASE: EnforcedSpeed_v284_2026-02-08_county_preview_nudge_guard (no drift)
+ZIP VERSION/FOLDER: EnforcedSpeed_v285_2026-02-08_county_preview_outline_zoom_tune
+
+What changed
+1) Feed boundary shape: closer match to interactive map
+- app.py: `_county_bbox_and_outline_polyline(geoid)`
+  - Switched to a gentler PostGIS simplification for the feed preview:
+    `ST_SimplifyPreserveTopology(geom, 0.0025)` (old: 0.01)
+  - Still draws EXTERIOR RING ONLY (no holes).
+  - Increased point budget (target ~420 points) with a URL-length guard (auto increases sampling step if encoded polyline is too long).
+  - Computes the bbox from the same exterior ring we draw, so zoom framing matches the actual outline (instead of using ST_Extent from the full raw geometry).
+
+2) Feed zoom: “happy middle” between too tight and too loose
+- app.py: `county_static_map_url(...)`
+  - Base zoom still computed with fitBounds-style padding: pad=24.
+  - The +1 zoom nudge is now allowed if the bbox fits with a tighter margin (pad=12) so the outline sits closer to the square edges without clipping.
+
+Files changed
+- app.py
+- VERSION.txt (v285)
+- CHANGELOG_v281-290.txt (added v285 entry)
+- HANDOFF_v285_NEXT.txt (this file)
+
+How to test
+1) Start local normally (es-up / es-app).
+2) Home feed: find a ticket with a county boundary preview.
+   - The blue outline should look noticeably closer to the interactive county silhouette.
+   - The outline should sit closer to the square edges than v284, without getting clipped.
+3) Click into the county (Map filtered view).
+   - Interactive boundary (black) remains the source of truth (full geometry).
+   - Feed preview is still an exterior-ring preview, but should be visually much closer now.
+
+Notes / reminders
+- Interactive boundary: from our DB via `/api/county_geom/<geoid>` (not a Google/TIGER boundary API call).
+- Feed preview: intentionally simplified exterior ring only to keep Static Maps URLs manageable.
+
+================================================================================
+FILE: HANDOFF_v286_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v286
+
+Base ZIP: v285 (no drift)
+Goal: quick zoom tuning for feed county static-map preview (square map) — user requested “just zoom in 1 level” from current behavior.
+
+What changed
+- app.py: county_static_map_url() now applies an unconditional +1 zoom nudge (capped at 18) after computing the base zoom (pad=24). This is intentionally a simple test knob, even if it may be slightly tight for some counties.
+- VERSION.txt: v286
+- CHANGELOG_v281-290.txt: added v286 entry
+
+How to test
+1) Run locally (es-up / es-app).
+2) Home feed: check county static preview framing — outline should sit closer to edges than v285.
+3) Compare against interactive map framing for the same county.
+
+If too tight/clipping
+- Reduce the nudge (remove +1) or implement a “fit check” guard (like previous experiments).
+
+================================================================================
+FILE: HANDOFF_v287_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v287
+
+Base ZIP: v286 (no drift)
+Goal: Make the Home feed county static-map preview frame “like the interactive map” by:
+- Using a continuous (fractional) fit-to-frame zoom (instead of integer zoom guessing + pad tweaks).
+- Simulating the missing fractional zoom for Static Maps by requesting a smaller image and scaling it up in the square container.
+- Styling the county boundary to match interactive: black outline + very subtle interior shading (no holes; exterior ring only).
+
+What changed
+- app.py
+  - county_static_map_url():
+    - Replaced the old integer-only fit + manual nudges with:
+      - Continuous fit zoom calculation (Web Mercator) using the county bbox and a small pixel pad.
+      - zoom_int = floor(z*) for Static Maps
+      - fractional part simulated by shrinking the requested `size=` (req_w/req_h) and letting the browser scale up to the square container.
+    - County outline styling changed from blue stroke to:
+      - black stroke (color:0x000000ff)
+      - subtle fill (fillcolor:0x00000014)
+- VERSION.txt: v287
+- CHANGELOG_v281-290.txt: added v287 entry
+
+How to test
+1) Run locally (es-up / es-app).
+2) Home feed:
+   - County preview outline should be maximized inside the square map (tight to edges but not clipped).
+   - Outline should be black with very subtle interior shading.
+3) Compare with interactive map filtered to the same county:
+   - Silhouette should match closely (feed is exterior ring only; interactive may show interior holes/enclaves).
+
+Notes
+- This does NOT add any new DB columns or precomputed per-county settings; it’s purely runtime math + Static Maps request sizing.
+
+================================================================================
+FILE: HANDOFF_v288_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) — v288
+SOURCE ZIP: v287
+GOAL: Adjust static county preview outline thickness to match interactive map while preserving the new perfect fractional zoom.
+
+What changed in v288
+- app.py: county_static_map_url() Static Maps path weight reduced from 3 → 2 (black outline now thinner, closer to interactive).
+- VERSION.txt: v288
+- CHANGELOG_v281-290.txt: added v288 entry
+
+How to test
+1) Run as usual (es-up / es-app).
+2) Home feed: compare a county preview against the interactive map filtered to that same county.
+   - Zoom/framing should be identical to v287 (still perfect).
+   - Outline thickness should be visibly thinner and closer to the interactive black boundary line.
+
+================================================================================
+FILE: HANDOFF_v289_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF (Web) v289
+
+SOURCE ZIP: v288
+OUTPUT ZIP: EnforcedSpeed_v289_2026-02-08_static_border_shade_tune.zip
+
+Change summary
+- Static county preview (home feed): stroke weight decreased (2 → 1) to match interactive thickness.
+- Static county preview (home feed): fill shading increased ~15% (alpha 0x14 → 0x17) for slightly stronger interior tint.
+- Continuous + fractional zoom logic preserved exactly (do not revert).
+
+Files changed
+- app.py
+- VERSION.txt
+- CHANGELOG_v281-290.txt
+
+Test
+1) Run app, open Home feed.
+2) Compare a county outline vs Map page: border should be thinner; interior shading slightly more visible.
+3) Confirm zoom framing unchanged from v287/v288 (still the “perfect” framing).
+
+================================================================================
+FILE: HANDOFF_v290_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v290_2026-02-08_small_pin.zip
+Workflow: ZIP-first, no-drift. Base all changes on v290 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+WHAT CHANGED IN v290
+1) Static Maps pin size
+- Reduced the red pin size on Google Static Maps by adding `markers=size:small|...`.
+- This offsets the fractional-zoom preview technique (which enlarges the raster slightly when scaled up).
+- Applies to:
+  - Feed static previews (static_map_url / county_static_map_url)
+  - /api/staticmap proxy (mobile clients) so pins stay consistent.
+
+FILES CHANGED
+- app.py
+- VERSION.txt (v290)
+- CHANGELOG_v281-290.txt (added v290 entry)
+- HANDOFF_v290_NEXT.txt
+
+HOW TO TEST
+1) Run v290 normally.
+2) Home feed: confirm county static preview still frames perfectly, and the red pin is smaller / closer to “normal.”
+3) Confirm nothing else regressed on feed cards (pills/date/etc.).
+
+IMPORTANT — STATIC COUNTY PREVIEW (DO NOT REVERT)
+We now have a “perfect” county static preview framing approach:
+- Compute continuous Web Mercator fit-to-frame zoom for the county bbox.
+- Use `zoom_int = floor(zoom_float)` (Static Maps integer-only).
+- Simulate fractional zoom by requesting a smaller square image size and scaling it up in CSS.
+- Use `scale=2` for sharpness.
+- Outline uses exterior ring only (no holes) and matches interactive styling (black outline + subtle shaded fill).
+This approach is locked in and must be included in future handoffs.
+
+COUNTY-BASED REMINDER
+- EnforcedSpeed is county-based (not road-focused). Do NOT add road snapping or road autocomplete.
+
+================================================================================
+FILE: HANDOFF_v291-300.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF LOG (Web)
+
+Consolidated handoff notes for v291–v300.
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v291_2026-02-08_home_pill_pin_orange_county_link.zip
+Workflow: ZIP-first, no-drift. Base all changes on v291 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+STANDING DECISIONS (DO NOT REGRESS)
+- County-based (not road-focused). No road snapping/autocomplete.
+- Static feed county preview MUST keep the “continuous + fractional zoom” method for NON-pin tickets.
+- Feed preview outline style: black border + subtle shaded fill; exterior ring only (no holes).
+- Keep Pin/Photo checkmark conventions and current Verified wording.
+- Do NOT reintroduce the removed “90% … ≥ X mph” sentence.
+
+WHAT CHANGED IN v291
+1) Home feed: speed pill above pin (PIN tickets only)
+- When location_source is user_pin or user_pin_snapped:
+  - The feed Static Maps preview centers on the pin (marker sits at the image center).
+  - The “84 in a 65 (+XX mph)” pill shifts to an above-the-marker position (no overlap).
+- Non-pin tickets keep the existing county-framed preview and pill placement unchanged.
+
+2) Home feed: overage color
+- The (+XX mph) text inside the speed pill is now orange.
+
+3) Home feed: county link
+- The county name in the ticket card metadata line is now a link.
+- Clicking it routes to the interactive Map filtered to that county (state + county_geoid), matching the Statistics page.
+
+FILES CHANGED
+- app.py
+- templates/home_feed.html
+- VERSION.txt (v291)
+- CHANGELOG_v291-300.txt (added v291 entry)
+- HANDOFF_v291_NEXT.txt
+
+HOW TO TEST (v291)
+Home feed
+1) Find a ticket with a user pin (Pin ✓ pill present).
+   - Confirm the static map is centered on the marker.
+   - Confirm the speed pill is above the marker (not overlapping).
+2) Find a ticket WITHOUT a user pin (no Pin ✓ pill).
+   - Confirm the static county preview framing is unchanged (fractional zoom method preserved).
+   - Confirm the speed pill stays at the original/top position.
+3) Confirm the (+XX mph) overage text in the speed pill is orange.
+4) Click the county name in the card submeta line.
+   - You should land on the interactive Map page filtered to that county.
+   - County boundary highlighted; pins filtered to that county.
+
+------------------------------------------------------------------------
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v292_2026-02-08_static_retina_integer_zoom_default_pin.zip
+Workflow: ZIP-first, no-drift. Base all changes on v292 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+STANDING DECISIONS (DO NOT REGRESS)
+- County-based (not road-focused). No road snapping/autocomplete.
+- Feed static county preview overlay style: black border + subtle shaded fill; exterior ring only (no holes).
+- Keep Pin/Photo checkmark conventions and current Verified wording.
+- Don’t reintroduce the removed “90% … ≥ X mph” sentence.
+- Feed static previews: prefer crisp roads/labels (retina request + CSS downscale) over fractional-zoom size-scaling hacks.
+
+v292 Summary — 2026-02-08
+Goal: Make feed Static Maps previews look “premium” (crisper road labels, less giant attribution), and restore the default Google pin (white-dot marker).
+
+What changed
+1) Feed Static Maps rendering (county_static_map_url in app.py)
+- Removed the “fractional zoom via smaller requested size + CSS upscale” trick.
+- Now uses:
+  - integer zoom (fit math) + a small padding factor (pad_pct)
+  - requests the full width/height you ask for
+  - keeps scale=2 (retina) so the browser naturally downsamples to the card size → sharper roads/labels and less “huge” Google text
+- When center_on_pin=True (pin-based tickets), zoom uses symmetric spans around the pin so the county outline stays in-frame even if the pin is near an edge.
+
+2) Feed preview image size
+- home_feed.html now requests a 4:3 static image (640x480) to match the .ticket-staticmap-wrap aspect-ratio (4/3), avoiding object-fit cropping artifacts.
+
+3) Default pin restored
+- Static Maps marker strings no longer use size:small or size:tiny; we use the default Google marker so the white-dot marker renders correctly.
+
+FILES CHANGED
+- app.py
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v292_NEXT.txt (this file)
+
+TEST CHECKLIST
+Home feed (pick multiple tickets)
+A) Non-pin ticket
+- County preview loads and framing looks consistent (slight breathing room).
+- Road names/labels look crisper than before.
+- Google attribution text no longer feels “huge.”
+- Speed pill remains in its default position.
+
+B) Pin ticket (location_source=user_pin or user_pin_snapped)
+- Marker is centered in the preview.
+- Speed pill is positioned above the marker (not overlapping).
+- County outline is still visible (auto zoom-out if pin is near county edge).
+
+C) Marker style
+- Pin is the default Google marker (with the white dot), not the tiny/small dotless version.
+
+Regression
+- County boundary styling remains black outline + subtle fill, exterior ring only.
+- No road snapping/autocomplete logic reintroduced.
+
+------------------------------------------------------------------------
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v293_2026-02-08_fix_indenterror.zip
+Workflow: ZIP-first, no-drift. Base all changes on v293 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+STANDING DECISIONS (DO NOT REGRESS)
+- County-based (not road-focused). No road snapping/autocomplete.
+- Static feed county preview MUST keep the “integer zoom + padding + scale=2” approach (no fractional-size upscale hack).
+- Feed preview outline style: black border, subtle shaded fill, exterior ring only (no holes).
+- Keep Pin/Photo checkmark conventions and current Verified wording.
+- Don’t reintroduce the removed “90% … ≥ X mph” sentence.
+
+v293 CHANGE SUMMARY
+- Fix only: corrected indentation in `county_static_map_url()` (app.py) that caused the site to fail to boot in v292.
+
+FILES CHANGED
+- app.py
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v293_NEXT.txt
+
+TEST CHECKLIST
+1) Start locally (`es-up`).
+2) Open Home feed:
+   - Maps load (no server crash).
+   - Non-pin tickets: county-framed preview still looks consistent and sharp (scale=2, integer zoom).
+   - Pin tickets: map centers on pin; speed pill sits above marker.
+3) Verify road labels look crisp and attribution isn’t “blown up” (we no longer upscale images).
+
+------------------------------------------------------------------------
+
+ENFORCEDSPEED — HANDOFF v294 (Web)
+
+Goal: Fix feed map letterboxing + pinmode pill alignment after switching to retina static maps.
+
+Source of truth: built from v293 only.
+
+What changed
+1) Feed static map request is now square (640x640) to match the square media frame.
+   - Removes the big blank/letterboxed area.
+2) Pinmode speed pill sits above the default Google marker (bigger vertical offset).
+3) Static map image is centered within the frame (object-position:center), keeping pin/pill alignment deterministic.
+
+Test checklist
+- Open Home feed on a pin-based ticket:
+  - Map fills the square frame (no large blank area).
+  - Marker is centered; speed pill sits above the marker with a small gap.
+- Open Home feed on a non-pin ticket:
+  - Default pill placement remains at the top.
+- Verify road labels look crisp (scale=2) and the Google attribution is not comically large.
+
+------------------------------------------------------------------------
+
+ENFORCEDSPEED — HANDOFF v295 (Web)
+
+Goal: Submit page UX polish (state default none, county preview on selection, pin/photo incentive copy) + home disclaimer copy + consolidate handoffs.
+
+Source of truth: built from v294 only.
+
+What changed
+1) Submit a Ticket
+   - State no longer defaults to MO; the page starts with no state selected unless prefilled via ?st=XX.
+   - Removed “(plain text)” from the Road label.
+   - Intro (title + guidance) moved inside the main card container.
+   - Once a county is selected, a static preview image appears immediately (outlined county).
+   - If a pin is set, the same preview updates to include the pin and centers on it.
+   - Pin section label/button renamed to “Place pin on map”.
+   - Photo + Pin helper text updated to explain the “Photo ✓” / “Pin ✓” pills.
+
+2) Home
+   - Updated the disclaimer copy to the new wording you provided.
+
+3) Logging
+   - Added HANDOFF_v291-300.txt and appended v295 details here (future handoffs should go into this consolidated file).
+
+Files changed
+- app.py
+- templates/submit_ticket.html
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v291-300.txt
+
+Test checklist
+Submit page
+- Load /submit
+  - State is blank (no default selection).
+  - County help prompts you to select a state first.
+- Select a state, then pick a county from the dropdown
+  - Preview appears automatically and shows the county outline.
+- Click “Place pin on map”
+  - Interactive map opens; placing a pin + “Use this pin” closes modal.
+  - Preview updates to show the pin centered inside the county outline.
+  - “Clear pin” appears and works (returns preview to county-only).
+- Photo helper text shows “Photo ✓” pill inline.
+
+Home
+- Disclaimer text matches the updated wording and is not duplicated.
+------------------------------------------------------------------------
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v296_2026-02-14_submit_cleanup_pinzoom_outline_fix.zip
+Workflow: ZIP-first, no-drift. Base all changes on v296 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+What changed (v296)
+1) Submit a Ticket copy/layout cleanup
+- Removed the extra guidance lines:
+  - “County is required. Pin is optional …”
+  - “Pin is optional, but if you set it … (validated on submit).”
+  - “Type a state abbreviation or name (required).”
+  - “Pick a county from the list (required).”
+- Centered the “Submit a Ticket” header and matched the standard page H1 styling.
+- Fixed Caption textarea overflow by enforcing box-sizing + max-width.
+
+2) Pin picker modal consistency
+- County boundary is no longer blue; it uses a black outline + subtle fill (matches site styling).
+- fitBounds now uses padding for more consistent initial framing.
+
+3) Feed zoom stability for pin-centered previews
+- When centering a static preview on a user pin, the zoom stays based on the county bbox (prevents the “zoomed out” feed preview when pins are near the edge of a county).
+
+Files changed
+- templates/submit_ticket.html
+- app.py
+- VERSION.txt (v296)
+- CHANGELOG_v291-300.txt
+- HANDOFF_v291-300.txt
+
+Test checklist (v296)
+Submit page
+- Verify header is centered and matches other pages.
+- Confirm the removed helper lines no longer appear.
+- Confirm Caption textarea stays inside the container at all screen widths.
+- Select a county: preview loads immediately.
+- Open “Place a pin”: county outline is black, not blue; initial zoom/framing is reasonable.
+
+Home feed regression
+- Place/confirm a pin, submit a ticket, then check the feed:
+  - Pin-based preview is centered on the marker, but does NOT zoom way out compared to county-only previews.
+
+------------------------------------------------------------------------
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v297_2026-02-14_submit_layout_tighten.zip
+Workflow: ZIP-first, no-drift. Base all changes on v297 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+What changed (v297)
+Submit a Ticket layout tightening (no functional rule changes)
+- State and County are now on the same row (State narrower, County wider).
+- Road, Posted speed, and Ticketed speed are now on the same row (Road wider).
+- Removed “(optional)” text from the Pin/Photo/Caption labels.
+- Pin + Photo sections now share one row; action buttons are on the right side of their labels.
+- Photo upload uses a custom “Choose file” button (styled to match the pin button) and shows the selected filename.
+- Caption textarea is non-resizable; Cancel button removed.
+- Static county/pin preview image sits between the Pin/Photo row and the Caption/Submit row.
+- Caption and Submit share one row; Submit is bottom-aligned and keeps a normal height.
+
+Files changed
+- templates/submit_ticket.html
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v291-300.txt
+
+Test checklist (v297)
+- /submit
+  - State + County appear on one line (desktop width).
+  - Road + Posted + Ticketed appear on one line (desktop width).
+  - Pin + Photo appear on one line (desktop width).
+  - “Choose file” opens the file picker and shows the filename after selection.
+  - Caption cannot be resized (no corner grabber) and stays inside the card.
+  - Submit button is to the right of Caption; there is no Cancel button.
+  - Selecting a county shows the static preview image; setting/clearing a pin updates the preview.
+
+v298 — 2026-02-14 — Submit layout polish (Option A buttons)
+Summary
+- Balanced required rows (State/County 50/50) and added a subtle divider to separate required vs optional inputs.
+- Simplified optional section copy: removed helper sentences and kept only the Pin ✓ / Photo ✓ pills.
+- Updated Pin control to a compact “Pin” label with a “Map” button.
+- Caption is now a compact 2-line, non-resizable field; Submit matches its height.
+- Introduced shared elevated-outline button class (.es-btn) and used it for Map / Choose file / Submit.
+
+Files changed
+- templates/submit_ticket.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v291-300.txt
+
+Test checklist (v298)
+- /submit
+  - State + County are on one line and are equal width (desktop).
+  - Required section is visually separated from optional section by a subtle divider.
+  - Pin row shows “Pin” with a “Map” button; Photo shows “Photo” with a “Choose file” button.
+  - No helper sentences under Pin/Photo; Pin ✓ and Photo ✓ pills still display.
+  - Caption is ~2 lines tall, cannot be resized (no corner grabber), and Submit matches its height.
+  - County preview still loads on county selection; pin setting/clearing still updates the preview.
+
+v299 (2026-02-14) — Submit layout polish (optional divider + US default preview)
+Changes
+- Pin/Photo pills moved inline with labels; pin button label is now “Map location”.
+- Default preview loads as a US static map until a county is selected.
+- Divider now shows “Optional items below”.
+- Caption and Submit are single-line height.
+
+Test checklist (v299)
+- /submit
+  - Before selecting a county, the preview image shows a US map.
+  - After selecting a county, preview updates to the county outline; after setting a pin, preview updates to show the pin.
+  - Pin/Photo pills appear inline next to labels; “Map location” button works; Choose file still works.
+  - Divider shows “Optional items below”.
+  - Caption and Submit are single-line height and aligned.
+
+================================================================================
+FILE: HANDOFF_v291_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v291_2026-02-08_home_pill_pin_orange_county_link.zip
+Workflow: ZIP-first, no-drift. Base all changes on v291 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+STANDING DECISIONS (DO NOT REGRESS)
+- County-based (not road-focused). No road snapping/autocomplete.
+- Static feed county preview MUST keep the “continuous + fractional zoom” method for NON-pin tickets.
+- Feed preview outline style: black border + subtle shaded fill; exterior ring only (no holes).
+- Keep Pin/Photo checkmark conventions and current Verified wording.
+- Do NOT reintroduce the removed “90% … ≥ X mph” sentence.
+
+WHAT CHANGED IN v291
+1) Home feed: speed pill above pin (PIN tickets only)
+- When location_source is user_pin or user_pin_snapped:
+  - The feed Static Maps preview centers on the pin (marker sits at the image center).
+  - The “84 in a 65 (+XX mph)” pill shifts to an above-the-marker position (no overlap).
+- Non-pin tickets keep the existing county-framed preview and pill placement unchanged.
+
+2) Home feed: overage color
+- The (+XX mph) text inside the speed pill is now orange.
+
+3) Home feed: county link
+- The county name in the ticket card metadata line is now a link.
+- Clicking it routes to the interactive Map filtered to that county (state + county_geoid), matching the Statistics page.
+
+FILES CHANGED
+- app.py
+- templates/home_feed.html
+- VERSION.txt (v291)
+- CHANGELOG_v291-300.txt (added v291 entry)
+- HANDOFF_v291_NEXT.txt
+
+HOW TO TEST (v291)
+Home feed
+1) Find a ticket with a user pin (Pin ✓ pill present).
+   - Confirm the static map is centered on the marker.
+   - Confirm the speed pill is above the marker (not overlapping).
+2) Find a ticket WITHOUT a user pin (no Pin ✓ pill).
+   - Confirm the static county preview framing is unchanged (fractional zoom method preserved).
+   - Confirm the speed pill stays at the original/top position.
+3) Confirm the (+XX mph) overage text in the speed pill is orange.
+4) Click the county name in the card submeta line.
+   - You should land on the interactive Map page filtered to that county.
+   - County boundary highlighted; pins filtered to that county.
+
+================================================================================
+FILE: HANDOFF_v292_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v292_2026-02-08_static_retina_integer_zoom_default_pin.zip
+Workflow: ZIP-first, no-drift. Base all changes on v292 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+STANDING DECISIONS (DO NOT REGRESS)
+- County-based (not road-focused). No road snapping/autocomplete.
+- Feed static county preview overlay style: black border + subtle shaded fill; exterior ring only (no holes).
+- Keep Pin/Photo checkmark conventions and current Verified wording.
+- Don’t reintroduce the removed “90% … ≥ X mph” sentence.
+- Feed static previews: prefer crisp roads/labels (retina request + CSS downscale) over fractional-zoom size-scaling hacks.
+
+v292 Summary — 2026-02-08
+Goal: Make feed Static Maps previews look “premium” (crisper road labels, less giant attribution), and restore the default Google pin (white-dot marker).
+
+What changed
+1) Feed Static Maps rendering (county_static_map_url in app.py)
+- Removed the “fractional zoom via smaller requested size + CSS upscale” trick.
+- Now uses:
+  - integer zoom (fit math) + a small padding factor (pad_pct)
+  - requests the full width/height you ask for
+  - keeps scale=2 (retina) so the browser naturally downsamples to the card size → sharper roads/labels and less “huge” Google text
+- When center_on_pin=True (pin-based tickets), zoom uses symmetric spans around the pin so the county outline stays in-frame even if the pin is near an edge.
+
+2) Feed preview image size
+- home_feed.html now requests a 4:3 static image (640x480) to match the .ticket-staticmap-wrap aspect-ratio (4/3), avoiding object-fit cropping artifacts.
+
+3) Default pin restored
+- Static Maps marker strings no longer use size:small or size:tiny; we use the default Google marker so the white-dot marker renders correctly.
+
+FILES CHANGED
+- app.py
+- templates/home_feed.html
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v292_NEXT.txt (this file)
+
+TEST CHECKLIST
+Home feed (pick multiple tickets)
+A) Non-pin ticket
+- County preview loads and framing looks consistent (slight breathing room).
+- Road names/labels look crisper than before.
+- Google attribution text no longer feels “huge.”
+- Speed pill remains in its default position.
+
+B) Pin ticket (location_source=user_pin or user_pin_snapped)
+- Marker is centered in the preview.
+- Speed pill is positioned above the marker (not overlapping).
+- County outline is still visible (auto zoom-out if pin is near county edge).
+
+C) Marker style
+- Pin is the default Google marker (with the white dot), not the tiny/small dotless version.
+
+Regression
+- County boundary styling remains black outline + subtle fill, exterior ring only.
+- No road snapping/autocomplete logic reintroduced.
+
+================================================================================
+FILE: HANDOFF_v293_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v293_2026-02-08_fix_indenterror.zip
+Workflow: ZIP-first, no-drift. Base all changes on v293 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy (local copying is NOT deploy).
+
+Local startup reminder (Windows):
+- Use `es-up` (preferred) or `es-app`. If the site “hangs/spins,” first verify Docker Desktop is running and the local Postgres container is up (localhost:5433 via C:\ES_INFRA\docker-compose.yml).
+
+STANDING DECISIONS (DO NOT REGRESS)
+- County-based (not road-focused). No road snapping/autocomplete.
+- Static feed county preview MUST keep the “integer zoom + padding + scale=2” approach (no fractional-size upscale hack).
+- Feed preview outline style: black border, subtle shaded fill, exterior ring only (no holes).
+- Keep Pin/Photo checkmark conventions and current Verified wording.
+- Don’t reintroduce the removed “90% … ≥ X mph” sentence.
+
+v293 CHANGE SUMMARY
+- Fix only: corrected indentation in `county_static_map_url()` (app.py) that caused the site to fail to boot in v292.
+
+FILES CHANGED
+- app.py
+- VERSION.txt
+- CHANGELOG_v291-300.txt
+- HANDOFF_v293_NEXT.txt
+
+TEST CHECKLIST
+1) Start locally (`es-up`).
+2) Open Home feed:
+   - Maps load (no server crash).
+   - Non-pin tickets: county-framed preview still looks consistent and sharp (scale=2, integer zoom).
+   - Pin tickets: map centers on pin; speed pill sits above marker.
+3) Verify road labels look crisp and attribution isn’t “blown up” (we no longer upscale images).
+
+================================================================================
+FILE: HANDOFF_v294_NEXT.txt
+================================================================================
+
+ENFORCEDSPEED — HANDOFF v294 (Web)
+
+Goal: Fix feed map letterboxing + pinmode pill alignment after switching to retina static maps.
+
+Source of truth: built from v293 only.
+
+What changed
+1) Feed static map request is now square (640x640) to match the square media frame.
+   - Removes the big blank/letterboxed area.
+2) Pinmode speed pill sits above the default Google marker (bigger vertical offset).
+3) Static map image is centered within the frame (object-position:center), keeping pin/pill alignment deterministic.
+
+Test checklist
+- Open Home feed on a pin-based ticket:
+  - Map fills the square frame (no large blank area).
+  - Marker is centered; speed pill sits above the marker with a small gap.
+- Open Home feed on a non-pin ticket:
+  - Default pill placement remains at the top.
+- Verify road labels look crisp (scale=2) and the Google attribution is not comically large.
+
+================================================================================
+FILE: HANDOFF_v300_NEXT (generated)
+================================================================================
+
+ENFORCEDSPEED — HANDOFF SCRIPT (Web)
+Current ZIP (SOURCE OF TRUTH): EnforcedSpeed_v300_2026-02-14_submit_align_bundle_logs.zip
+Workflow: ZIP-first, no-drift. Base all changes on v300 only.
+ZIP packaging: single top-level root folder named exactly like the ZIP/version.
+“Going live” = git add/commit/push → Render deploy.
+
+What changed in v300
+- Submit Ticket: button label “Map location” → “Set location”.
+- Submit Ticket: grid alignment normalized with a single 12-col grid (State/County 50/50, Road/Posted/Ticketed 50/25/25, Pin/Photo 50/50, Caption/Submit aligned).
+- Submit Ticket: moved Pin ✓ / Photo ✓ pills to the left of their corresponding buttons.
+- Submit Ticket: Posted/Ticketed placeholders now read “e.g. 55 mph” and “e.g. 68 mph”.
+- Handoff logs: moved root HANDOFF_*.txt into /handoffs and bundled v251–v300 into this file.
+
+Test steps
+1) Open /submit and confirm all columns align vertically (State/County, Road/Posted/Ticketed, Pin/Photo, Caption/Submit).
+2) Confirm Pin row shows: Pin | (Pin ✓) | Set location | Clear (hidden until pin set).
+3) Confirm Photo row shows: Photo | (Photo ✓) | Choose file.
+4) Confirm placeholders show “e.g. 55 mph” and “e.g. 68 mph”.
+5) Confirm no HANDOFF_*.txt files remain in project root (now under /handoffs).

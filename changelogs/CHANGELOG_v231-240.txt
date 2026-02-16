@@ -1,0 +1,31 @@
+ENFORCEDSPEED — CHANGELOG (v231–v240)
+
+v231 — 2026-02-06
+- Fix: app.py now instantiates the Flask app (app = create_app()) *before* module-level route decorators for /submit, preventing NameError: app is not defined.
+- Fix: removed duplicate app = create_app() at bottom to avoid double-instantiation.
+
+
+
+=== v234 (2026-02-06) — Fix User.deleted_reports relationship ===
+- Fixed SQLAlchemy mapper error by adding ForeignKey(users.id) to SpeedReport.deleted_by.
+
+- v235 (2026-02-06): Bulletproof schema patching on startup: auto-add missing speed_reports columns (route_class + county fields, etc.) so older local DBs boot without ProgrammingError; also removed duplicate deleted_only query branches.
+
+- v236 (2026-02-06): Add schema bootstrap helpers to proactively ensure speed_reports and counties schemas exist before routes run (factory-safe), reducing "NoneType app" and missing-table issues.
+
+- v237 (2026-02-06): Extend speed_reports startup schema patch to include core numeric fields (posted_speed, ticketed_speed, overage) so legacy local DBs don't crash on homepage queries.
+
+v238 (2026-02-06)
+- Robust schema auto-patch: on app startup, add any missing columns for SpeedReport/User (and Like/Comment when present) so older local Postgres DBs keep working without manual migrations.
+- Moved schema initialization into app context and made it non-fatal (app still runs even if counties bootstrap fails).
+
+v239 (2026-02-07)
+- Fix: define ensure_schema_patches() so create_app() can run.
+- Robust: schema patching now adds missing SpeedReport columns (route_class/overage/verified_by/etc.) using IF NOT EXISTS, to support older local DBs without manual migrations.
+
+v240 (2026-02-07)
+- Fix: add SpeedReport.road_key (plus refresh_road_key) so homepage grouping/filtering no longer crashes.
+- DB bootstrap: ensure_schema now adds/backfills road_key + overage, applies NULL-default backfills, and creates key indexes.
+- Fix: persist OCR pipeline error details via SpeedReport.ocr_error.
+- Worker: clearer Redis connectivity failure messaging (no noisy stack trace); exits cleanly when Redis is down.
+- API: /api/v1/tickets now uses caption + location_source, computes overage, and refreshes road_key.

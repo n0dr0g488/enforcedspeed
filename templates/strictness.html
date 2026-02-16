@@ -8,8 +8,6 @@
       <form method="get" action="{{ url_for('strictness') }}" class="filterbar" id="strictnessFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter Speeding Tickets</div>
-            <div class="filterbox-section">Location</div>
-
             <div class="filterbar-row filterbar-row--stack">
 
               <div class="filterbar-item">
@@ -22,107 +20,83 @@
                 </select>
               </div>
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-road">Road</label>
-                <input id="filter-road" name="road" class="filterbar-input" type="text" value="{{ filter_road or '' }}" placeholder="I-95, US-1, SR-520" autocomplete="off" list="road_suggestions">
-                <datalist id="road_suggestions">
-                  {% for s in road_suggestions %}
-                    <option value="{{ s }}"></option>
-                  {% endfor %}
-                </datalist>
-              </div>
-
-              <div class="filterbox-section">Enforcement</div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
-                {% set ssel = [] %}
-                {% for b in speed_limit_buckets %}
-                  {% if b.value in filter_speed_limit_list and b.value != 'any' %}
-                    {% set _ = ssel.append(b.label) %}
-                  {% endif %}
-                {% endfor %}
-
-                <details class="multi" data-multi>
-                  <summary class="multi-summary">
-                    {% if ssel|length == 0 %}Any{% else %}{{ ssel|join(', ') }}{% endif %}
-                  </summary>
-                  <div class="multi-panel">
-                    {% for b in speed_limit_buckets %}
-                      {% if b.value != 'any' %}
-                        {% set _id = 'sl-' ~ b.value %}
-                        <label class="multi-opt">
-                          <input type="checkbox" id="{{ _id }}" name="speed_limit" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_speed_limit_list %}checked{% endif %}>
-                          <span>{{ b.label }}</span>
-                        </label>
-                      {% endif %}
-                    {% endfor %}
-                    <button type="button" class="multi-done" data-multi-done>Done</button>
-                  </div>
-                </details>
-              </div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label">Overage (mph over)</label>
-                {# Compact multi-select dropdown (no big chip grid). #}
-                {% set sel = [] %}
-                {% for b in over_buckets %}
-                  {% if b.value in filter_over_list %}
-                    {% set _ = sel.append(b.label) %}
-                  {% endif %}
-                {% endfor %}
-
-                <details class="multi" data-multi>
-                  <summary class="multi-summary">
-                    {% if sel|length == 0 %}Any{% else %}{{ sel|join(', ') }}{% endif %}
-                  </summary>
-                  <div class="multi-panel">
-                    {% for b in over_buckets %}
-                      {% if b.value != 'all' %}
-                        {% set _id = 'ov-' ~ b.value %}
-                        <label class="multi-opt">
-                          <input type="checkbox" id="{{ _id }}" name="overage" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_over_list %}checked{% endif %}>
-                          <span>{{ b.label }}</span>
-                        </label>
-                      {% endif %}
-                    {% endfor %}
-                    <button type="button" class="multi-done" data-multi-done>Done</button>
-                  </div>
-                </details>
-              </div>
-
-              <div class="filterbox-section">Evidence</div>
-
-              <div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-photo-only" style="margin:0;">Photo submitted</label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-photo-only" name="photo_only" value="1" {% if filter_photo_only %}checked{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
+                            <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-county">County</label>
+                <div class="filter-autocomplete-wrap">
+                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
+                  <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
+                  <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
                 </div>
+              </div>
 
+<div class="filterbar-item filterbar-item--tight">
                 <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Auto-Extracted</label>
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
                   <label class="switch">
                     <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
                   </label>
                 </div>
               </div>
+<div class="filterbar-item filterbar-item--tight">
+  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
+    <label class="switch">
+      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
 
-              <div class="filterbox-section">Visibility</div>
 
-              <div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous{% if not current_user.is_authenticated %} <span class="filter-inline-note">(must log in)</span>{% endif %}</label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
+
+              <div class="filterbar-item">
+  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
+  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
+    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
+    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
+    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
+    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
+  </select>
+</div>
+
+              <div class="filterbar-item">
+  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
+  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
+    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
+    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
+    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
+    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
+  </select>
+</div>
+              
+              
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-date">Date</label>
+                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
+                  {% for o in date_options %}
+                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-sort">Sort by</label>
+                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
+                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
+                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
+                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
+                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Lower median overage</option>
+                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Higher median overage</option>
+                </select>
+              </div>
+
+              
+
+<div class="filterbar-item filterbar-item--tight">
 {% if is_admin %}
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:8px;">
+                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
                   <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
                   <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
                     <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
@@ -133,29 +107,7 @@
                 {% endif %}
               </div>
 
-              <div class="filterbox-section">Date</div>
-
-              <div class="filterbar-item">
-                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
-                  {% for o in date_options %}
-                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="filterbox-section">Sort by</div>
-
-              <div class="filterbar-item">
-                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
-                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
-                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
-                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
-                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Lower median overage</option>
-                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Higher median overage</option>
-                </select>
-              </div>
-
-              <div class="filterbox-footer">
+<div class="filterbox-footer">
                 <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('strictness') }}">Clear</a>
               </div>
 
@@ -168,61 +120,70 @@
         <a href="{{ url_for('privacy') }}">Privacy</a>
         <span class="dot">·</span>
         <a href="{{ url_for('terms') }}">Terms</a>
+          <span class="dot">·</span>
+          <a href="{{ url_for('cookies') }}">Cookie Policy</a>
       </div>
       <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC</div>
     </div>
   </aside>
 
   <main class="home-center">
-    <div class="card" style="padding:14px;">
-      <div class="submit-title" style="margin:0 0 2px;">Median Overage Rankings</div>
-      <div class="submit-note" style="margin:0 0 12px;">Rankings based on median ticketed speed over posted speed.</div>
-
-      <div class="blocks">
-          <div class="block">
-            <strong>Lower Median Overage</strong>
-            <ol>
-              {% for i in range(20) %}
-                {% if i < most_strict|length %}
-                  {% set r = most_strict[i] %}
-                  <li>
-                    <span class="pill">{{ r.state }}</span>
-                    <span class="pill">{{ format_road_bucket(r.road) }}</span>
-	                    <br>
-                    +{{ '%.1f'|format(r.median_overage) }} mph <a class="action-link" href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
-                  </li>
-                {% else %}
-                  <li class="subtle">Waiting for more data…</li>
-                {% endif %}
-              {% endfor %}
-            </ol>
-          </div>
-
-          <div class="block">
-            <strong>Higher Median Overage</strong>
-            <ol>
-              {% for i in range(20) %}
-                {% if i < least_strict|length %}
-                  {% set r = least_strict[i] %}
-                  <li>
-                    <span class="pill">{{ r.state }}</span>
-                    <span class="pill">{{ format_road_bucket(r.road) }}</span>
-	                    <br>
-                    +{{ '%.1f'|format(r.median_overage) }} mph <a class="action-link" href="{{ url_for('bucket_tickets', state=r.state, road=r.road) }}">(tickets: {{ r.tickets }})</a>
-                  </li>
-                {% else %}
-                  <li class="subtle">Waiting for more data…</li>
-                {% endif %}
-              {% endfor %}
-            </ol>
-          </div>
-        </div>
-
+  <div class="card" style="padding:14px;">
+    <div style="margin-bottom:14px; text-align:center;">
+      <h1 style="margin:0;">County Statistics</h1>
+      <div class="subtle" style="margin-top:6px; font-size:14px;">Based on median ticketed speed over posted speed</div>
     </div>
-  </main>
+
+    <div class="blocks">
+      <div class="block">
+        <strong>Lower median overage</strong>
+        <ol class="stat-list">
+          {% for i in range(20) %}
+            {% if i < most_strict|length %}
+              {% set r = most_strict[i] %}
+              <li class="stat-row">
+                <div class="stat-place">
+                  <span class="stat-state">{{ r.state_name }}</span>,
+                  <a class="stat-county" href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a>
+                </div>
+                <div class="stat-metrics">
+                  +{{ '%.1f'|format(r.median_overage) }} mph <span class="stat-tickets">({{ r.tickets }} tickets)</span>
+                </div>
+              </li>
+            {% else %}
+              <li class="subtle">Waiting for more data…</li>
+            {% endif %}
+          {% endfor %}
+        </ol>
+      </div>
+
+      <div class="block">
+        <strong>Higher median overage</strong>
+        <ol class="stat-list">
+          {% for i in range(20) %}
+            {% if i < least_strict|length %}
+              {% set r = least_strict[i] %}
+              <li class="stat-row">
+                <div class="stat-place">
+                  <span class="stat-state">{{ r.state_name }}</span>,
+                  <a class="stat-county" href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a>
+                </div>
+                <div class="stat-metrics">
+                  +{{ '%.1f'|format(r.median_overage) }} mph <span class="stat-tickets">({{ r.tickets }} tickets)</span>
+                </div>
+              </li>
+            {% else %}
+              <li class="subtle">Waiting for more data…</li>
+            {% endif %}
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+
+  </div>
+</main>
 
 </div>
-
 
 <script>
   // Multi-select dropdown behavior (speed limit + overage):

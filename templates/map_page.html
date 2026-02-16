@@ -8,9 +8,6 @@
         <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter Speeding Tickets</div>
-
-            <div class="filterbox-section">Location</div>
-
             <div class="filterbar-row filterbar-row--stack">
 
               <div class="filterbar-item">
@@ -23,104 +20,59 @@
                 </select>
               </div>
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-road">Road</label>
-                <input id="filter-road" name="road" class="filterbar-input" type="text" value="{{ filter_road or '' }}" placeholder="I-95, US-1, SR-520" autocomplete="off">
-              </div>
-
-              <div class="filterbox-section">Enforcement</div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
-                {% set ssel = [] %}
-                {% for b in speed_limit_buckets %}
-                  {% if b.value in filter_speed_limit_list and b.value != 'any' %}
-                    {% set _ = ssel.append(b.label) %}
-                  {% endif %}
-                {% endfor %}
-
-                <details class="multi" data-multi>
-                  <summary class="multi-summary">
-                    {% if ssel|length == 0 %}Any{% else %}{{ ssel|join(', ') }}{% endif %}
-                  </summary>
-                  <div class="multi-panel">
-                    {% for b in speed_limit_buckets %}
-                      {% if b.value != 'any' %}
-                        {% set _id = 'sl-' ~ b.value %}
-                        <label class="multi-opt">
-                          <input type="checkbox" id="{{ _id }}" name="speed_limit" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_speed_limit_list %}checked{% endif %}>
-                          <span>{{ b.label }}</span>
-                        </label>
-                      {% endif %}
-                    {% endfor %}
-                    <button type="button" class="multi-done" data-multi-done>Done</button>
-                  </div>
-                </details>
-              </div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label">Overage (mph over)</label>
-                {% set sel = [] %}
-                {% for b in over_buckets %}
-                  {% if b.value in filter_over_list %}
-                    {% set _ = sel.append(b.label) %}
-                  {% endif %}
-                {% endfor %}
-
-                <details class="multi" data-multi>
-                  <summary class="multi-summary">
-                    {% if sel|length == 0 %}Any{% else %}{{ sel|join(', ') }}{% endif %}
-                  </summary>
-                  <div class="multi-panel">
-                    {% for b in over_buckets %}
-                      {% if b.value != 'all' %}
-                        {% set _id = 'ov-' ~ b.value %}
-                        <label class="multi-opt">
-                          <input type="checkbox" id="{{ _id }}" name="overage" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_over_list %}checked{% endif %}>
-                          <span>{{ b.label }}</span>
-                        </label>
-                      {% endif %}
-                    {% endfor %}
-                    <button type="button" class="multi-done" data-multi-done>Done</button>
-                  </div>
-                </details>
-              </div>
-
-              <div class="filterbox-section">Evidence</div>
-
-              <div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-photo-only" style="margin:0;">Photo submitted</label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-photo-only" name="photo_only" value="1" {% if filter_photo_only %}checked{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
+                            <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-county">County</label>
+                <div class="filter-autocomplete-wrap">
+                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
+                  <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
+                  <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
                 </div>
+              </div>
 
+<div class="filterbar-item filterbar-item--tight">
                 <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Auto-Extracted</label>
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
                   <label class="switch">
                     <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
                   </label>
                 </div>
               </div>
-
-              <div class="filterbox-section">Visibility</div>
-
-              <div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous{% if not current_user.is_authenticated %} <span class="filter-inline-note">(must log in)</span>{% endif %}</label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
+<div class="filterbar-item filterbar-item--tight">
+  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
+    <label class="switch">
+      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
+      <span class="slider"></span>
+    </label>
+  </div>
 </div>
 
-              <div class="filterbox-section">Date</div>
+
 
               <div class="filterbar-item">
+  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
+  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
+    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
+    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
+    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
+    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
+  </select>
+</div>
+
+              <div class="filterbar-item">
+  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
+  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
+    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
+    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
+    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
+    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
+  </select>
+</div>
+              
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-date">Date</label>
                 <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
                   {% for o in date_options %}
                     <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
@@ -128,18 +80,32 @@
                 </select>
               </div>
 
-              <div class="filterbox-section">Sort by</div>
-
               <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-sort">Sort by</label>
                 <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
                   <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
-                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
+                  <option value="most_over" {% if filter_sort in ['most_over', 'least_strict'] %}selected{% endif %}>Highest overage</option>
                   <option value="least_over" {% if filter_sort == 'least_over' or filter_sort == 'least_strict' %}selected{% endif %}>Least over</option>
                 </select>
               </div>
 
-              <div class="filterbox-footer">
+              
+
+<div class="filterbar-item filterbar-item--tight">
+{% if is_admin %}
+                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+                  <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
+                  <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
+                    <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
+                    <option value="include" {% if deleted_mode == 'include' %}selected{% endif %}>Include</option>
+                    <option value="only" {% if deleted_mode == 'only' %}selected{% endif %}>Only</option>
+                  </select>
+                </div>
+                {% endif %}
+              </div>
+
+<div class="filterbox-footer">
                 <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('map_view') }}">Clear</a>
               </div>
 
@@ -151,15 +117,17 @@
 
     <main class="home-center">
       <div class="card ticket-card" style="padding:14px;">
-        <div class="submit-title" style="margin:0 0 2px;">EnforcedSpeed&#39;s Interactive Map</div>
-        <div class="submit-note" style="margin:0 0 10px;">Shows speeding tickets with a pinned location.</div>
+        <div style="margin-bottom:14px; text-align:center;">
+          <h1 style="margin:0;">EnforcedSpeed&#39;s Interactive Map</h1>
+          <div class="subtle" style="margin-top:6px; font-size:14px;">Shows speeding tickets with a pinned location.</div>
+        </div>
 
         {% if not maps_api_key %}
           <div class="subtle" style="margin-top:12px;">
             Google Maps key not configured. Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map.
           </div>
         {% else %}
-          <div id="esMap" style="width:100%; height:72vh; border-radius:14px; overflow:hidden;"></div>
+          <div id="esMap" style="width:100%; aspect-ratio: 1 / 1; max-height:72vh; border-radius:14px; overflow:hidden;"></div>
           <div class="subtle" id="esMapMeta" style="margin-top:10px;"></div>
         {% endif %}
       </div>
@@ -174,6 +142,51 @@
     let ES_MAP;
     let ES_INFO;
     let ES_MARKERS = [];
+    let ES_FOCUS = { type: null, value: null };
+    let ES_PINS_DEBOUNCE;
+
+    // Pin style (Option 3: classic teardrop + thicker outline)
+    // Colors requested:
+    // - Selected: Deep red
+    // - Inside focus: Rose
+    // - Outside focus: Warm gray
+    const ES_PIN_COLORS = {
+      selected: '#eab308', // selected ticket
+      inside: '#dc2626',   // inside focus (non-selected)
+      outside: '#a1a1aa'   // outside focus (within viewport)
+    };
+
+    function esSvgPinDataUrl(fill) {
+      const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <path d="M24 46c-7.2-10.1-14-17.4-14-26.1C10 11.4 16.3 5 24 5s14 6.4 14 14.9C38 28.6 31.2 35.9 24 46z"
+        fill="${fill}" stroke="rgba(0,0,0,0.55)" stroke-width="1.6"/>
+  <circle cx="24" cy="19.8" r="6.0" fill="#111827" opacity="0.22"/>
+</svg>`;
+      return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
+    }
+
+    const ES_PIN_ICON_CACHE = {
+      selected: null,
+      inside: null,
+      outside: null
+    };
+
+    function esGetPinIcon(kind) {
+      const k = (kind || 'inside');
+      if (ES_PIN_ICON_CACHE[k]) return ES_PIN_ICON_CACHE[k];
+      // Use hosted PNG assets (so Static Maps + interactive map can share the exact same art).
+      const url = ({
+        selected: '/static/img/pins/pin_selected_yellow.png',
+        inside:   '/static/img/pins/pin_inside_deepred.png',
+        outside:  '/static/img/pins/pin_outside_warmgray.png'
+      }[k] || '/static/img/pins/pin_inside_deepred.png');
+      // Keep sizing consistent across all colors.
+      const scaledSize = new google.maps.Size(36, 36);
+      const anchor = new google.maps.Point(18, 35);
+      ES_PIN_ICON_CACHE[k] = { url, scaledSize, anchor };
+      return ES_PIN_ICON_CACHE[k];
+    }
 
     function esClearMarkers() {
       for (const m of ES_MARKERS) {
@@ -182,68 +195,236 @@
       ES_MARKERS = [];
     }
 
-    async function esLoadPins() {
-      const meta = document.getElementById('esMapMeta');
-      if (meta) meta.textContent = 'Loading pins...';
+    async function esLoadCountyGeomIfAny() {
+  const params = new URLSearchParams(window.location.search);
+  const geoid = (params.get('focus_county_geoid') || params.get('county_geoid') || params.get('county') || '').trim();
+  if (!geoid) return { ok: false };
 
-      const url = '/api/map_pins' + window.location.search;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      const data = await res.json();
+  try {
+    const res = await fetch(`/api/county_geom/${encodeURIComponent(geoid)}`, { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if (!data || !data.ok || !data.geojson) return { ok: false };
 
-      if (!data || !data.ok) {
-        if (meta) meta.textContent = 'Could not load pins.';
+    try {
+      ES_MAP.data.forEach((f) => ES_MAP.data.remove(f));
+    } catch(e) {}
+
+    ES_MAP.data.addGeoJson(data.geojson);
+    ES_MAP.data.setStyle({ strokeWeight: 2, fillOpacity: 0.08 });
+
+    const bounds = new google.maps.LatLngBounds();
+    function processGeom(g) {
+      if (!g) return;
+      if (g instanceof google.maps.LatLng) {
+        bounds.extend(g);
         return;
       }
-
-      esClearMarkers();
-      const pins = data.pins || [];
-      if (meta) meta.textContent = pins.length + ' pins shown (max 1500).';
-
-      let bounds = new google.maps.LatLngBounds();
-      for (const p of pins) {
-        if (p.lat == null || p.lng == null) continue;
-        const pos = { lat: Number(p.lat), lng: Number(p.lng) };
-        bounds.extend(pos);
-
-        const m = new google.maps.Marker({ position: pos, map: ES_MAP });
-        m.addListener('click', () => {
-          const title = `${p.road || 'Road'}, ${p.state || ''}`;
-          const over = (Number(p.ticketed) - Number(p.posted));
-          const html = `
-            <div style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:240px;">
-              <div style="font-weight:600; margin-bottom:4px;">${title}</div>
-              <div style="font-size:13px;">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over})</span></div>
-              <div style="font-size:13px; margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
-            </div>
-          `;
-          ES_INFO.setContent(html);
-          ES_INFO.open({ anchor: m, map: ES_MAP });
-        });
-        ES_MARKERS.push(m);
+      if (g.get) {
+        // Data.Point
+        const p = g.get();
+        if (p) bounds.extend(p);
+        return;
       }
-
-      try {
-        if (pins.length > 0) {
-          ES_MAP.fitBounds(bounds);
-        }
-      } catch(e) {}
+      if (g.getArray) {
+        for (const part of g.getArray()) processGeom(part);
+      }
     }
 
-    window.esInitMap = async function() {
-      ES_MAP = new google.maps.Map(document.getElementById('esMap'), {
-        center: { lat: 39.5, lng: -98.35 },
-        zoom: 4,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      });
-      ES_INFO = new google.maps.InfoWindow();
-      await esLoadPins();
+    ES_MAP.data.forEach(function(feature){
+      const geom = feature.getGeometry();
+      if (geom) processGeom(geom);
+    });
+
+    try {
+      if (!bounds.isEmpty()) {
+        // Fit to the county boundary, then nudge one zoom level closer (tighter county view).
+        ES_MAP.fitBounds(bounds, { top: 24, right: 24, bottom: 24, left: 24 });
+        google.maps.event.addListenerOnce(ES_MAP, 'bounds_changed', () => {
+          try {
+            const z = ES_MAP.getZoom();
+            if (typeof z === 'number') ES_MAP.setZoom(Math.min(z + 1, 18));
+          } catch(e) {}
+        });
+      }
+    } catch(e) {}
+
+    ES_FOCUS = { type: 'county', value: data.geoid || geoid };
+    return { ok: true, geoid: data.geoid, centroid: data.centroid || null };
+  } catch(e) {
+    return { ok: false };
+  }
+}
+
+
+async function esLoadStateGeomIfAny() {
+  const params = new URLSearchParams(window.location.search);
+  const geoid = (params.get('focus_county_geoid') || params.get('county_geoid') || params.get('county') || '').trim();
+  if (geoid) return { ok: false }; // county wins
+
+  const st = (params.get('focus_state') || params.get('state') || '').trim().toUpperCase();
+  if (!st || st.length !== 2) return { ok: false };
+
+  try {
+    const res = await fetch(`/api/state_geom/${encodeURIComponent(st)}`, { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    if (!data || !data.ok || !data.geojson) return { ok: false };
+
+    try {
+      ES_MAP.data.forEach((f) => ES_MAP.data.remove(f));
+    } catch(e) {}
+
+    ES_MAP.data.addGeoJson(data.geojson);
+    ES_MAP.data.setStyle({ strokeWeight: 2, fillOpacity: 0.08 });
+
+    const bounds = new google.maps.LatLngBounds();
+    function processGeom(g) {
+      if (!g) return;
+      if (g instanceof google.maps.LatLng) { bounds.extend(g); return; }
+      if (g.get) { const p = g.get(); if (p) bounds.extend(p); return; }
+      if (g.getArray) { for (const part of g.getArray()) processGeom(part); }
     }
+
+    ES_MAP.data.forEach(function(feature){
+      const geom = feature.getGeometry();
+      if (geom) processGeom(geom);
+    });
+
+    try {
+      if (!bounds.isEmpty()) {
+        ES_MAP.fitBounds(bounds, { top: 24, right: 24, bottom: 24, left: 24 });
+      }
+    } catch(e) {}
+
+    ES_FOCUS = { type: 'state', value: (data.stusps || st) };
+    return { ok: true, stusps: data.stusps || st, centroid: data.centroid || null };
+  } catch(e) {
+    return { ok: false };
+  }
+}
+
+async function esLoadBoundaryGeomIfAny() {
+  const countyFocus = await esLoadCountyGeomIfAny();
+  if (countyFocus && countyFocus.ok) return countyFocus;
+  const stateFocus = await esLoadStateGeomIfAny();
+  if (stateFocus && stateFocus.ok) return stateFocus;
+  return { ok: false };
+}
+
+function esGetViewportBoundsParams() {
+  try {
+    const b = ES_MAP.getBounds();
+    if (!b) return null;
+    const ne = b.getNorthEast();
+    const sw = b.getSouthWest();
+    if (!ne || !sw) return null;
+    return {
+      north: ne.lat(),
+      south: sw.lat(),
+      east: ne.lng(),
+      west: sw.lng(),
+    };
+  } catch(e) {
+    return null;
+  }
+}
+
+async function esLoadPins(opts) {
+  opts = opts || {};
+  const meta = document.getElementById('esMapMeta');
+  if (meta) meta.textContent = 'Loading pins...';
+
+  const params = new URLSearchParams(window.location.search);
+  const vp = esGetViewportBoundsParams();
+  if (vp) {
+    params.set('north', String(vp.north));
+    params.set('south', String(vp.south));
+    params.set('east', String(vp.east));
+    params.set('west', String(vp.west));
+  }
+
+  // Also pass focus through explicitly for the API (lets focus work without filtering).
+  if (ES_FOCUS && ES_FOCUS.type === 'state' && ES_FOCUS.value) {
+    params.set('focus_state', String(ES_FOCUS.value));
+  }
+  if (ES_FOCUS && ES_FOCUS.type === 'county' && ES_FOCUS.value) {
+    params.set('focus_county_geoid', String(ES_FOCUS.value));
+  }
+
+  const url = '/api/map_pins?' + params.toString();
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  const data = await res.json();
+
+  if (!data || !data.ok) {
+    if (meta) meta.textContent = 'Could not load pins.';
+    return;
+  }
+
+  esClearMarkers();
+  const pins = data.pins || [];
+  if (meta) meta.textContent = pins.length + ' pins shown (max 1500).';
+
+  const selectedId = (data.selected_id != null) ? String(data.selected_id) : null;
+
+  let bounds = new google.maps.LatLngBounds();
+  for (const p of pins) {
+    if (p.lat == null || p.lng == null) continue;
+    const pos = { lat: Number(p.lat), lng: Number(p.lng) };
+    bounds.extend(pos);
+
+    const isSelected = (selectedId && String(p.id) === selectedId);
+    const isInside = !!p.inside_focus;
+    const icon = isSelected ? esGetPinIcon('selected') : (isInside ? esGetPinIcon('inside') : esGetPinIcon('outside'));
+
+    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isSelected ? 999999 : undefined) });
+    m.addListener('click', () => {
+      const title = `${p.road || 'Road'}, ${p.state || ''}`;
+      const over = (Number(p.ticketed) - Number(p.posted));
+      const html = `
+        <div style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:240px;">
+          <div style="font-weight:600; margin-bottom:4px;">${title}</div>
+          <div style="font-size:13px;">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over})</span></div>
+          <div style="font-size:13px; margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
+        </div>
+      `;
+      ES_INFO.setContent(html);
+      ES_INFO.open({ anchor: m, map: ES_MAP });
+    });
+    ES_MARKERS.push(m);
+  }
+
+  try {
+    if (pins.length > 0 && !opts.skipFit) {
+      ES_MAP.fitBounds(bounds);
+    }
+  } catch(e) {}
+}
+
+window.esInitMap = async function() {
+  ES_MAP = new google.maps.Map(document.getElementById('esMap'), {
+    center: { lat: 39.5, lng: -98.35 },
+    zoom: 4,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  });
+  ES_INFO = new google.maps.InfoWindow();
+
+  const focus = await esLoadBoundaryGeomIfAny();
+
+  // Initial pin load
+  await esLoadPins({ skipFit: focus && focus.ok });
+
+  // Refresh pins as the viewport changes (debounced)
+  ES_MAP.addListener('idle', () => {
+    clearTimeout(ES_PINS_DEBOUNCE);
+    ES_PINS_DEBOUNCE = setTimeout(() => {
+      esLoadPins({ skipFit: true });
+    }, 220);
+  });
+}
   </script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key|urlencode }}&callback=esInitMap"></script>
 {% endif %}
-
 
 <script>
   // Multi-select dropdown behavior (speed limit + overage):

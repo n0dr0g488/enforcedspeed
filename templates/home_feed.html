@@ -9,8 +9,6 @@
         <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter Speeding Tickets</div>
-            <div class="filterbox-section">Location</div>
-
             <div class="filterbar-row filterbar-row--stack">
 
               <div class="filterbar-item">
@@ -23,107 +21,82 @@
                 </select>
               </div>
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-road">Road</label>
-                <input id="filter-road" name="road" class="filterbar-input" type="text" value="{{ filter_road or '' }}" placeholder="I-95, US-1, SR-520" autocomplete="off" list="road_suggestions">
-                <datalist id="road_suggestions">
-                  {% for s in road_suggestions %}
-                    <option value="{{ s }}"></option>
-                  {% endfor %}
-                </datalist>
-              </div>
-
-              <div class="filterbox-section">Enforcement</div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
-                {% set ssel = [] %}
-                {% for b in speed_limit_buckets %}
-                  {% if b.value in filter_speed_limit_list and b.value != 'any' %}
-                    {% set _ = ssel.append(b.label) %}
-                  {% endif %}
-                {% endfor %}
-
-                <details class="multi" data-multi>
-                  <summary class="multi-summary">
-                    {% if ssel|length == 0 %}Any{% else %}{{ ssel|join(', ') }}{% endif %}
-                  </summary>
-                  <div class="multi-panel">
-                    {% for b in speed_limit_buckets %}
-                      {% if b.value != 'any' %}
-                        {% set _id = 'sl-' ~ b.value %}
-                        <label class="multi-opt">
-                          <input type="checkbox" id="{{ _id }}" name="speed_limit" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_speed_limit_list %}checked{% endif %}>
-                          <span>{{ b.label }}</span>
-                        </label>
-                      {% endif %}
-                    {% endfor %}
-                    <button type="button" class="multi-done" data-multi-done>Done</button>
-                  </div>
-                </details>
-              </div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label">Overage (mph over)</label>
-                {# Compact multi-select dropdown (no big chip grid). #}
-                {% set sel = [] %}
-                {% for b in over_buckets %}
-                  {% if b.value in filter_over_list %}
-                    {% set _ = sel.append(b.label) %}
-                  {% endif %}
-                {% endfor %}
-
-                <details class="multi" data-multi>
-                  <summary class="multi-summary">
-                    {% if sel|length == 0 %}Any{% else %}{{ sel|join(', ') }}{% endif %}
-                  </summary>
-                  <div class="multi-panel">
-                    {% for b in over_buckets %}
-                      {% if b.value != 'all' %}
-                        {% set _id = 'ov-' ~ b.value %}
-                        <label class="multi-opt">
-                          <input type="checkbox" id="{{ _id }}" name="overage" value="{{ b.value }}" data-label="{{ b.label }}" {% if b.value in filter_over_list %}checked{% endif %}>
-                          <span>{{ b.label }}</span>
-                        </label>
-                      {% endif %}
-                    {% endfor %}
-                    <button type="button" class="multi-done" data-multi-done>Done</button>
-                  </div>
-                </details>
-              </div>
-
-              <div class="filterbox-section">Evidence</div>
-
-              <div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-photo-only" style="margin:0;">Photo submitted</label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-photo-only" name="photo_only" value="1" {% if filter_photo_only %}checked{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
+                            <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-county">County</label>
+                <div class="filter-autocomplete-wrap">
+                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
+                  <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
+                  <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
                 </div>
+              </div>
 
+<div class="filterbar-item filterbar-item--tight">
                 <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Auto-Extracted</label>
+                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
                   <label class="switch">
                     <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
                     <span class="slider"></span>
                   </label>
                 </div>
               </div>
+<div class="filterbar-item filterbar-item--tight">
+  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
+    <label class="switch">
+      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
 
-              <div class="filterbox-section">Visibility</div>
 
-              <div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight">
-                  <label class="filterbar-label" for="filter-hide-anon" style="margin:0;">Hide anonymous{% if not current_user.is_authenticated %} <span class="filter-inline-note">(must log in)</span>{% endif %}</label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-hide-anon" name="hide_anon" value="1" {% if hide_anon %}checked{% endif %} {% if not current_user.is_authenticated %}disabled{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
+
+              <div class="filterbar-item">
+  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
+  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
+    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
+    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
+    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
+    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
+  </select>
+</div>
+
+              <div class="filterbar-item">
+  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
+  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
+    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
+    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
+    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
+    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
+  </select>
+</div>
+              
+              
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-date">Date</label>
+                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
+                  {% for o in date_options %}
+                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="filterbar-item">
+                <label class="filterbar-label" for="filter-sort">Sort by</label>
+                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
+                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
+                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
+                  <option value="most_over" {% if filter_sort in ['most_over', 'least_strict'] %}selected{% endif %}>Highest overage</option>
+                  <option value="least_over" {% if filter_sort in ['least_over', 'most_strict'] %}selected{% endif %}>Lowest overage</option>
+</select>
+              </div>
+
+              
+
+<div class="filterbar-item filterbar-item--tight">
 {% if is_admin %}
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:8px;">
+                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
                   <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
                   <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
                     <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
@@ -134,29 +107,7 @@
                 {% endif %}
               </div>
 
-              <div class="filterbox-section">Date</div>
-
-              <div class="filterbar-item">
-                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
-                  {% for o in date_options %}
-                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="filterbox-section">Sort by</div>
-
-              <div class="filterbar-item">
-                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
-                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
-                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
-                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
-                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Lower median overage</option>
-                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Higher median overage</option>
-                </select>
-              </div>
-
-              <div class="filterbox-footer">
+<div class="filterbox-footer">
                 <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('home') }}">Clear</a>
               </div>
 
@@ -169,6 +120,8 @@
           <a href="{{ url_for('privacy') }}">Privacy</a>
           <span class="dot">·</span>
           <a href="{{ url_for('terms') }}">Terms</a>
+          <span class="dot">·</span>
+          <a href="{{ url_for('cookies') }}">Cookie Policy</a>
         </div>
         <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC</div>
       </div>
@@ -255,14 +208,10 @@
       <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
 
       <div class="home-intro-body">
-        EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers to identify the speeds at which enforcement most commonly occurs. By analyzing thousands of tickets, EnforcedSpeed highlights the speed at which the vast majority of drivers are cited.
+        EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.
       </div>
 
-      <div class="home-intro-disclaimer">
-        <span class="home-intro-disclaimer-lead">Important:</span> EnforcedSpeed is an informational data platform only. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that enforcement thresholds replace posted limits.
-      </div>
-
-    {% if is_admin %}
+{% if is_admin %}
       </span>
     {% endif %}
 
@@ -292,102 +241,98 @@
             <span class="pill pill-deleted" title="This ticket is soft-deleted and excluded from public views and analytics.">Deleted</span>
           {% endif %}
         </div>
+
+        {# Under-username metadata line (State / County / Road). #}
+        <div class="ticket-submeta">
+          {# State click should focus the interactive map without forcing a state filter. #}
+          <span class="ticket-submeta-item"><a class="ticket-state-link" href="{{ url_for('map_view', focus_state=state_code, ticket_id=r.id) }}">{{ state_name }}</a> <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span></span>
+          <span class="ticket-submeta-sep">·</span>
+          {# County click should focus the interactive map without forcing a county filter. #}
+          <span class="ticket-submeta-item">{% if r.county_geoid and r.county_name %}<a class="ticket-county-link" href="{{ url_for('map_view', focus_state=(r.state[:2] if r.state else ''), focus_county_geoid=r.county_geoid, ticket_id=r.id) }}">{{ r.county_name }}</a>{% else %}{{ r.county_name or '—' }}{% endif %} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span></span>
+          <span class="ticket-submeta-sep">·</span>
+          <span class="ticket-submeta-item">{{ format_road_bucket(r.road_name) }}</span>
+        </div>
       {% else %}
         <div class="ticket-userline">Anonymous</div>
       {% endif %}
     </div>
 
     <div class="ticket-ocr">
-    {# Photo submitted pill: only true if we actually stored an R2 key. #}
-    {% set photo_submitted = (r.photo_key is not none) %}
-    {% if photo_submitted %}
-      <span class="pill pill-photo pill-photo-submitted">Photo Submitted</span>
-    {% else %}
-      <span class="pill pill-photo pill-photo-unsubmitted">Photo Unsubmitted</span>
-    {% endif %}
-
-    {# OCR status pill: only show when a photo exists. #}
-    {% if photo_submitted %}
-      {% if r.ocr_status == 'processing' or r.ocr_status == 'pending' or r.verification_status == 'pending' %}
-        <span class="pill pill-ocr pill-ocr-pending">Photo OCR Processing</span>
-        <span class="pill-info" title="OCR is processing this photo now.">i</span>
-      {% elif r.ocr_status == 'verified' or r.verification_status == 'verified' %}
-        <span class="pill pill-ocr pill-ocr-verified">Auto-Extracted ✓</span>
-        <span class="pill-info" title="OCR completed and key fields were validated automatically.">i</span>
-      {% else %}
-        <span class="pill pill-ocr pill-ocr-unverified">Not Auto-Extracted</span>
-        {# Subtle reassurance: OCR did run. Tooltip text varies based on what we observed internally. #}
-        {% set _vr = (r.verify_reason or '') %}
-        {% set _err = (r.ocr_error or '') %}
-        {% if _vr in ['no_text','missing_candidates','no_image','no_speeds','ocr_exception','ocr_error'] or _err in ['no_image','no_speeds'] %}
-          {% set _tip = "OCR completed, but we couldn't read the key speed details clearly enough to verify." %}
-        {% else %}
-          {% set _tip = "OCR completed, but the extracted speeds didn't match closely enough to verify." %}
-        {% endif %}
-        <span class="pill-info" title="{{ _tip }}">i</span>
+      {# Pin pill: only when the user has a refined pin. (Pin left) #}
+      {% if r.location_source in ['user_pin','user_pin_snapped'] %}
+        <span class="pill pill-photo pill-photo-ok">Pin ✓</span>
       {% endif %}
-    {% endif %}
 
-    </div>
-  </div>
-
-  <div class="subtle ticket-date" style="margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-    <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
-
-    {% if is_admin %}
-      <span>
-        {% if r.is_deleted %}
-          <form method="post" action="{{ url_for('admin_restore_report', report_id=r.id) }}" style="margin:0;">
-            <input type="hidden" name="next" value="{{ request.full_path if request.full_path.startswith('/') else url_for('home') }}">
-            <button type="submit" class="admin-meta-link">Admin · Restore</button>
-          </form>
+      {# Photo pill with status (Option 2): one pill when a photo exists. (Photo right) #}
+      {% set has_photo = (r.photo_key is not none) %}
+      {% if has_photo %}
+        {% set pk = (r.photo_key|string) %}
+        {% set st = (r.ocr_status or '') %}
+        {% set vs = (r.verification_status or '') %}
+        {% if pk.startswith('pending:') or st in ['pending','processing'] %}
+          <span class="pill pill-photo pill-photo-processing">Photo …</span>
+        {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
+          <span class="pill pill-photo pill-photo-fail">Photo !</span>
+        {% elif st == 'verified' or vs == 'verified' %}
+          <span class="pill pill-photo pill-photo-ok">Photo ✓</span>
         {% else %}
-          <form method="post" action="{{ url_for('admin_delete_report', report_id=r.id) }}" style="margin:0;" onsubmit="return confirm('Delete this ticket?');">
-            <input type="hidden" name="next" value="{{ request.full_path if request.full_path.startswith('/') else url_for('home') }}">
-            <button type="submit" class="admin-meta-link">Admin · Delete</button>
-          </form>
+          <span class="pill pill-photo pill-photo-fail">Photo !</span>
         {% endif %}
-      </span>
-    {% endif %}
-  </div>
+      {% endif %}
+
+      {# Info icon (top-right) - click for verification details. (far right of pills row) #}
+      <button type="button" class="ticket-info" data-report-id="{{ r.id }}"
+              data-photo-key="{{ r.photo_key or '' }}"
+              data-ocr-status="{{ r.ocr_status or '' }}"
+              data-ocr-error="{{ r.ocr_error or '' }}"
+              data-verification-status="{{ r.verification_status or '' }}"
+              data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
+              data-verify-reason="{{ r.verify_reason or '' }}"
+              data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
+              data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
+              data-overage="{{ r.overage if r.overage is not none else '' }}"
+              title="Details">i</button>
+          <div class="ticket-date-right">
+            <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }} UTC</span>
+          </div>
+            </div>
+	</div>
+	</div>
+{# --- Precompute speeds for map overlay + display --- #}
+{% set disp_posted = r.posted_speed %}
+{% set disp_ticketed = r.ticketed_speed %}
+{% if disp_posted is not none and disp_ticketed is not none and disp_ticketed < disp_posted %}
+  {% set _tmp = disp_posted %}
+  {% set disp_posted = disp_ticketed %}
+  {% set disp_ticketed = _tmp %}
+{% endif %}
+{% set ticket_over = (disp_ticketed - disp_posted)|round|int %}
+{% set enforced_over = enforced_a.get(r.id, ticket_over) %}
+{% set enforced_speed_mph = (disp_posted + enforced_over)|round|int %}
 
 {# --- Static map preview (feed hero) --- #}
-{% if r.lat and r.lng and maps_api_key %}
-  {% set _sm = static_map_url(r.lat, r.lng, zoom=11, width=640, height=340) %}
-  {% if _sm %}
-    <div class="ticket-staticmap-wrap">
-      {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
-        <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}">Refine pin</button>
-      {% endif %}
-      <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+{# Don't gate this on a template var (maps_api_key) because home() may not pass it.
+   The helper returns None when static maps are not configured. #}
+{% set _pin_lat = r.lat if r.location_source in ['user_pin','user_pin_snapped','route_class:interstate','route_class:numbered','route_class:local','prefer_highway','nearest'] else None %}
+{% set _pin_lng = r.lng if _pin_lat is not none else None %}
+{% set _pinmode = (r.location_source in ['user_pin','user_pin_snapped']) %}
+{% set _sm = county_static_map_url(r.county_geoid, _pin_lat, _pin_lng, width=640, height=640, center_on_pin=_pinmode) %}
+{% if _sm %}
+
+  <div class="ticket-staticmap-frame">
+  <div class="ticket-staticmap-wrap">
+    {# Centered speed pill overlay ("84 in a 65 (+19 mph)") #}
+    <div class="ticket-speedpill{% if _pinmode %} ticket-speedpill--pinmode{% endif %}">
+      {{ disp_ticketed }} in a {{ disp_posted }}
+      <span class="ticket-speedpill-over">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
     </div>
-  {% endif %}
+    {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
+      <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">Refine pin</button>
+    {% endif %}
+    <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+  </div>
+  </div>
 {% endif %}
-
-</div>
-
-{# --- Center: Road + State, speed/limit, ticket overage --- #}
-{% set ticket_over = (r.ticketed_speed - r.posted_speed)|round|int %}
-{% set enforced_over = enforced_a.get(r.id, (r.ticketed_speed - r.posted_speed)) %}
-{% set enforced_speed_mph = (r.posted_speed + enforced_over)|round|int %}
-
-<div class="ticket-center">
-  <div class="ticket-roadstate">{{ format_road_bucket(r.road_name) }} in {{ state_name }}</div>
-
-  <div class="ticket-speedrow">
-    <div class="ticket-speedtext">
-      <span class="ticket-speednum">{{ r.ticketed_speed }}</span>
-      <span class="ticket-speedin">in a</span>
-      <span class="ticket-speedlimit">{{ r.posted_speed }}</span>
-      <span class="ticket-overageblue ticket-overageinline">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
-    </div>
-  </div>
-
-  <div class="ticket-enforcedline">
-    This location, 90% of submitted tickets occur ≥ {{ enforced_speed_mph }} mph.
-  </div>
-</div>
-
 <div class="row ticket-actions" style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;">
         <div class="row" style="display:flex;gap:14px;align-items:center;flex-wrap:nowrap;justify-content:flex-start;">
 
@@ -416,13 +361,20 @@
 
         {% set bucket_total = a_counts.get((r.state, r.road_key), 0) %}
         <div class="ticket-total" style="margin-left:auto;text-align:right;">
-        <a class="action-link ticket-total-link" href="{{ url_for('bucket_tickets', state=state_code, road=r.road_key) }}" style="font-size:14px;font-weight:600;line-height:1;color:inherit;text-decoration:none;">View all {{ bucket_total }} tickets for this state and road</a>
-        </div>
+</div>
         {# Report link later (v3) #}
       
 </div>
+{% if r.caption %}
+        <div class="ticket-caption ticket-caption--clamp">{{ r.caption }}</div>
+      {% endif %}
 
-      {% set thread = comment_threads_by_report.get(r.id, {"top": [], "replies": {}}) %}
+{# date moved to header-right under pills #}
+
+{% if r.caption and not _sm %}
+        <div class="ticket-caption" style="margin-top:10px; font-size:14px; line-height:1.35; color:#111827;">{{ r.caption }}</div>
+      {% endif %}
+{% set thread = comment_threads_by_report.get(r.id, {"top": [], "replies": {}}) %}
       {% set top_comments = thread["top"] %}
       {% set replies_map = thread["replies"] %}
       {% set total_comments = comments_by_report.get(r.id, [])|length %}
@@ -498,7 +450,7 @@
                     <input type="hidden" name="next" value="{{ request.full_path }}">
                     <input type="hidden" name="parent_id" value="{{ c.id }}">
                     <textarea class="js-comment-body" name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a reply…"></textarea>
-                    <div style="margin-top:8px;">
+                    <div style="margin-top:0;">
                       <button type="submit">Reply</button>
                       <span class="subtle" style="margin-left:10px;">280 characters max.</span>
                     </div>
@@ -523,7 +475,7 @@
             <input type="hidden" name="next" value="{{ request.full_path }}">
             <input type="hidden" name="parent_id" value="">
             <textarea class="js-comment-body" name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a comment…"></textarea>
-            <div style="margin-top:8px;">
+            <div style="margin-top:0;">
               <button type="submit">Post</button>
               <span class="subtle" style="margin-left:10px;">280 characters max.</span>
             </div>
@@ -565,7 +517,7 @@
 <style>
 
   /* Reuse the exact thank_you thermometer styling (scoped to this template). */
-  .ticket-card{padding-top:18px;padding-bottom:18px}
+  .ticket-card{padding-top:18px;padding-bottom:18px;overflow:hidden}
 
   .thermo-label{font-size:13px;font-weight:700;color:#374151}
   .thermo-line{display:flex;align-items:center;gap:10px}
@@ -585,9 +537,65 @@
   .ticket-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
   .ticket-userline{display:flex;align-items:baseline;gap:6px}
   .ticket-usercount{font-size:13px;font-weight:600;color:#6b7280}
-  .ticket-ocr{align-self:flex-start;margin-top:0}
+  .ticket-ocr{align-self:flex-start;margin-top:0;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}
+  .ticket-info{border:1px solid #e5e7eb;background:#fff;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer}
+  .ticket-info:hover{background:#f9fafb}
+
+  /* Under-username State/County/Road line */
+  .ticket-state-link{color:inherit;text-decoration:none}
+  .ticket-state-link:hover{text-decoration:underline}
+  .ticket-county-link{color:inherit;text-decoration:none}
+  .ticket-county-link:hover{text-decoration:underline}
+  .ticket-submeta{margin-top:4px;font-size:12.5px;color:#6b7280;display:flex;gap:6px;flex-wrap:wrap}
+  .ticket-submeta-count{font-weight:600;color:#4b5563}
+  .ticket-submeta-sep{opacity:.8}
   .user-link{text-decoration:none;color:inherit}
   .user-link:hover{text-decoration:underline}
+
+  /* Static map (ticket card hero)
+     FB-style: the *media block* (map + action row + optional caption) is square.
+     The map itself becomes shorter to accommodate the footer.
+  */
+    /* FB-style square media frame:
+     - The *frame* is square (matches FB post media).
+     - The map image is allowed to be shorter inside the square (letterboxed) so it doesn't feel overly tall.
+  */
+  .ticket-staticmap-frame{
+    margin-top:12px;
+    border-radius:14px;
+    overflow:hidden;
+    border:1px solid #e5e7eb;
+    background:#f3f4f6;
+    aspect-ratio:1/1;
+    position:relative;
+  }
+
+  .ticket-staticmap-frame .ticket-staticmap-wrap{
+    margin-top:0;
+    border:0;
+    border-radius:0;
+    width:100%;
+    height:100%;
+    background:transparent;
+    position:relative;
+    aspect-ratio:auto;
+  }
+
+  .ticket-staticmap-frame .ticket-staticmap{
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    object-position:center center;
+  }
+
+.ticket-staticmap-wrap{width:100%;overflow:hidden;background:#f3f4f6;position:relative;}
+  .ticket-caption--clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  .ticket-speedpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:#111827;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:2;white-space:nowrap}
+  .ticket-speedpill--pinmode{top:50%;left:50%;transform:translate(-50%,calc(-100% - 56px))}
+  .ticket-speedpill-over{font-weight:700;color:#f97316;margin-left:8px}
+  .ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:2}
 
   /* Ticket card center (Version 5). */
   .ticket-center{margin-top:12px;text-align:center;position:relative}
@@ -609,7 +617,7 @@
   .ticket-total{flex:1;min-width:160px}
 
   /* v58 refinements */
-  .ticket-card{padding-top:18px;padding-bottom:18px}
+  .ticket-card{padding-top:18px;padding-bottom:18px;overflow:hidden}
   .ticket-top{margin-top:-10px}
   .thermo-line{display:flex;align-items:center;gap:10px}
   .thermo-bar{flex:1}
@@ -677,7 +685,6 @@
   // Note: comment/reply boxes are closed by default on page load.
 </script>
 
-
 <script>
   function convertLocalTimes(){
     var nodes = document.querySelectorAll('.js-localtime[data-utc]');
@@ -732,7 +739,6 @@
   }
 
   
-
 
   // --- Mobile helpers (home) ---
   function initHomeFiltersToggle(){
@@ -827,6 +833,8 @@ document.addEventListener('DOMContentLoaded', function(){
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
+            gestureHandling: 'greedy',
+            scrollwheel: true,
           });
 
           const bounds = new google.maps.LatLngBounds();
@@ -863,6 +871,71 @@ document.addEventListener('DOMContentLoaded', function(){
 
 </div> {# /home-shell #}
 
+{# --- Ticket details modal (eye icon) --- #}
+<div id="ticketInfoModal" class="modal" style="display:none;">
+  <div class="modal-backdrop" id="ticketInfoBackdrop"></div>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="ticketInfoTitle">
+    <div class="modal-title" id="ticketInfoTitle">Ticket details</div>
+    <div class="subtle" id="ticketInfoBody" style="margin-top:10px; white-space:pre-wrap;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="ticketInfoClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    const modal = document.getElementById('ticketInfoModal');
+    if(!modal) return;
+    const backdrop = document.getElementById('ticketInfoBackdrop');
+    const closeBtn = document.getElementById('ticketInfoClose');
+    const body = document.getElementById('ticketInfoBody');
+
+    function close(){ modal.style.display='none'; }
+    function open(text){
+      body.textContent = text;
+      modal.style.display='block';
+    }
+
+    backdrop && backdrop.addEventListener('click', close);
+    closeBtn && closeBtn.addEventListener('click', close);
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && modal.style.display==='block') close(); });
+
+    document.addEventListener('click', function(e){
+      const btn = e.target && e.target.closest ? e.target.closest('.ticket-info') : null;
+      if(!btn) return;
+      const photoKey = btn.getAttribute('data-photo-key') || '';
+      const ocrStatus = btn.getAttribute('data-ocr-status') || '';
+      const ocrError = btn.getAttribute('data-ocr-error') || '';
+      const verStatus = btn.getAttribute('data-verification-status') || '';
+      const attempts = btn.getAttribute('data-verify-attempts') || '';
+      const reason = btn.getAttribute('data-verify-reason') || '';
+      const posted = btn.getAttribute('data-posted-speed') || '';
+      const ticketed = btn.getAttribute('data-ticketed-speed') || '';
+      const overage = btn.getAttribute('data-overage') || '';
+
+      const lines = [];
+      lines.push(`Photo: ${photoKey ? 'uploaded' : 'none'}`);
+      if(photoKey) lines.push(`Photo key: ${photoKey}`);
+      if(posted !== '' || ticketed !== ''){
+        let p = posted === '' ? null : parseInt(posted,10);
+        let t = ticketed === '' ? null : parseInt(ticketed,10);
+        if(p !== null && t !== null && t < p){ const tmp=p; p=t; t=tmp; }
+        if(p !== null) lines.push(`Posted speed: ${p}`);
+        if(t !== null) lines.push(`Ticketed speed: ${t}`);
+        if(p !== null && t !== null) lines.push(`Overage: ${t - p}`);
+        else if(overage !== '') lines.push(`Overage: ${overage}`);
+      }
+      lines.push(`OCR status: ${ocrStatus || 'n/a'}`);
+      if(ocrError) lines.push(`OCR error: ${ocrError}`);
+      lines.push(`Verification: ${verStatus || 'n/a'}`);
+      if(attempts !== '') lines.push(`Verify attempts: ${attempts}`);
+      if(reason) lines.push(`Verify reason: ${reason}`);
+
+      open(lines.join('\n'));
+    });
+  })();
+</script>
 
 {# --- Owner-only pin refine modal (feed) --- #}
 {% if current_user.is_authenticated and maps_api_key %}
@@ -882,7 +955,6 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </div>
 {% endif %}
-
 
 {% if current_user.is_authenticated and maps_api_key %}
 <script>
@@ -953,6 +1025,10 @@ document.addEventListener('DOMContentLoaded', function(){
             fullscreenControl: false,
           });
           marker = new google.maps.Marker({ position: center, map: map, draggable: true });
+          map.addListener('click', function(e){
+            if(!e || !e.latLng) return;
+            marker.setPosition(e.latLng);
+          });
         }else{
           map.setCenter(center);
           map.setZoom(16);
@@ -1010,5 +1086,4 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endif %}
 
 {% endblock %}
-
 

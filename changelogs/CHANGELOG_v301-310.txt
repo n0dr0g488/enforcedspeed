@@ -1,0 +1,66 @@
+CHANGELOG v301-310 (Web) — EnforcedSpeed
+
+v301 — 2026-02-14
+- Submit: remove Pin/Photo ✓ pills on submit form (cleaner UI).
+- Submit: rename Photo label to "Ticket Photo".
+- Submit: add caption placeholder text ("What do you think about this ticket?").
+- Repo hygiene: move CHANGELOG_*.txt files into /changelogs/ to de-clutter project root.
+- Handoffs: add v301 entry under /handoffs/ (bundled by 50).
+
+
+v302 — 2026-02-14
+- Submit: make Caption placeholder render like other inputs (switch to input-style field).
+- Submit: normalize pin/photo status text styling for consistency.
+- Submit: restore Pin ✓ / Photo ✓ pills under the buttons, shown only after pin is set / photo selected.
+- Submit: minor button weight consistency.
+
+
+v303 — 2026-02-14
+- Submit: move earned Pin ✓ / Photo ✓ pills onto the same line as their status text (removes extra whitespace).
+
+
+v304 — 2026-02-14
+- Map: match Submit page header styling (centered H1 + subtitle).
+- Statistics: match Submit page header styling and shorten subtitle to “Based on median ticketed speed over posted speed”.
+
+
+v305 — 2026-02-14
+- Submit: rename "Pin" label to "Map pin" on Submit a Ticket.
+- Filters (Home/Map/Statistics): remove section headers (Location/Evidence/Visibility) to reduce visual clutter.
+- Filters (Home/Map/Statistics): remove Hide anonymous toggle (anonymous submissions no longer supported).
+- Filters (Home/Map/Statistics): remove "Photo submitted" toggle; rename "Auto-Extracted" to "Photo ✓" (OCR-validated photo filter).
+- Filters (Home/Map/Statistics): convert Date and Sort by headings into standard field labels for consistent typography.
+- Styles: add .filter-check (green ✓) for Photo ✓ label.
+
+
+v306 — 2026-02-14
+- Filters (Home/Map/Statistics): move Photo ✓ toggle directly under County (above Posted speed limit).
+- Filters (Home/Map/Statistics): add Map pin toggle to filter tickets with a user-placed map pin.
+- Filters: move Deleted (admin) control to the bottom of the filter panel (and add it to Map).
+- Styles: make multi-select summary text (e.g., “Any”) non-bold for consistent typography.
+
+
+v307 — 2026-02-14
+- Filters (Home/Map/Statistics): add green ✓ to the Map pin label (match Photo ✓ styling).
+- Styles: align filter control font sizing so multi-select summaries (Posted speed limit/Overage) match Date/Sort by dropdowns.
+
+v308 (2026-02-14) — Filter rail: unify control font-size (Posted/Overage multi-select summaries now match Date/Sort dropdowns).
+v309 (2026-02-14) — Filter rail: force Posted/Overage multi-select summary typography to match Date/Sort selects (font-size/weight/line-height), keeping 'Any' non-bold.
+
+v310 (2026-02-14) — Filter rail: correct remaining font mismatch by standardizing filter control typography to 15px across selects + multi-select summaries (matches perceived select size).
+
+
+v311 (2026-02-14) — Filter rail: replace Posted speed limit and Overage controls with compact native dropdowns (≤35 / 40–55 / ≥60; 1–10 / 11–20 / ≥21) to match State/Date/Sort typography and eliminate control-type font mismatch.
+
+v312 (2026-02-14) — Fix v311 syntax error + overage Any handling
+- Fix SyntaxError in app.py (unmatched bracket) introduced in v311.
+- Ensure overage dropdown 'Any' (value 'all') does not apply a filter (strip 'all' from filter_over_list) across routes.
+v316 — 2026-02-15
+- Legal: replace Privacy Policy and Terms of Service pages with final provided text.
+- Legal: add Cookie Policy page and add footer link next to Privacy/Terms (same styling).
+- Notes: v313–v315 regressed county autocomplete; do not use those builds. v312 remains last known-good baseline.
+
+
+
+v317 — 2026-02-15
+- Home: shorten welcome blurb under “Welcome to EnforcedSpeed.” and remove separate “Important:” disclaimer line (new combined disclaimer text).

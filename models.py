@@ -121,6 +121,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
     username = db.Column(db.String(20), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    phone = db.Column(db.String(25), nullable=True, index=True)
+    birthdate = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # Password reset rate limiting (per account)
@@ -152,99 +154,102 @@ class User(UserMixin, db.Model):
         return f"<User id={self.id} username={self.username!r}>"
 
 class SpeedReport(db.Model):
-    __tablename__ = "speed_reports"
+    __tablename__ = 'speed_reports'
 
     id = db.Column(db.Integer, primary_key=True)
 
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    # Ownership
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
-    # Raw user input
+    # Core inputs
     state = db.Column(db.String(100), nullable=False)
-
-    # Road/location raw input
+    route_class = db.Column(db.String(20), nullable=True)
     road_name = db.Column(db.String(200), nullable=False)
+    # Normalized, stable road identity key (used for grouping/filtering).
+    # Must match normalize_road() so URL filters and analytics group correctly.
+    road_key = db.Column(db.String(120), nullable=True, index=True)
 
-    # Normalized key used for grouping/aggregation
-    road_key = db.Column(db.String(200), nullable=False, index=True)
-
-    posted_speed = db.Column(db.Integer, nullable=False, index=True)
+    posted_speed = db.Column(db.Integer, nullable=False)
     ticketed_speed = db.Column(db.Integer, nullable=False)
+    overage = db.Column(db.Integer, nullable=True, index=True)
 
-    notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    caption = db.Column(db.String(500), nullable=True)
 
-    # OCR verification (async)
-    # pending -> show 'Pending verification'
-    # verified -> show 'Verified by OCR' (green check)
-    # unverified -> show nothing
-    verification_status = db.Column(db.String(20), nullable=False, default="unverified", index=True)
-    verified_at = db.Column(db.DateTime, nullable=True)
+    # County-first (required by app; nullable for legacy rows)
+    county_geoid = db.Column(db.String(10), nullable=True, index=True)
+    county_name = db.Column(db.String(120), nullable=True)
+    county_state = db.Column(db.String(2), nullable=True, index=True)
 
-    # Stored for internal tuning/debug only (never shown publicly)
+    # Location
+    raw_lat = db.Column(db.Float, nullable=True)
+    raw_lng = db.Column(db.Float, nullable=True)
+    lat = db.Column(db.Float, nullable=True)
+    lng = db.Column(db.Float, nullable=True)
+    location_hint = db.Column(db.String(120), nullable=True)
+    location_source = db.Column(db.String(40), nullable=True)
+    location_accuracy_m = db.Column(db.Integer, nullable=True)
+
+    # Evidence / OCR / verification
+    photo_key = db.Column(db.String(255), nullable=True)
+    ocr_status = db.Column(db.String(30), nullable=False, default='pending')  # pending|processing|done|failed
+    # Internal error details from OCR pipeline (short code / message).
+    ocr_error = db.Column(db.String(255), nullable=True)
+    verification_status = db.Column(db.String(30), nullable=False, default='pending')  # pending|verified|rejected
+
     ocr_posted_speed = db.Column(db.Integer, nullable=True)
     ocr_ticketed_speed = db.Column(db.Integer, nullable=True)
     ocr_confidence = db.Column(db.Float, nullable=True)
+
+    verified_at = db.Column(db.DateTime, nullable=True)
+    verified_by = db.Column(db.Integer, nullable=True)
     verify_attempts = db.Column(db.Integer, nullable=False, default=0)
-    verify_reason = db.Column(db.String(50), nullable=True)
+    verify_reason = db.Column(db.String(120), nullable=True)
 
-    # Photo + OCR job tracking (R2 quarantine + RQ)
-    photo_key = db.Column(db.Text, nullable=True)
-    photo_uploaded_at = db.Column(db.DateTime, nullable=True)
-    ocr_status = db.Column(db.String(20), nullable=True)  # pending|processing|verified|unverified|failed
-    ocr_job_id = db.Column(db.String(64), nullable=True)
-    ocr_error = db.Column(db.Text, nullable=True)
-
-    # Mapping (optional)
-    location_hint = db.Column(db.String(200), nullable=True)
-
-    # Raw user-selected coordinates (before snapping). Stored for tuning/analytics.
-    raw_lat = db.Column(db.Float, nullable=True)
-    raw_lng = db.Column(db.Float, nullable=True)
-
-    # Final coordinates used for mapping (may be snapped to nearest road).
-    lat = db.Column(db.Float, nullable=True, index=True)
-    lng = db.Column(db.Float, nullable=True, index=True)
-
-    # Where lat/lng came from: none|user_pin|user_pin_snapped
-    lat_lng_source = db.Column(db.String(30), nullable=True)
-
-    # Place ID from Places Autocomplete (routes can return a place_id)
-    google_place_id = db.Column(db.String(128), nullable=True)
-
-
-    # Soft delete (admin moderation)
-    is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    # Soft delete
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False)
     deleted_at = db.Column(db.DateTime, nullable=True)
-    deleted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    # Who soft-deleted this report (admin / moderator). This must be a ForeignKey so
+    # SQLAlchemy can build the User.deleted_reports relationship reliably.
+    deleted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Ensure road_key stays consistent with latest normalization rules
-        self.road_key = normalize_road(self.road_name, self.state)
+    comments = db.relationship('Comment', backref='report', lazy=True, cascade='all, delete-orphan')
+    likes = db.relationship('Like', backref='report', lazy=True, cascade='all, delete-orphan')
 
     def refresh_road_key(self) -> None:
-        self.road_key = normalize_road(self.road_name, self.state)
+        """Compute and store road_key using the shared normalize_road() logic."""
+        try:
+            self.road_key = normalize_road(self.road_name or "", self.state or "")
+        except Exception:
+            # Never fail a write because of a normalization edge case.
+            self.road_key = (self.road_name or "").strip().lower()[:120] or None
 
-    def __repr__(self) -> str:
-        return (
-            f"<SpeedReport id={self.id} state={self.state!r} road_name={self.road_name!r} "
-            f"road_key={self.road_key!r} posted={self.posted_speed} ticketed={self.ticketed_speed} "
-        )
+    def __repr__(self):
+        return f"<SpeedReport {self.id} {self.county_state}:{self.county_name}>"
 
 
 class Like(db.Model):
+    """A single user 'like' on a specific SpeedReport.
+
+    One-like-per-user-per-report is enforced with a unique constraint.
+    """
+
     __tablename__ = "likes"
 
     id = db.Column(db.Integer, primary_key=True)
     report_id = db.Column(db.Integer, db.ForeignKey("speed_reports.id"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (
-        db.UniqueConstraint("report_id", "user_id", name="uq_likes_report_user"),
+        db.UniqueConstraint("report_id", "user_id", name="uq_like_report_user"),
     )
 
+    user = db.relationship("User", backref=db.backref("likes", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f"<Like report={self.report_id} user={self.user_id}>"
 
 class Comment(db.Model):
     __tablename__ = "comments"

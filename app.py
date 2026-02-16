@@ -68,7 +68,7 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
-from sqlalchemy import text, func, tuple_, or_, and_, bindparam
+from sqlalchemy import text, func, case, tuple_, or_, and_, bindparam
 from sqlalchemy.orm import joinedload
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sendgrid import SendGridAPIClient
@@ -104,7 +104,7 @@ from forms import (
     CommentForm,
     DeleteCommentForm,
 )
-from models import db, SpeedReport, User, Like, Comment, normalize_road, state_code_from_value
+from models import db, SpeedReport, User, Like, Comment, FollowedCounty, normalize_road, state_code_from_value
 
 
 # -----------------------------------------------------------------------------
@@ -2806,7 +2806,135 @@ GROUP BY UPPER(TRIM(stusps));
             state_ticket_counts = {}
             county_ticket_counts = {}
 
-        return render_template(
+        
+        # Right-rail: Trending counties + followed counties (top 5). Keep this best-effort and never break home.
+        trending_counties = []
+        followed_counties = []
+        followed_geoids = set()
+
+        try:
+            now_utc = datetime.utcnow()
+            t7 = now_utc - timedelta(days=7)
+            t30 = now_utc - timedelta(days=30)
+            t365 = now_utc - timedelta(days=365)
+
+            # Aggregate per-county counts and "last seen" timestamp once.
+            rows = (
+                db.session.query(
+                    SpeedReport.county_geoid.label("geoid"),
+                    func.sum(case((SpeedReport.created_at >= t7, 1), else_=0)).label("c7"),
+                    func.sum(case((SpeedReport.created_at >= t30, 1), else_=0)).label("c30"),
+                    func.sum(case((SpeedReport.created_at >= t365, 1), else_=0)).label("c365"),
+                    func.max(SpeedReport.created_at).label("last_ts"),
+                )
+                .filter(SpeedReport.is_deleted == False)
+                .filter(SpeedReport.county_geoid.isnot(None))
+                .group_by(SpeedReport.county_geoid)
+                .all()
+            )
+
+            # Compute acceleration score (7d vs monthly baseline), with a small-data guard.
+            scored = []
+            recent = []
+            for r in rows:
+                geoid = str(r.geoid) if r.geoid is not None else ""
+                c7 = int(r.c7 or 0)
+                c30 = int(r.c30 or 0)
+                c365 = int(r.c365 or 0)
+                last_ts = r.last_ts
+                recent.append((last_ts, geoid, c7, c30, c365))
+
+                # Guard: require some volume so 1 ticket doesn't "trend".
+                if c30 < 5:
+                    continue
+
+                baseline = (c30 / 4.285)  # expected weekly volume from 30d
+                score = (c7 - baseline) / math.sqrt(baseline + 1.0)
+                scored.append((score, c7, geoid, c7, c30, c365))
+
+            scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            chosen = []
+            chosen_geoids = set()
+            for s in scored:
+                if len(chosen) >= 5:
+                    break
+                geoid = s[2]
+                chosen.append((geoid, s[3], s[4], s[5]))
+                chosen_geoids.add(geoid)
+
+            # Fallback: if not enough trending data, fill remaining slots with most recent counties.
+            if len(chosen) < 5:
+                recent.sort(key=lambda x: (x[0] is not None, x[0]), reverse=True)
+                for last_ts, geoid, c7, c30, c365 in recent:
+                    if len(chosen) >= 5:
+                        break
+                    if not geoid or geoid in chosen_geoids:
+                        continue
+                    chosen.append((geoid, c7, c30, c365))
+                    chosen_geoids.add(geoid)
+
+            # Attach labels for display.
+            for geoid, c7, c30, c365 in chosen:
+                label = geoid
+                st = ""
+                try:
+                    row = db.session.execute(
+                        text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                        {"g": geoid},
+                    ).mappings().first()
+                    if row:
+                        label = row.get("namelsad") or label
+                        st = row.get("stusps") or ""
+                except Exception:
+                    pass
+
+                trending_counties.append(
+                    {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365}
+                )
+
+            # Followed counties for the current user.
+            if current_user.is_authenticated:
+                followed_rows = (
+                    db.session.query(FollowedCounty.county_geoid)
+                    .filter(FollowedCounty.user_id == current_user.id)
+                    .order_by(FollowedCounty.created_at.desc())
+                    .limit(50)
+                    .all()
+                )
+                followed_geoids = {str(r[0]) for r in followed_rows if r and r[0]}
+
+                if followed_geoids:
+                    # Re-use aggregates above (rows) by building a map.
+                    agg = {str(r.geoid): (int(r.c7 or 0), int(r.c30 or 0), int(r.c365 or 0), r.last_ts) for r in rows if r.geoid}
+                    # Sort followed by most recent activity.
+                    order_geoids = sorted(
+                        list(followed_geoids),
+                        key=lambda g: (agg.get(g, (0, 0, 0, None))[3] is not None, agg.get(g, (0, 0, 0, None))[3]),
+                        reverse=True,
+                    )[:5]
+
+                    for geoid in order_geoids:
+                        c7, c30, c365, _ = agg.get(geoid, (0, 0, 0, None))
+                        label = geoid
+                        st = ""
+                        try:
+                            row = db.session.execute(
+                                text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                                {"g": geoid},
+                            ).mappings().first()
+                            if row:
+                                label = row.get("namelsad") or label
+                                st = row.get("stusps") or ""
+                        except Exception:
+                            pass
+                        followed_counties.append(
+                            {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365}
+                        )
+        except Exception:
+            trending_counties = []
+            followed_counties = []
+            followed_geoids = set()
+return render_template(
 
             "home_feed.html",
             reports=reports,
@@ -2847,6 +2975,9 @@ GROUP BY UPPER(TRIM(stusps));
             filters_active=filters_active,
             maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
             map_pins=map_pins,
+            trending_counties=trending_counties,
+            followed_counties=followed_counties,
+            followed_geoids=followed_geoids,
             is_admin=is_admin,
             show_deleted=show_deleted,
             deleted_mode=deleted_mode,

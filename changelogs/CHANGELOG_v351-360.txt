@@ -1,0 +1,5 @@
+v351 (2026-02-16)
+- Right rail cards: match straight-edge rail styling, remove extra descriptions.
+- Trending Counties: fallback to 5 most-recent counties when trending data is sparse.
+- Followed Counties: remove extra helper copy to keep sidebar compact.
+

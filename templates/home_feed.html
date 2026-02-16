@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-  /* Right-rail sections: keep flush, straight edges like the mini-map rail */
+  /* Right-rail cards: two stacked containers (mini-map card + stats card), flush aligned */
+  .rail-card{border:1px solid #e5e7eb;border-radius:12px;background:#fff;overflow:hidden;}
+  .rail-card + .rail-card{margin-top:10px;}
+  .rail-card-head{padding:14px 14px 12px;}
   .rail-section{padding:14px 14px 12px;border-top:1px solid #e5e7eb;}
-  .rail-section:first-of-type{border-top:0;padding-top:0;}
+  .rail-section:first-of-type{border-top:0;}
   .follow-star{border:0;background:transparent;padding:0 2px;font-size:16px;line-height:1;color:#111827;cursor:pointer;}
   .follow-star:hover{transform:translateY(-1px);}
 </style>
@@ -779,29 +782,30 @@ document.addEventListener('DOMContentLoaded', function(){
 
     {# Right rail: mini-map of the current feed page (only tickets with lat/lng). #}
     <aside class="home-right" aria-label="Ticket map">
-      <div class="maps-rail">
-        <div class="rail-section">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="display:flex; flex-direction:column; line-height:1.1;">
-            <div style="font-weight:600;">Recent tickets</div>
-            <div style="font-size:12px; color:#6b7280; margin-top:2px;">Last 20 tickets</div>
+      {# Card 1: Mini-map (keep its own container like before; map is full-bleed to the card edges) #}
+      <div class="rail-card">
+        <div class="rail-card-head">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div style="display:flex; flex-direction:column; line-height:1.1;">
+              <div style="font-weight:600;">Recent tickets</div>
+              <div style="font-size:12px; color:#6b7280; margin-top:2px;">Last 20 tickets</div>
+            </div>
+            <a class="subtle" href="{{ url_for('map_view') }}" style="text-decoration:none;">Open full map</a>
           </div>
-          <a class="subtle" href="{{ url_for('map_view') }}" style="text-decoration:none;">Open full map</a>
         </div>
 
         {% if map_pins and map_pins|length > 0 and maps_api_key %}
-          <div class="subtle" style="margin-top:6px;">
-          </div>
-          <div id="homeMiniMap" style="width:100%; height:346px; margin-top:10px; border:1px solid #e5e7eb; border-radius:12px; background:#f3f4f6;"></div>
+          <div id="homeMiniMap" style="width:100%; height:346px; background:#f3f4f6;"></div>
         {% elif not maps_api_key %}
-          <div class="subtle" style="margin-top:10px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
+          <div class="subtle" style="padding:0 14px 14px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
         {% else %}
-          <div class="subtle" style="margin-top:10px;">No pinned tickets on this page yet.</div>
+          <div class="subtle" style="padding:0 14px 14px;">No pinned tickets on this page yet.</div>
         {% endif %}
-      
-        </div>
+      </div>
 
-<div class="rail-section">
+      {# Card 2: Trending + Followed (separate container, flush aligned) #}
+      <div class="rail-card">
+        <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
       <div style="font-weight:600;">Trending Counties</div>
@@ -847,9 +851,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
     {% endif %}
   </div>
-</div>
 
-<div class="rail-section">
+        </div>
+
+        <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
       <div style="font-weight:600;">Counties you follow</div>
@@ -897,9 +902,8 @@ document.addEventListener('DOMContentLoaded', function(){
       <div class="subtle" style="margin-top:8px;">You haven’t followed any counties yet.</div>
     {% endif %}
   </div>
-</div>
 
-    
+        </div>
       </div>
     </aside>
 

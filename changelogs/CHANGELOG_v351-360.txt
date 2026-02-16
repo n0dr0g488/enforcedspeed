@@ -1,7 +1,8 @@
-v352 (2026-02-16)
-- Fix Render deploy failure: correct indentation for home() return render_template (app.py).
+CHANGELOG v351–360
 
-v351 (2026-02-16)
-- Right rail cards: match straight-edge rail styling, remove extra descriptions.
-- Trending Counties: fallback to 5 most-recent counties when trending data is sparse.
-- Followed Counties: remove extra helper copy to keep sidebar compact.
+v354 (2026-02-16)
+- Home right-rail layout: split into two stacked cards again (Recent tickets mini-map card + Trending/Followed card)
+- Mini-map restored to full-bleed inside its own card, matching the prior look while keeping the new cards below
+
+v353 (2026-02-16)
+- Attempted right-rail layout adjustments for new cards (superseded by v354)

@@ -6,3 +6,7 @@ v341 (2026-02-15) — Fix Submit Ticket post-pin Static Maps preview (g.co/stati
 - Static Maps query encoding now preserves ':' and '/' characters (safe=':/') to avoid edge-case parsing issues for icon: URLs.
 - Applied the same public-base icon logic to both /api/county_staticmap (submit preview) and /api/staticmap (mobile proxy).
 
+v342 (2026-02-16) — Add Static Maps debug mode for submit-pin preview
+- /api/county_staticmap now supports ?debug=1 to return the upstream Google Static Maps URL and parsed marker/icon details.
+- Debug response also attempts a server-side fetch of the icon URL and reports status/final URL/content-type to diagnose redirects or access issues.
+

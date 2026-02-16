@@ -4729,6 +4729,45 @@ GROUP BY UPPER(TRIM(stusps));
         else:
             upstream = us_static_map_url(width=w, height=h)
 
+
+        # Debug helper: return the upstream Google Static Maps URL (and marker/icon details)
+        # without proxying the image. Use only for troubleshooting.
+        if request.args.get("debug") == "1":
+            try:
+                parsed = urllib.parse.urlparse(upstream)
+                qs = urllib.parse.parse_qs(parsed.query)
+                markers_raw = (qs.get("markers") or [None])[0]
+                icon_url = None
+                if markers_raw:
+                    # markers usually looks like: icon:https://...%7Clat,lng
+                    markers_decoded = urllib.parse.unquote(markers_raw)
+                    if markers_decoded.startswith("icon:"):
+                        icon_url = markers_decoded.split("|", 1)[0][len("icon:"):]
+                icon_fetch = None
+                if icon_url:
+                    try:
+                        req_icon = urllib.request.Request(icon_url, method="GET", headers={"User-Agent": "EnforcedSpeedWeb/1.0"})
+                        with urllib.request.urlopen(req_icon, timeout=10) as r:
+                            icon_fetch = {
+                                "status": getattr(r, "status", None) or r.getcode(),
+                                "final_url": getattr(r, "geturl", lambda: None)(),
+                                "content_type": (r.headers.get("Content-Type") or ""),
+                                "content_length": int(r.headers.get("Content-Length") or 0) if (r.headers.get("Content-Length") or "").isdigit() else None,
+                            }
+                    except Exception as e:
+                        icon_fetch = {"error": str(e)}
+                return jsonify({
+                    "upstream": upstream,
+                    "upstream_len": len(upstream),
+                    "has_geoid": bool(geoid),
+                    "pin_lat": request.args.get("pin_lat"),
+                    "pin_lng": request.args.get("pin_lng"),
+                    "markers_raw": markers_raw,
+                    "icon_url": icon_url,
+                    "icon_fetch": icon_fetch,
+                })
+            except Exception as e:
+                return jsonify({"error": str(e), "upstream": upstream}), 200
         if not upstream:
             abort(404)
 

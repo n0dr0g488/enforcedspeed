@@ -315,7 +315,7 @@
    The helper returns None when static maps are not configured. #}
 {% set _pin_lat = r.lat if r.location_source in ['user_pin','user_pin_snapped','route_class:interstate','route_class:numbered','route_class:local','prefer_highway','nearest'] else None %}
 {% set _pin_lng = r.lng if _pin_lat is not none else None %}
-{% set _pinmode = (r.location_source in ['user_pin','user_pin_snapped']) %}
+{% set _pinmode = False %}
 {% set _sm = county_static_map_url(r.county_geoid, _pin_lat, _pin_lng, width=640, height=640, center_on_pin=_pinmode) %}
 {% if _sm %}
 

@@ -21,3 +21,7 @@ v344 (2026-02-16)
 v345 (2026-02-16)
 - Fix Render boot hang by disabling expensive states schema init at app startup; states table remains lazy/optional.
 - Keep static maps marker icon URL encoding fix for submit pin preview.
+
+v346 (2026-02-16)
+- Fix Submit Ticket pin-preview Static Maps error by using a safe marker fallback (no custom icon) in /api/county_staticmap proxy requests when a pin is present.
+- Keep custom pin icons for non-proxy (browser-fetched) static map URLs (e.g., home feed), avoiding g.co/staticmaperror caused by Google failing to fetch icon URLs.

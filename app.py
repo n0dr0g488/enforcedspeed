@@ -574,7 +574,7 @@ def _bbox_fits_zoom_pxpad(
     span_x = world_px * (lng_diff / 360.0)
     span_y = world_px * (y_diff / (2.0 * math.pi))
     return (span_x <= float(w)) and (span_y <= float(h))
-def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None, pin_lng: float | None = None, *, width: int = 640, height: int = 340, center_on_pin: bool = False) -> str:
+def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None, pin_lng: float | None = None, *, width: int = 640, height: int = 340, center_on_pin: bool = False, use_custom_icon: bool = True) -> str:
     """Static map URL showing the county boundary (black outline + subtle fill) and an optional red pin.
 
     If center_on_pin=True (and a pin is provided), the map center is set to the pin location.
@@ -702,11 +702,16 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     if poly:
         params['path'] = f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly}"
 
-    # Optional pin (default-size Google marker for readability)
+    # Optional pin
     if pin_lat is not None and pin_lng is not None:
         center = f"{pin_lat:.6f},{pin_lng:.6f}"
-        encoded_icon = urllib.parse.quote(icon_url, safe="")
-        params['markers'] = f"icon:{encoded_icon}|{center}"
+        if use_custom_icon:
+            # Custom icon markers can be rejected if Google cannot fetch the icon URL quickly/reliably.
+            encoded_icon = urllib.parse.quote(icon_url, safe="")
+            params['markers'] = f"icon:{encoded_icon}|{center}"
+        else:
+            # Safe fallback (no custom icon) to avoid g.co/staticmaperror in proxy flows.
+            params['markers'] = center
 
     # Keep ':' and '/' readable in URLs (helps avoid edge-case parsing issues for icon: URLs)
     return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/,%')
@@ -4725,7 +4730,8 @@ GROUP BY UPPER(TRIM(stusps));
                 pin_lng,
                 width=w,
                 height=h,
-                center_on_pin=center_on_pin
+                center_on_pin=center_on_pin,
+                use_custom_icon=False
             )
         else:
             upstream = us_static_map_url(width=w, height=h)

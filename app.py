@@ -705,10 +705,11 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     # Optional pin (default-size Google marker for readability)
     if pin_lat is not None and pin_lng is not None:
         center = f"{pin_lat:.6f},{pin_lng:.6f}"
-        params['markers'] = f"icon:{icon_url}|{center}"
+        encoded_icon = urllib.parse.quote(icon_url, safe="")
+        params['markers'] = f"icon:{encoded_icon}|{center}"
 
     # Keep ':' and '/' readable in URLs (helps avoid edge-case parsing issues for icon: URLs)
-    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/')
+    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/,%|')
 
 def us_static_map_url(*, width: int = 640, height: int = 640) -> str:
     """Static map URL of the United States (default preview before a county is selected)."""

@@ -6,3 +6,7 @@ v354 (2026-02-16)
 
 v353 (2026-02-16)
 - Attempted right-rail layout adjustments for new cards (superseded by v354)
+
+v355 (2026-02-16)
+- Right-rail cards: make panels sharp-edged (no rounded corners) and tighten Recent tickets header spacing
+- Trending Counties: add robust fallback so the list populates even with sparse trend data (top overall counties)

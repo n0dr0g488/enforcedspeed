@@ -2836,6 +2836,7 @@ GROUP BY UPPER(TRIM(stusps));
             # Compute acceleration score (7d vs monthly baseline), with a small-data guard.
             scored = []
             recent = []
+            agg_counts = {}
             for r in rows:
                 geoid = str(r.geoid) if r.geoid is not None else ""
                 c7 = int(r.c7 or 0)
@@ -2843,6 +2844,7 @@ GROUP BY UPPER(TRIM(stusps));
                 c365 = int(r.c365 or 0)
                 last_ts = r.last_ts
                 recent.append((last_ts, geoid, c7, c30, c365))
+                agg_counts[geoid] = (c7, c30, c365)
 
                 # Guard: require some volume so 1 ticket doesn't "trend".
                 if c30 < 5:
@@ -2873,7 +2875,32 @@ GROUP BY UPPER(TRIM(stusps));
                     chosen.append((geoid, c7, c30, c365))
                     chosen_geoids.add(geoid)
 
-            # Attach labels for display.
+            
+            # Fallback 2: if we *still* don't have enough, fill with top counties overall (so the panel never looks empty).
+            if len(chosen) < 5:
+                top_rows = (
+                    db.session.query(
+                        SpeedReport.county_geoid.label("geoid"),
+                        func.count(SpeedReport.id).label("ct"),
+                        func.max(SpeedReport.created_at).label("last_ts"),
+                    )
+                    .filter(SpeedReport.is_deleted == False)
+                    .filter(SpeedReport.county_geoid.isnot(None))
+                    .group_by(SpeedReport.county_geoid)
+                    .order_by(func.count(SpeedReport.id).desc(), func.max(SpeedReport.created_at).desc())
+                    .limit(10)
+                    .all()
+                )
+                for r2 in top_rows:
+                    if len(chosen) >= 5:
+                        break
+                    geoid = str(r2.geoid) if r2.geoid is not None else ""
+                    if not geoid or geoid in chosen_geoids:
+                        continue
+                    c7, c30, c365 = agg_counts.get(geoid, (0, 0, 0))
+                    chosen.append((geoid, c7, c30, c365))
+                    chosen_geoids.add(geoid)
+# Attach labels for display.
             for geoid, c7, c30, c365 in chosen:
                 label = geoid
                 st = ""

@@ -4969,6 +4969,8 @@ GROUP BY UPPER(TRIM(stusps));
 
         Click behavior is handled client-side by wrapping the <img> in a link to /map.
         """
+        debug = (request.args.get("debug") or "").strip() in ("1", "true", "yes")
+
         google_key = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_STATIC_MAPS_API_KEY") or ""
         if not google_key:
             return ("Missing GOOGLE_MAPS_API_KEY", 503)
@@ -5066,20 +5068,22 @@ GROUP BY UPPER(TRIM(stusps));
             # Pull county center/centroid coordinates.
             county_pts = []
             if chosen_geoids:
-                county_rows = db.session.execute(
-                    text(
-                        """
-                        SELECT geoid,
-                               COALESCE(center_lat, centroid_lat) AS lat,
-                               COALESCE(center_lng, centroid_lng) AS lng
-                        FROM counties
-                        WHERE geoid = ANY(:geoids)
-                          AND (COALESCE(center_lat, centroid_lat) IS NOT NULL)
-                          AND (COALESCE(center_lng, centroid_lng) IS NOT NULL)
-                        """
-                    ),
-                    {"geoids": chosen_geoids},
-                ).mappings().all()
+                # NOTE: use an expanding bind for compatibility across DB drivers.
+                from sqlalchemy import bindparam
+
+                stmt = text(
+                    """
+                    SELECT geoid,
+                           COALESCE(center_lat, centroid_lat) AS lat,
+                           COALESCE(center_lng, centroid_lng) AS lng
+                    FROM counties
+                    WHERE geoid IN :geoids
+                      AND (COALESCE(center_lat, centroid_lat) IS NOT NULL)
+                      AND (COALESCE(center_lng, centroid_lng) IS NOT NULL)
+                    """
+                ).bindparams(bindparam("geoids", expanding=True))
+
+                county_rows = db.session.execute(stmt, {"geoids": chosen_geoids}).mappings().all()
 
                 coord_map = {str(r["geoid"]): (float(r["lat"]), float(r["lng"])) for r in county_rows if r.get("geoid")}
 
@@ -5110,11 +5114,27 @@ GROUP BY UPPER(TRIM(stusps));
             url = f"https://maps.googleapis.com/maps/api/staticmap?{qs}"
 
             # Fetch and return image
-            resp = requests.get(url, timeout=12)
+            resp = requests.get(url, timeout=12, headers={"User-Agent": "EnforcedSpeedWeb/1.0"})
+
+            if debug:
+                return jsonify(
+                    {
+                        "chosen_geoids": chosen_geoids,
+                        "county_pts": county_pts,
+                        "url": url,
+                        "status_code": resp.status_code,
+                        "content_type": resp.headers.get("Content-Type"),
+                        "content_len": len(resp.content or b""),
+                        "first_bytes": (resp.content or b"")[:50].decode("latin1", errors="replace"),
+                    }
+                ), 200
+
             if resp.status_code != 200:
                 return (f"Upstream error {resp.status_code}", 502)
 
-            return Response(resp.content, mimetype="image/png")
+            out = Response(resp.content, mimetype=(resp.headers.get("Content-Type") or "image/png"))
+            out.headers["Cache-Control"] = "public, max-age=300"
+            return out
 
         except Exception as e:
             try:

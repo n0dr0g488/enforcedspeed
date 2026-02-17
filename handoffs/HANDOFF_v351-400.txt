@@ -48,3 +48,20 @@ v358 — Home mini-map static trending counties
 - Mini-map plots up to 20 unique trending counties at county centroid/center (no ticket pins); falls back to recent/top counties.
 - Remove mini-map title; click-anywhere opens /map; keep small 'Open full map' overlay.
 v360: Home right-rail trending minimap was broken (500) due to missing requests import; fixed.
+
+v361 (2026-02-16)
+GOAL
+- Fix home right-rail static minimap image not loading (likely 500 due to county center DB query param binding).
+
+CHANGES
+- app.py
+  - /api/home_minimap_staticmap: replace Postgres ANY(:geoids) with SQLAlchemy expanding IN :geoids bindparam for driver compatibility.
+  - Add debug=1 mode that returns JSON describing chosen geoids, resolved county center points, and the exact upstream Google Static Maps URL/status.
+  - Return upstream Content-Type and set Cache-Control: public, max-age=300.
+
+HOW TO TEST (PROD)
+1) Open home page and confirm the right-rail minimap image loads.
+2) If it does not load, open this in a browser (or curl) and check the JSON:
+   /api/home_minimap_staticmap?debug=1
+   - Verify chosen_geoids length is 5 and county_pts has lat/lngs.
+   - Verify status_code=200 and content_type is image/png (or image/*).

@@ -1,0 +1,6 @@
+CHANGELOG v361-370
+
+v361 (2026-02-16)
+- Fix /api/home_minimap_staticmap DB lookup for county centers using SQLAlchemy expanding bind (compatible with Render Postgres drivers).
+- Add debug=1 option to /api/home_minimap_staticmap to return JSON (chosen_geoids, resolved points, upstream URL/status) for troubleshooting.
+- Return upstream content-type + add short cache header for the static minimap image.

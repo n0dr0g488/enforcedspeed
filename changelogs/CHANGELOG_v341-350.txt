@@ -45,3 +45,6 @@ v346 (2026-02-16)
 
 v353 (2026-02-16)
 - Fix right-rail layout: make Recent/Trending/Follow cards flush inside maps rail; fix Trending county label rendering.
+
+v359 (2026-02-16)
+- Home right-rail static mini-map now shows exactly the same 5 counties as the 'Trending counties' list (one marker per county at centroid/center).

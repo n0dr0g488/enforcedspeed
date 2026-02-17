@@ -781,34 +781,29 @@ document.addEventListener('DOMContentLoaded', function(){
 
     </div> {# /home-center #}
 
-    {# Right rail: mini-map of the current feed page (only tickets with lat/lng). #}
+    {# Right rail: static mini-map (trending counties). Click anywhere to open the full interactive map. #}
     <aside class="home-right" aria-label="Ticket map">
-      {# Card 1: Mini-map (keep its own container like before; map is full-bleed to the card edges) #}
-      <div class="rail-card">
-        <div class="rail-card-head">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <div style="display:flex; flex-direction:column; line-height:1.1;">
-              <div style="font-weight:600;">Recent tickets</div>
-            </div>
-            <a class="subtle" href="{{ url_for('map_view') }}" style="text-decoration:none;">Open full map</a>
-          </div>
-        </div>
-
-        {% if map_pins and map_pins|length > 0 and maps_api_key %}
-          <div id="homeMiniMap" style="width:100%; height:346px; background:#f3f4f6;"></div>
-        {% elif not maps_api_key %}
-          <div class="subtle" style="padding:0 14px 14px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
+      {# Card 1: Static mini-map (no title; full-bleed image + tiny overlay link) #}
+      <div class="rail-card" style="border-radius:0;">
+        {% if maps_api_key %}
+          <a href="{{ url_for('map_view') }}" style="display:block; position:relative; width:100%;">
+            <img src="{{ url_for('api_home_minimap_staticmap') }}" alt="Trending counties map" style="display:block; width:100%; height:346px; object-fit:cover; background:#f3f4f6;">
+            <span class="subtle" style="position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.92); border:1px solid rgba(0,0,0,0.08); padding:4px 8px; border-radius:999px; font-size:12px; text-decoration:none;">Open full map</span>
+          </a>
         {% else %}
-          <div class="subtle" style="padding:0 14px 14px;">No pinned tickets on this page yet.</div>
+          <div class="subtle" style="padding:12px 14px 14px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
         {% endif %}
       </div>
+
+      {# Card 2: Trending + Followed (separate container, flush aligned) #}
+      <div class="rail-card" style="border-radius:0;">
 
       {# Card 2: Trending + Followed (separate container, flush aligned) #}
       <div class="rail-card">
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-weight:600;">Trending Counties</div>
+      <div style="font-weight:600;">Trending counties</div>
     </div>
   </div>
 
@@ -883,90 +878,6 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </aside>
 
-    {% if map_pins and map_pins|length > 0 and maps_api_key %}
-    <script>
-      (function(){
-        const mapsKey = "{{ maps_api_key|e }}";
-        const pins = {{ map_pins|tojson }};
-        const el = document.getElementById('homeMiniMap');
-        if(!mapsKey || !el || !pins || !pins.length) return;
-
-        let _loaded = false;
-        function loadGoogleMaps(cb){
-          if(_loaded && window.google && window.google.maps){ cb(); return; }
-          const existing = document.getElementById('gmapMiniScript');
-          if(existing){
-            const iv = setInterval(()=>{
-              if(window.google && window.google.maps){ clearInterval(iv); _loaded = true; cb(); }
-            }, 50);
-            return;
-          }
-          window.__esMiniMapInit = function(){ _loaded = true; cb(); };
-          const s = document.createElement('script');
-          s.id = 'gmapMiniScript';
-          s.async = true;
-          s.defer = true;
-          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&callback=__esMiniMapInit`;
-          document.head.appendChild(s);
-        }
-
-        function init(){
-          if(!(window.google && window.google.maps)) return;
-
-          // Custom marker icon for the mini-map (use the hi-res pin, scaled down for crispness).
-          const pinIconUrl = "{{ url_for('static', filename='img/pins/pin_inside_deepred.png') }}";
-          const pinIcon = {
-            url: pinIconUrl,
-            scaledSize: new google.maps.Size(28, 28),
-            anchor: new google.maps.Point(14, 28)
-          };
-
-          // Center on the average pin (simple, stable).
-          let avgLat = 0, avgLng = 0;
-          pins.forEach(p => { avgLat += p.lat; avgLng += p.lng; });
-          avgLat /= pins.length; avgLng /= pins.length;
-
-          const map = new google.maps.Map(el, {
-            center: { lat: avgLat, lng: avgLng },
-            zoom: 6,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            gestureHandling: 'greedy',
-            scrollwheel: true,
-          });
-
-          const bounds = new google.maps.LatLngBounds();
-          pins.forEach(p => {
-            const pos = { lat: p.lat, lng: p.lng };
-            bounds.extend(pos);
-            const m = new google.maps.Marker({ position: pos, map: map, icon: pinIcon });
-            m.addListener('click', function(){
-              // Keep it simple: go to the bucket list (stable route).
-              if(p.url){ window.location.href = p.url; }
-            });
-          });
-
-          if(pins.length === 1){
-            map.setZoom(10);
-          }else{
-            map.fitBounds(bounds, 28);
-          }
-        }
-
-        // Lazy-load when the rail is likely visible.
-        function start(){ loadGoogleMaps(init); }
-        if('IntersectionObserver' in window){
-          const io = new IntersectionObserver((entries)=>{
-            entries.forEach(e=>{ if(e.isIntersecting){ io.disconnect(); start(); } });
-          }, { root: null, threshold: 0.05 });
-          io.observe(el);
-        }else{
-          setTimeout(start, 150);
-        }
-      })();
-    </script>
-    {% endif %}
 
 </div> {# /home-shell #}
 
@@ -1184,4 +1095,3 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 {% endif %}
 {% endblock %}
-

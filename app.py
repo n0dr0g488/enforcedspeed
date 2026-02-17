@@ -4959,6 +4959,169 @@ GROUP BY UPPER(TRIM(stusps));
             "created_at": u.created_at.isoformat() if getattr(u, "created_at", None) else None,
         }
 
+    @app.get("/api/home_minimap_staticmap")
+    def api_home_minimap_staticmap():
+        """Proxy a Google Static Maps image for the home right-rail mini-map.
+
+        The mini-map shows up to 5 *unique counties* (trending-first), plotted at the county centroid/center.
+        Falls back to the most recent counties / overall top counties so the map never looks empty.
+
+        Click behavior is handled client-side by wrapping the <img> in a link to /map.
+        """
+        google_key = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_STATIC_MAPS_API_KEY") or ""
+        if not google_key:
+            return ("Missing GOOGLE_MAPS_API_KEY", 503)
+
+        # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
+        # SW: near San Diego, CA coastline. NE: near northern Maine coastline.
+        visible_sw = "24.396308,-124.848974"
+        visible_ne = "49.384358,-66.885444"
+
+        try:
+            now_utc = datetime.utcnow()
+            t7 = now_utc - timedelta(days=7)
+            t30 = now_utc - timedelta(days=30)
+            t365 = now_utc - timedelta(days=365)
+
+            rows = (
+                db.session.query(
+                    SpeedReport.county_geoid.label("geoid"),
+                    func.sum(case((SpeedReport.created_at >= t7, 1), else_=0)).label("c7"),
+                    func.sum(case((SpeedReport.created_at >= t30, 1), else_=0)).label("c30"),
+                    func.sum(case((SpeedReport.created_at >= t365, 1), else_=0)).label("c365"),
+                    func.max(SpeedReport.created_at).label("last_ts"),
+                )
+                .filter(SpeedReport.is_deleted == False)
+                .filter(SpeedReport.county_geoid.isnot(None))
+                .group_by(SpeedReport.county_geoid)
+                .all()
+            )
+
+            scored = []
+            recent = []
+            for r in rows:
+                geoid = str(r.geoid) if r.geoid is not None else ""
+                c7 = int(r.c7 or 0)
+                c30 = int(r.c30 or 0)
+                c365 = int(r.c365 or 0)
+                last_ts = r.last_ts
+                recent.append((last_ts, geoid))
+
+                # Guard: require some volume so 1 ticket doesn't "trend".
+                if c30 < 5:
+                    continue
+                baseline = (c30 / 4.285)
+                score = (c7 - baseline) / math.sqrt(baseline + 1.0)
+                scored.append((score, c7, geoid))
+
+            scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+
+            # Choose up to 5 unique geoids, trending-first then recent.
+            chosen_geoids = []
+            chosen_set = set()
+
+            for score, c7, geoid in scored:
+                if len(chosen_geoids) >= 5:
+                    break
+                if not geoid or geoid in chosen_set:
+                    continue
+                chosen_geoids.append(geoid)
+                chosen_set.add(geoid)
+
+            if len(chosen_geoids) < 5:
+                recent.sort(key=lambda x: (x[0] is not None, x[0]), reverse=True)
+                for last_ts, geoid in recent:
+                    if len(chosen_geoids) >= 5:
+                        break
+                    if not geoid or geoid in chosen_set:
+                        continue
+                    chosen_geoids.append(geoid)
+                    chosen_set.add(geoid)
+
+            # Final fallback: fill remaining slots with highest-volume counties overall.
+            if len(chosen_geoids) < 5:
+                top_rows = (
+                    db.session.query(
+                        SpeedReport.county_geoid.label("geoid"),
+                        func.count(SpeedReport.id).label("cnt"),
+                        func.max(SpeedReport.created_at).label("last_ts"),
+                    )
+                    .filter(SpeedReport.is_deleted == False)
+                    .filter(SpeedReport.county_geoid.isnot(None))
+                    .group_by(SpeedReport.county_geoid)
+                    .order_by(func.count(SpeedReport.id).desc(), func.max(SpeedReport.created_at).desc())
+                    .limit(200)
+                    .all()
+                )
+                for r in top_rows:
+                    if len(chosen_geoids) >= 5:
+                        break
+                    geoid = str(r.geoid) if r.geoid is not None else ""
+                    if not geoid or geoid in chosen_set:
+                        continue
+                    chosen_geoids.append(geoid)
+                    chosen_set.add(geoid)
+
+            # Pull county center/centroid coordinates.
+            county_pts = []
+            if chosen_geoids:
+                county_rows = db.session.execute(
+                    text(
+                        """
+                        SELECT geoid,
+                               COALESCE(center_lat, centroid_lat) AS lat,
+                               COALESCE(center_lng, centroid_lng) AS lng
+                        FROM counties
+                        WHERE geoid = ANY(:geoids)
+                          AND (COALESCE(center_lat, centroid_lat) IS NOT NULL)
+                          AND (COALESCE(center_lng, centroid_lng) IS NOT NULL)
+                        """
+                    ),
+                    {"geoids": chosen_geoids},
+                ).mappings().all()
+
+                coord_map = {str(r["geoid"]): (float(r["lat"]), float(r["lng"])) for r in county_rows if r.get("geoid")}
+
+                # Preserve chosen order; one marker per county.
+                for geoid in chosen_geoids:
+                    if geoid in coord_map:
+                        county_pts.append(coord_map[geoid])
+
+            # If still nothing, return a plain US map.
+            # Use marker dots (no custom icon) to avoid Google icon fetch timeouts.
+            # Use marker dots (no custom icon) to avoid Google icon fetch timeouts.
+            params = [
+                ("size", "640x346"),
+                ("scale", "2"),
+                ("maptype", "roadmap"),
+                ("style", "feature:poi|visibility:off"),
+                ("style", "feature:transit|visibility:off"),
+                ("visible", f"{visible_sw}|{visible_ne}"),
+                ("key", google_key),
+            ]
+
+            for lat, lng in county_pts[:5]:
+                params.append(("markers", f"size:mid|color:0xb91c1c|{lat:.6f},{lng:.6f}"))
+
+            # Build URL manually to allow repeated 'style' and 'markers' to allow repeated 'style' and 'markers'
+            from urllib.parse import urlencode
+            qs = urlencode(params, doseq=True)
+            url = f"https://maps.googleapis.com/maps/api/staticmap?{qs}"
+
+            # Fetch and return image
+            resp = requests.get(url, timeout=12)
+            if resp.status_code != 200:
+                return (f"Upstream error {resp.status_code}", 502)
+
+            return Response(resp.content, mimetype="image/png")
+
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return (f"Error generating minimap: {e}", 500)
+
     @app.post("/api/auth/register")
     def api_auth_register():
         data = request.get_json(silent=True) or {}

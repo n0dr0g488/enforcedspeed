@@ -22,3 +22,9 @@ v356 (2026-02-16)
 
 v357 (2026-02-16)
 - Right rail panels now flush + sharp-edged to match left filter rail; keep mini-map and trending/follow blocks separate with divider.
+
+
+v358 (2026-02-16)
+- Home: Replace interactive mini-map with static Google Static Maps image showing up to 20 unique trending counties (markers at county centroid/center).
+- Home: Mini-map is click-anywhere to open the full interactive map; remove mini-map title to reclaim vertical space; keep small overlay 'Open full map' link.
+- UI: Rename card title to 'Trending counties' (lowercase c).

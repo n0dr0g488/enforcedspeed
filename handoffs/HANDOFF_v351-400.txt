@@ -41,3 +41,9 @@ Git commands
 
 v357 — Home right-rail styling
 - Make right rail flush + sharp edges like left filter rail; keep mini-map block separate from trending/follow block with divider.
+
+
+v358 — Home mini-map static trending counties
+- Replace interactive home mini-map with a static Google Static Maps image.
+- Mini-map plots up to 20 unique trending counties at county centroid/center (no ticket pins); falls back to recent/top counties.
+- Remove mini-map title; click-anywhere opens /map; keep small 'Open full map' overlay.

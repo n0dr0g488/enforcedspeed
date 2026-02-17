@@ -65,3 +65,15 @@ HOW TO TEST (PROD)
    /api/home_minimap_staticmap?debug=1
    - Verify chosen_geoids length is 5 and county_pts has lat/lngs.
    - Verify status_code=200 and content_type is image/png (or image/*).
+
+=============================
+EnforcedSpeed v362 (2026-02-16)
+=============================
+Goal
+- Fix minimap static map crash on Render caused by missing counties.center_lat/center_lng columns.
+
+What changed
+- app.py: minimap DB query now checks information_schema.columns for the counties table and uses center_lat/center_lng when present, otherwise falls back to centroid_lat/centroid_lng.
+
+Deploy
+- Standard Render deploy: git add -A, commit, push to GitHub.

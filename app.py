@@ -5071,15 +5071,36 @@ GROUP BY UPPER(TRIM(stusps));
                 # NOTE: use an expanding bind for compatibility across DB drivers.
                 from sqlalchemy import bindparam
 
+                # Determine which county coordinate columns exist (Render schema differs across versions).
+                col_rows = db.session.execute(
+                    text(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'counties'
+                        """
+                    )
+                ).all()
+                cols = {r[0] for r in col_rows}
+
+                # Prefer explicit center columns if present, otherwise fall back to centroid columns.
+                if 'center_lat' in cols and 'center_lng' in cols:
+                    lat_expr = "COALESCE(center_lat, centroid_lat)"
+                    lng_expr = "COALESCE(center_lng, centroid_lng)"
+                else:
+                    # Render DB has centroid_lat/centroid_lng; keep this as the safe default.
+                    lat_expr = "centroid_lat"
+                    lng_expr = "centroid_lng"
+
                 stmt = text(
-                    """
+                    f"""
                     SELECT geoid,
-                           COALESCE(center_lat, centroid_lat) AS lat,
-                           COALESCE(center_lng, centroid_lng) AS lng
+                           {lat_expr} AS lat,
+                           {lng_expr} AS lng
                     FROM counties
                     WHERE geoid IN :geoids
-                      AND (COALESCE(center_lat, centroid_lat) IS NOT NULL)
-                      AND (COALESCE(center_lng, centroid_lng) IS NOT NULL)
+                      AND ({lat_expr} IS NOT NULL)
+                      AND ({lng_expr} IS NOT NULL)
                     """
                 ).bindparams(bindparam("geoids", expanding=True))
 

@@ -7,3 +7,6 @@ v361 (2026-02-16)
 
 v362 (2026-02-16)
 - Fix minimap static map generation on Render by dynamically detecting counties coordinate columns (center_lat/center_lng vs centroid_lat/centroid_lng) and falling back safely.
+
+v363 (2026-02-16)
+- Fix minimap static map generation across varying counties schemas by supporting PostGIS point columns (center/centroid) and polygon geom fallback (ST_Centroid).

@@ -5083,14 +5083,30 @@ GROUP BY UPPER(TRIM(stusps));
                 ).all()
                 cols = {r[0] for r in col_rows}
 
-                # Prefer explicit center columns if present, otherwise fall back to centroid columns.
+                # Pick the best available lat/lng expressions.
+                # Different environments have used:
+                # - center_lat/center_lng (numeric)
+                # - centroid_lat/centroid_lng (numeric)
+                # - center (PostGIS point)
+                # - centroid (PostGIS point)
+                # - geom (PostGIS polygon)
                 if 'center_lat' in cols and 'center_lng' in cols:
-                    lat_expr = "COALESCE(center_lat, centroid_lat)"
-                    lng_expr = "COALESCE(center_lng, centroid_lng)"
-                else:
-                    # Render DB has centroid_lat/centroid_lng; keep this as the safe default.
+                    lat_expr = "center_lat"
+                    lng_expr = "center_lng"
+                elif 'centroid_lat' in cols and 'centroid_lng' in cols:
                     lat_expr = "centroid_lat"
                     lng_expr = "centroid_lng"
+                elif 'center' in cols:
+                    lat_expr = "ST_Y(center::geometry)"
+                    lng_expr = "ST_X(center::geometry)"
+                elif 'centroid' in cols:
+                    lat_expr = "ST_Y(centroid::geometry)"
+                    lng_expr = "ST_X(centroid::geometry)"
+                elif 'geom' in cols:
+                    lat_expr = "ST_Y(ST_Centroid(geom)::geometry)"
+                    lng_expr = "ST_X(ST_Centroid(geom)::geometry)"
+                else:
+                    raise RuntimeError("Counties table missing center/centroid/geom columns for minimap")
 
                 stmt = text(
                     f"""

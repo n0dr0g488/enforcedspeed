@@ -10,3 +10,6 @@ v362 (2026-02-16)
 
 v363 (2026-02-16)
 - Fix minimap static map generation across varying counties schemas by supporting PostGIS point columns (center/centroid) and polygon geom fallback (ST_Centroid).
+
+v364 (2026-02-16)
+- Fix v363 syntax/boot regression and ensure minimap county coordinate lookup works on Render by selecting available PostGIS columns (center/centroid/geom) without invalid if/elif structure.

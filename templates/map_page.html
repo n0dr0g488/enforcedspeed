@@ -1,47 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
-<style id="esMapPageStyle">
-  /* Make map page fit viewport: no vertical scroll, map gets max height */
-  .home-shell{min-height:calc(100vh - 64px);}
-  .home-center.map-center{padding:0; margin:0;}
-  .map-layout{
-    display:grid;
-    grid-template-columns: 1fr 320px;
-    gap:14px;
-    padding:14px;
-    height:calc(100vh - 64px - 28px);
-    box-sizing:border-box;
-  }
-  @media (max-width: 980px){
-    .map-layout{grid-template-columns:1fr; height:auto;}
-  }
-  .es-map{
-    width:100%;
-    height:100%;
-    border-radius:14px;
-    overflow:hidden;
-    background:#f3f4f6;
-  }
-  .map-side{
-    background:#fff;
-    border:1px solid rgba(0,0,0,0.08);
-    border-radius:14px;
-    padding:14px;
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-    min-height:0;
-  }
-  .map-side-head{font-weight:600; font-size:16px; line-height:1.2;}
-  .map-legend{display:flex; flex-direction:column; gap:8px; font-size:13px;}
-  .map-legend-row{display:flex; align-items:center; gap:10px;}
-  .map-legend-row img{width:18px; height:18px;}
-  .map-side-meta{margin-top:auto;}
-  #esMapMeta{font-size:12px; color:#6b7280;}
-  #esRegionLabel{font-size:13px; font-weight:600;}
-  .follow-btn{display:inline-flex; align-items:center; justify-content:center; padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.12); background:#fff; font-weight:600; font-size:13px; cursor:pointer;}
-  .follow-btn[disabled]{opacity:.55; cursor:not-allowed;}
-</style>
 
 <div class="home-shell">
 
@@ -157,54 +115,23 @@
       </div>
     </aside>
 
-    <main class="home-center map-center">
-  {% if not maps_api_key %}
-    <div style="padding:14px;" class="subtle">
-      Google Maps key not configured. Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map.
-    </div>
-  {% else %}
-    <div class="map-layout">
-      <div class="map-canvas-wrap">
-        <div id="esMap" class="es-map"></div>
+    <main class="home-center">
+      <div class="card ticket-card" style="padding:14px;">
+        <div style="margin-bottom:14px; text-align:center;">
+          <h1 style="margin:0;">EnforcedSpeed&#39;s Interactive Map</h1>
+          <div class="subtle" style="margin-top:6px; font-size:14px;">Shows speeding tickets with a pinned location.</div>
+        </div>
+
+        {% if not maps_api_key %}
+          <div class="subtle" style="margin-top:12px;">
+            Google Maps key not configured. Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map.
+          </div>
+        {% else %}
+          <div id="esMap" style="width:100%; aspect-ratio: 1 / 1; max-height:72vh; border-radius:14px; overflow:hidden;"></div>
+          <div class="subtle" id="esMapMeta" style="margin-top:10px;"></div>
+        {% endif %}
       </div>
-
-      <aside class="map-side" aria-label="Map panel">
-        <div>
-          <div class="map-side-head">EnforcedSpeed&#39;s Interactive Map</div>
-          <div class="subtle" style="margin-top:6px; font-size:13px;">Pin colors are consistent across static + interactive maps.</div>
-        </div>
-
-        <div class="map-legend">
-          <div class="map-legend-row">
-            <img src="{{ url_for('static', filename='img/pins/pin_selected_red.png') }}" alt="">
-            <span>Selected</span>
-          </div>
-          <div class="map-legend-row">
-            <img src="{{ url_for('static', filename='img/pins/pin_inside_midgray.png') }}" alt="">
-            <span>In-county context</span>
-          </div>
-          <div class="map-legend-row">
-            <img src="{{ url_for('static', filename='img/pins/pin_outside_midgray_ghost.png') }}" alt="">
-            <span>Out-of-county</span>
-          </div>
-        </div>
-
-        <div>
-          <div class="subtle" style="font-size:12px; margin-bottom:6px;">Region</div>
-          <div id="esRegionLabel">—</div>
-
-          <div id="esFollowWrap" style="margin-top:10px; display:none;">
-            <button class="follow-btn" type="button" disabled title="Coming soon">Follow county</button>
-          </div>
-        </div>
-
-        <div class="map-side-meta">
-          <div id="esMapMeta" class="subtle">Loading pins…</div>
-        </div>
-      </aside>
-    </div>
-  {% endif %}
-</main>
+    </main>
 
     <aside class="home-right"></aside>
 
@@ -218,30 +145,15 @@
     let ES_FOCUS = { type: null, value: null };
     let ES_PINS_DEBOUNCE;
 
-    function esSetRegionLabel(label){
-      try{
-        const el = document.getElementById('esRegionLabel');
-        if(el) el.textContent = label || '—';
-      }catch(e){}
-    }
-
-    function esSetFollowVisible(isCounty){
-      try{
-        const w = document.getElementById('esFollowWrap');
-        if(!w) return;
-        w.style.display = isCounty ? 'block' : 'none';
-      }catch(e){}
-    }
-
     // Pin style (Option 3: classic teardrop + thicker outline)
     // Colors requested:
     // - Selected: Deep red
     // - Inside focus: Rose
     // - Outside focus: Warm gray
     const ES_PIN_COLORS = {
-      selected: '#dc2626',
-      inside: '#9ca3af',
-      outside: '#9ca3af'
+      selected: '#eab308', // selected ticket
+      inside: '#dc2626',   // inside focus (non-selected)
+      outside: '#a1a1aa'   // outside focus (within viewport)
     };
 
     function esSvgPinDataUrl(fill) {
@@ -265,10 +177,10 @@
       if (ES_PIN_ICON_CACHE[k]) return ES_PIN_ICON_CACHE[k];
       // Use hosted PNG assets (so Static Maps + interactive map can share the exact same art).
       const url = ({
-        selected: '/static/img/pins/pin_selected_red.png',
-        inside:   '/static/img/pins/pin_inside_midgray.png',
-        outside:  '/static/img/pins/pin_outside_midgray_ghost.png'
-      }[k] || '/static/img/pins/pin_inside_midgray.png');
+        selected: '/static/img/pins/pin_selected_yellow.png',
+        inside:   '/static/img/pins/pin_inside_deepred.png',
+        outside:  '/static/img/pins/pin_outside_warmgray.png'
+      }[k] || '/static/img/pins/pin_inside_deepred.png');
       // Keep sizing consistent across all colors.
       const scaledSize = new google.maps.Size(36, 36);
       const anchor = new google.maps.Point(18, 35);
@@ -337,8 +249,6 @@
     } catch(e) {}
 
     ES_FOCUS = { type: 'county', value: data.geoid || geoid };
-    esSetRegionLabel((data.geojson && data.geojson.features && data.geojson.features[0] && (data.geojson.features[0].properties.namelsad || data.geojson.features[0].properties.name)) || 'County');
-    esSetFollowVisible(true);
     return { ok: true, geoid: data.geoid, centroid: data.centroid || null };
   } catch(e) {
     return { ok: false };
@@ -386,8 +296,6 @@ async function esLoadStateGeomIfAny() {
     } catch(e) {}
 
     ES_FOCUS = { type: 'state', value: (data.stusps || st) };
-    esSetRegionLabel((data.geojson && data.geojson.features && data.geojson.features[0] && data.geojson.features[0].properties.state_name) || (data.stusps || st));
-    esSetFollowVisible(false);
     return { ok: true, stusps: data.stusps || st, centroid: data.centroid || null };
   } catch(e) {
     return { ok: false };
@@ -502,18 +410,6 @@ window.esInitMap = async function() {
   ES_INFO = new google.maps.InfoWindow();
 
   const focus = await esLoadBoundaryGeomIfAny();
-
-  // If no boundary was loaded, set a reasonable region label based on filters (best-effort).
-  try{
-    if(!(focus && focus.ok)){
-      const params = new URLSearchParams(window.location.search);
-      const countyLabel = (params.get('county_label') || '').trim();
-      const st = (params.get('state') || '').trim().toUpperCase();
-      if(countyLabel){ esSetRegionLabel(countyLabel); esSetFollowVisible(true); }
-      else if(st && st.length===2){ esSetRegionLabel(st); esSetFollowVisible(false); }
-      else { esSetRegionLabel('United States'); esSetFollowVisible(false); }
-    }
-  }catch(e){}
 
   // Initial pin load
   await esLoadPins({ skipFit: focus && focus.ok });

@@ -257,16 +257,10 @@
         {# Under-username metadata line (State / County / Road). #}
         <div class="ticket-submeta">
           {# State click should focus the interactive map without forcing a state filter. #}
-          <span class="ticket-submeta-item"><a class="ticket-state-link" href="{{ url_for('map_view', state=state_code, focus_state=state_code, ticket_id=r.id) }}">{{ state_name }} <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span></a></span>
+          <span class="ticket-submeta-item"><a class="ticket-state-link" href="{{ url_for('map_view', focus_state=state_code, ticket_id=r.id) }}">{{ state_name }}</a> <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span></span>
           <span class="ticket-submeta-sep">·</span>
           {# County click should focus the interactive map without forcing a county filter. #}
-          <span class="ticket-submeta-item">
-            {% if r.county_geoid and r.county_name %}
-              <a class="ticket-county-link" href="{{ url_for('map_view', county_geoid=r.county_geoid, focus_state=(r.state[:2] if r.state else ''), focus_county_geoid=r.county_geoid, ticket_id=r.id) }}">{{ r.county_name }} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span></a>
-            {% else %}
-              {{ r.county_name or '—' }} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span>
-            {% endif %}
-          </span>
+          <span class="ticket-submeta-item">{% if r.county_geoid and r.county_name %}<a class="ticket-county-link" href="{{ url_for('map_view', focus_state=(r.state[:2] if r.state else ''), focus_county_geoid=r.county_geoid, ticket_id=r.id) }}">{{ r.county_name }}</a>{% else %}{{ r.county_name or '—' }}{% endif %} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span></span>
           <span class="ticket-submeta-sep">·</span>
           <span class="ticket-submeta-item">{{ format_road_bucket(r.road_name) }}</span>
         </div>
@@ -800,8 +794,12 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="subtle" style="padding:12px 14px 14px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
         {% endif %}
       </div>
+
       {# Card 2: Trending + Followed (separate container, flush aligned) #}
       <div class="rail-card" style="border-radius:0;">
+
+      {# Card 2: Trending + Followed (separate container, flush aligned) #}
+      <div class="rail-card">
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
@@ -813,7 +811,8 @@ document.addEventListener('DOMContentLoaded', function(){
     <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:10px; padding:0 2px;">
       <span style="width:34px; text-align:right;">7d</span>
       <span style="width:34px; text-align:right;">30d</span>
-      <span style="width:34px; text-align:right;">1y</span><span style="width:52px; text-align:right;">Avg. Ovr.</span>
+      <span style="width:34px; text-align:right;">1y</span>
+      <span style="width:64px; text-align:right;">Overage</span>
     </div>
 
     {% if trending_counties and trending_counties|length > 0 %}
@@ -827,7 +826,8 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="display:flex; align-items:center; gap:10px; font-size:12px; font-variant-numeric:tabular-nums;">
               <span style="width:34px; text-align:right;">{{ c.c7 }}</span>
               <span style="width:34px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:34px; text-align:right;">{{ c.c365 }}</span><span style="width:52px; text-align:right;">{{ c.avg_over if c.avg_over is not none else '—' }}</span>
+              <span style="width:34px; text-align:right;">{{ c.c365 }}</span>
+              <span style="width:64px; text-align:right;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}
@@ -850,7 +850,8 @@ document.addEventListener('DOMContentLoaded', function(){
     <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:10px; padding:0 2px;">
       <span style="width:34px; text-align:right;">7d</span>
       <span style="width:34px; text-align:right;">30d</span>
-      <span style="width:34px; text-align:right;">1y</span><span style="width:52px; text-align:right;">Avg. Ovr.</span>
+      <span style="width:34px; text-align:right;">1y</span>
+      <span style="width:64px; text-align:right;">Overage</span>
     </div>
 
     {% if not current_user.is_authenticated %}
@@ -866,7 +867,8 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="display:flex; align-items:center; gap:10px; font-size:12px; font-variant-numeric:tabular-nums;">
               <span style="width:34px; text-align:right;">{{ c.c7 }}</span>
               <span style="width:34px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:34px; text-align:right;">{{ c.c365 }}</span><span style="width:52px; text-align:right;">{{ c.avg_over if c.avg_over is not none else '—' }}</span>
+              <span style="width:34px; text-align:right;">{{ c.c365 }}</span>
+              <span style="width:64px; text-align:right;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}

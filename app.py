@@ -354,86 +354,122 @@ def _encode_polyline(points):
 
 
 def _county_bbox_and_outline_polyline(geoid: str):
-    """Return (minlat, minlng, maxlat, maxlng, polyline) for the county outline.
+    """Return (minlat, minlng, maxlat, maxlng, polyline) for the county geom.
 
-    Guardrails
-    - Do NOT require runtime geometry unions.
-    - Feature-detect where geometry lives (Render/local schemas can differ).
-    - If we cannot access geometry, we return None (caller may fall back to a
-      non-outline static map).
+    Notes
+    - Static Maps path data is carried in the URL, so we must simplify/limit the
+      outline somewhat.
+    - We intentionally draw ONLY the exterior ring (no holes) for the feed
+      preview. This keeps the URL smaller and avoids complex multi-path shapes.
+    - To keep zoom framing consistent with what we actually draw, we compute the
+      bbox from the exterior ring we choose (not from the full raw geometry).
     """
-    geoid = (geoid or "").strip()
-    if not geoid:
+    try:
+        # Gentler simplification than earlier versions (0.01 was too aggressive).
+        # ~0.0025 degrees is roughly ~275m in latitude; the point/URL cap below
+        # provides an additional safety net for huge/complex counties.
+        row = db.session.execute(
+            text(
+                """
+                SELECT ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, :tol)) AS geom_json
+                FROM counties
+                WHERE geoid = :geoid
+                LIMIT 1
+                """
+            ),
+            {"geoid": geoid, "tol": 0.0025},
+        ).mappings().first()
+    except Exception:
         return None
 
-    # Prefer counties.geom when present; fall back to counties_geom.geom if that's
-    # what exists in this environment.
-    candidates = [
-        ("counties", "geom"),
-        ("counties_geom", "geom"),
-    ]
+    if not row:
+        return None
 
-    geom_json = None
-    last_err = None
-
-    for table, col in candidates:
-        try:
-            row = db.session.execute(
-                text(
-                    f"""
-                    SELECT ST_AsGeoJSON(ST_SimplifyPreserveTopology({col}, :tol)) AS geom_json
-                    FROM {table}
-                    WHERE geoid = :geoid
-                    LIMIT 1
-                    """
-                ),
-                {"geoid": geoid, "tol": 0.0025},
-            ).mappings().first()
-            if row and row.get("geom_json"):
-                geom_json = row["geom_json"]
-                break
-        except Exception as e:
-            last_err = e
-            continue
-
+    geom_json = row.get('geom_json')
     if not geom_json:
         return None
 
     try:
-        gj = json.loads(geom_json)
+        import json
+        geom = json.loads(geom_json)
+    except Exception:
+        geom = None
+
+    if not geom or 'coordinates' not in geom:
+        return None
+
+    # Choose a reasonable exterior ring: pick the longest exterior ring.
+    rings = []
+    gtype = (geom.get('type') or '').lower()
+    coords = geom.get('coordinates')
+
+    def add_polygon(poly):
+        # poly: [ [ [lng,lat], ... ] , holes...]
+        if not poly or not poly[0]:
+            return
+        ring = poly[0]
+        rings.append(ring)
+
+    try:
+        if gtype == 'polygon':
+            add_polygon(coords)
+        elif gtype == 'multipolygon':
+            for poly in coords:
+                add_polygon(poly)
+    except Exception:
+        rings = []
+
+    if not rings:
+        return None
+
+    ring = max(rings, key=lambda r: len(r) if r else 0)
+
+    # Compute bbox from the chosen exterior ring (so zoom framing matches the outline).
+    try:
+        lats = [float(p[1]) for p in ring if p and len(p) >= 2]
+        lngs = [float(p[0]) for p in ring if p and len(p) >= 2]
+        if not lats or not lngs:
+            return None
+        min_lat = min(lats)
+        max_lat = max(lats)
+        min_lng = min(lngs)
+        max_lng = max(lngs)
     except Exception:
         return None
 
-    # Pull exterior ring only (Polygon or MultiPolygon)
-    coords = None
-    if gj.get("type") == "Polygon":
-        coords = (gj.get("coordinates") or [None])[0]
-    elif gj.get("type") == "MultiPolygon":
-        polys = gj.get("coordinates") or []
-        if polys and polys[0]:
-            coords = polys[0][0]
-    if not coords:
-        return None
+    # Downsample to keep URL length reasonable (Static Maps has URL length limits).
+    # Use a higher point budget than before and auto-tighten only if the encoded
+    # polyline becomes too long.
+    if not ring:
+        return (float(min_lat), float(min_lng), float(max_lat), float(max_lng), None)
 
-    # Cap point count to keep URL sizes reasonable
-    MAX_POINTS = 520
-    if len(coords) > MAX_POINTS:
-        step = max(1, len(coords) // MAX_POINTS)
-        coords = coords[::step]
-        # ensure closed ring
-        if coords and coords[0] != coords[-1]:
-            coords.append(coords[0])
+    max_poly_chars = 4200  # conservative; leaves room for other URL params
+    target_points = 420
+    step = max(1, int(len(ring) / target_points))
 
-    # coords are [lng,lat]
-    lats = [pt[1] for pt in coords]
-    lngs = [pt[0] for pt in coords]
-    min_lat, max_lat = min(lats), max(lats)
-    min_lng, max_lng = min(lngs), max(lngs)
+    def build_pts(step_n: int):
+        pts_local = []
+        for i in range(0, len(ring), max(1, int(step_n))):
+            lng, lat = ring[i]
+            pts_local.append((float(lat), float(lng)))
+        if pts_local and pts_local[0] != pts_local[-1]:
+            pts_local.append(pts_local[0])
+        return pts_local
 
-    # Polyline expects (lat,lng)
-    points = [(pt[1], pt[0]) for pt in coords]
-    poly = _encode_polyline(points)
-    return (min_lat, min_lng, max_lat, max_lng, poly)
+    poly = None
+    for _ in range(6):
+        pts = build_pts(step)
+        poly_try = _encode_polyline(pts) if len(pts) >= 3 else None
+        if not poly_try:
+            poly = None
+            break
+        if len(poly_try) <= max_poly_chars:
+            poly = poly_try
+            break
+        # Too long: sample fewer points.
+        step = int(step * 1.6) + 1
+
+    return (float(min_lat), float(min_lng), float(max_lat), float(max_lng), poly)
 
 
 def _mercator_y(lat: float) -> float:
@@ -567,58 +603,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
 
     info = _county_bbox_and_outline_polyline(geoid)
     if not info:
-        # Fallback: if we can't access geometry in this environment, still return a usable map.
-        # Use pin center when available; otherwise use a county centroid if present.
-        center_lat = None
-        center_lng = None
-        if center_on_pin and pin_lat is not None and pin_lng is not None:
-            center_lat = float(pin_lat)
-            center_lng = float(pin_lng)
-        else:
-            try:
-                rowc = db.session.execute(
-                    text("SELECT centroid_lat, centroid_lng FROM counties WHERE geoid=:g LIMIT 1"),
-                    {"g": geoid},
-                ).mappings().first()
-                if rowc and rowc.get("centroid_lat") is not None and rowc.get("centroid_lng") is not None:
-                    center_lat = float(rowc["centroid_lat"])
-                    center_lng = float(rowc["centroid_lng"])
-            except Exception:
-                pass
-        if center_lat is None or center_lng is None:
-            # As a last resort, return empty so the caller can 404.
-            return ''
-
-        # Conservative zoom so the preview is still informative without an outline.
-        zoom = 9
-
-        try:
-            from flask import current_app
-            cfg_base = (current_app.config.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
-        except Exception:
-            cfg_base = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
-
-        if cfg_base and cfg_base.startswith("http"):
-            base_url = cfg_base
-        else:
-            proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
-            host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
-            if proto == "http":
-                proto = "https"
-            base_url = f"{proto}://{host}"
-
-        icon_url = f"{base_url}/static/img/pins/pin_selected_red_static.png"
-        center = f"{center_lat:.6f},{center_lng:.6f}"
-        params = {
-            "center": center,
-            "zoom": str(int(zoom)),
-            "size": f"{int(width)}x{int(height)}",
-            "scale": "2",
-            "maptype": "roadmap",
-            "markers": f"icon:{icon_url}|{center}",
-            "key": key,
-        }
-        return "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params, safe=':/')
+        return ''
 
     min_lat, min_lng, max_lat, max_lng, poly = info
 
@@ -698,7 +683,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         return f"{proto}://{host}"
 
     base_url = _public_base_url()
-    icon_url = f"{base_url}/static/img/pins/pin_selected_red_static.png"
+    icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
 
     params = {
         'size': f"{int(width)}x{int(height)}",
@@ -2917,129 +2902,87 @@ GROUP BY UPPER(TRIM(stusps));
                     chosen.append((geoid2, c7b, c30b, c365b))
                     chosen_geoids.add(geoid2)
 
-            
-            def _median_overage_for_geoids(geoids_list):
-                """Best-effort median overage (ticketed - posted) per county geoid.
+            # Compute median overage (last 365d) for the counties we will display.
+            # Keep this best-effort and never break the home page.
+            median_overage_by_geoid: dict[str, str] = {}
+            try:
+                geoids_needed = set(chosen_geoids)
+                if current_user.is_authenticated and followed_geoids:
+                    geoids_needed.update(followed_geoids)
 
-                Uses Postgres percentile_cont when available. Never raises.
-                """
-                try:
-                    if not geoids_list:
-                        return {}
-                    # Only attempt on Postgres; other engines vary.
-                    try:
-                        dialect = (db.engine.name or '').lower()
-                    except Exception:
-                        dialect = ''
-                    if 'postgres' not in dialect:
-                        return {}
-                    from sqlalchemy import bindparam
-                    stmt = text(
-                        """
-                        SELECT county_geoid AS geoid,
-                               percentile_cont(0.5) WITHIN GROUP (ORDER BY (ticketed_speed - posted_speed)) AS med_over
-                        FROM speed_report
-                        WHERE is_deleted = false
-                          AND county_geoid IN :geoids
-                          AND posted_speed IS NOT NULL
-                          AND ticketed_speed IS NOT NULL
-                        GROUP BY county_geoid
-                        """
-                    ).bindparams(bindparam("geoids", expanding=True))
-                    rows2 = db.session.execute(stmt, {"geoids": list(geoids_list)}).mappings().all()
-                    out = {}
-                    for rr in rows2:
-                        g = str(rr.get("geoid") or "")
-                        if not g:
-                            continue
-                        try:
-                            v = rr.get("med_over")
-                            if v is None:
+                if geoids_needed:
+                    # Prefer Postgres percentile_cont; otherwise fall back to a small Python median per geoid.
+                    dialect = getattr(db.engine.dialect, "name", "") or ""
+                    if "postgres" in dialect:
+                        q = text(
+                            "SELECT county_geoid AS geoid, "
+                            "percentile_cont(0.5) WITHIN GROUP (ORDER BY overage) AS med "
+                            "FROM speed_reports "
+                            "WHERE is_deleted = false "
+                            "AND county_geoid = ANY(:geoids) "
+                            "AND created_at >= :t365 "
+                            "AND overage IS NOT NULL "
+                            "GROUP BY county_geoid"
+                        )
+                        rows_med = db.session.execute(q, {"geoids": list(geoids_needed), "t365": t365}).mappings().all()
+                        for rmed in rows_med:
+                            g = str(rmed.get("geoid") or "")
+                            med = rmed.get("med")
+                            if not g or med is None:
                                 continue
-                            out[g] = int(round(float(v)))
-                        except Exception:
-                            continue
-                    return out
-                except Exception:
-                    return {}
+                            try:
+                                v = int(round(float(med)))
+                                median_overage_by_geoid[g] = f"+{v}mph"
+                            except Exception:
+                                continue
+                    else:
+                        # Lightweight fallback: only for the small set of displayed counties.
+                        vals = (
+                            db.session.query(SpeedReport.county_geoid, SpeedReport.overage)
+                            .filter(SpeedReport.is_deleted == False)
+                            .filter(SpeedReport.county_geoid.in_(list(geoids_needed)))
+                            .filter(SpeedReport.created_at >= t365)
+                            .filter(SpeedReport.overage.isnot(None))
+                            .all()
+                        )
+                        by_g: dict[str, list[int]] = {}
+                        for g, v in vals:
+                            if g is None or v is None:
+                                continue
+                            by_g.setdefault(str(g), []).append(int(v))
+                        for g, arr in by_g.items():
+                            if not arr:
+                                continue
+                            arr.sort()
+                            n = len(arr)
+                            if n % 2 == 1:
+                                medv = arr[n // 2]
+                            else:
+                                medv = int(round((arr[n // 2 - 1] + arr[n // 2]) / 2.0))
+                            median_overage_by_geoid[g] = f"+{int(medv)}mph"
+            except Exception:
+                median_overage_by_geoid = {}
 
             # Attach labels for display.
-            def _fetch_county_display(geoids_list):
-                """Return {geoid: (label, st)} best-effort for the given geoids.
-
-                Render/local schemas have differed; we feature-detect columns and never raise.
-                """
-                try:
-                    geoids_list = [str(g) for g in (geoids_list or []) if g]
-                    if not geoids_list:
-                        return {}
-                    # Detect columns once.
-                    col_rows = db.session.execute(
-                        text(
-                            """
-                            SELECT column_name
-                            FROM information_schema.columns
-                            WHERE table_schema = 'public' AND table_name = 'counties'
-                            """
-                        )
-                    ).all()
-                    cols = {r[0] for r in col_rows}
-
-                    name_col = None
-                    for c in ("namelsad", "name", "county_name", "display_name", "label"):
-                        if c in cols:
-                            name_col = c
-                            break
-
-                    st_col = None
-                    for c in ("stusps", "state", "state_code", "st"):
-                        if c in cols:
-                            st_col = c
-                            break
-
-                    if not name_col and not st_col:
-                        return {}
-
-                    from sqlalchemy import bindparam
-                    select_parts = ["geoid"]
-                    if name_col:
-                        select_parts.append(f"{name_col} AS label")
-                    else:
-                        select_parts.append("NULL AS label")
-                    if st_col:
-                        select_parts.append(f"{st_col} AS st")
-                    else:
-                        select_parts.append("NULL AS st")
-
-                    stmt = text(
-                        f"""
-                        SELECT {', '.join(select_parts)}
-                        FROM counties
-                        WHERE geoid IN :geoids
-                        """
-                    ).bindparams(bindparam("geoids", expanding=True))
-
-                    rows2 = db.session.execute(stmt, {"geoids": geoids_list}).mappings().all()
-                    out = {}
-                    for r in rows2:
-                        g = str(r.get("geoid") or "")
-                        if not g:
-                            continue
-                        out[g] = ((r.get("label") or g), (r.get("st") or ""))
-                    return out
-                except Exception:
-                    return {}
-
-            display_map = _fetch_county_display([g for (g, _c7, _c30, _c365) in chosen])
-            med_over_map = _median_overage_for_geoids([g for (g, _c7, _c30, _c365) in chosen])
-
             for geoid, c7, c30, c365 in chosen:
-                label, st = display_map.get(geoid, (geoid, ""))
+                label = geoid
+                st = ""
+                try:
+                    row = db.session.execute(
+                        text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                        {"g": geoid},
+                    ).mappings().first()
+                    if row:
+                        label = row.get("namelsad") or label
+                        st = row.get("stusps") or ""
+                except Exception:
+                    pass
+
                 trending_counties.append(
-                    {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365, "avg_over": med_over_map.get(geoid)}
+                    {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365, "ovr": median_overage_by_geoid.get(geoid, "—")}
                 )
 
-# Followed counties for the current user.
+            # Followed counties for the current user.
             if current_user.is_authenticated:
                 followed_rows = (
                     db.session.query(FollowedCounty.county_geoid)
@@ -3060,14 +3003,22 @@ GROUP BY UPPER(TRIM(stusps));
                         reverse=True,
                     )[:5]
 
-                    med_over_map2 = _median_overage_for_geoids(order_geoids)
-                    display_map2 = _fetch_county_display(order_geoids)
-
                     for geoid in order_geoids:
                         c7, c30, c365, _ = agg.get(geoid, (0, 0, 0, None))
-                        label, st = display_map2.get(geoid, (geoid, ""))
+                        label = geoid
+                        st = ""
+                        try:
+                            row = db.session.execute(
+                                text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                                {"g": geoid},
+                            ).mappings().first()
+                            if row:
+                                label = row.get("namelsad") or label
+                                st = row.get("stusps") or ""
+                        except Exception:
+                            pass
                         followed_counties.append(
-                            {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365, "avg_over": med_over_map2.get(geoid)}
+                            {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365, "ovr": median_overage_by_geoid.get(geoid, "—")}
                         )
         except Exception:
             trending_counties = []
@@ -4933,7 +4884,7 @@ GROUP BY UPPER(TRIM(stusps));
                 proto = "https"
             base_url = f"{proto}://{host}"
 
-        icon_url = f"{base_url}/static/img/pins/pin_selected_red_static.png"
+        icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
 
         params = {
             "center": center,
@@ -5001,7 +4952,7 @@ GROUP BY UPPER(TRIM(stusps));
                 width=w,
                 height=h,
                 center_on_pin=center_on_pin,
-                use_custom_icon=True
+                use_custom_icon=False
             )
         else:
             upstream = us_static_map_url(width=w, height=h)
@@ -5087,8 +5038,8 @@ GROUP BY UPPER(TRIM(stusps));
 
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
         # Padded slightly so WA/OR (and Maine) don't feel clipped.
-        visible_sw = "22.6,-128.5"
-        visible_ne = "51.0,-64.2"
+        visible_sw = "23.0,-127.5"
+        visible_ne = "50.5,-65.0"
 
         try:
             now_utc = datetime.utcnow()
@@ -5240,43 +5191,23 @@ GROUP BY UPPER(TRIM(stusps));
                         county_pts.append(coord_map[geoid])
 
             # Build a small static map using the same custom pins as the rest of the site.
-            def _public_base_url() -> str:
-                try:
-                    from flask import current_app
-                    cfg = (current_app.config.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
-                except Exception:
-                    cfg = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
-                if cfg and cfg.startswith("http"):
-                    return cfg
-                proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "https").split(",")[0].strip()
-                host = (request.headers.get("X-Forwarded-Host") or request.host).split(",")[0].strip()
-                if host.endswith("onrender.com") or ".onrender.com" in host:
-                    host = "enforcedspeed.com"
-                if proto == "http":
-                    proto = "https"
-                return f"{proto}://{host}"
+            params = [
+                ("size", "640x346"),
+                ("scale", "2"),
+                ("maptype", "roadmap"),
+                ("style", "feature:poi|visibility:off"),
+                ("style", "feature:transit|visibility:off"),
+                ("visible", f"{visible_sw}|{visible_ne}"),
+                ("key", google_key),
+            ]
 
-            base_url = _public_base_url()
-            icon_url = f"{base_url}/static/img/pins/pin_inside_midgray_static.png"
-            encoded_icon = urllib.parse.quote(icon_url, safe="")
+            pin_icon_url = url_for('static', filename='img/pins/pin_inside_deepred_static.png', _external=True)
+            for lat, lng in county_pts[:5]:
+                params.append(("markers", f"icon:{pin_icon_url}|{lat:.6f},{lng:.6f}"))
 
-            params = {
-                "size": "640x346",
-                "scale": "2",
-                "maptype": "roadmap",
-                "style": [
-                    "feature:poi|visibility:off",
-                    "feature:transit|visibility:off",
-                ],
-                "visible": f"{visible_sw}|{visible_ne}",
-                "key": google_key,
-            }
-
-            if county_pts:
-                params["markers"] = [f"icon:{encoded_icon}|{lat:.6f},{lng:.6f}" for (lat, lng) in county_pts[:5]]
-
-            # Keep ':' and '/' readable in URLs and keep icon: intact (Google requires literal icon:)
-            qs = urllib.parse.urlencode(params, doseq=True, safe=":/,%")
+            # Build URL manually to allow repeated 'style' and 'markers' to allow repeated 'style' and 'markers'
+            from urllib.parse import urlencode
+            qs = urlencode(params, doseq=True)
             url = f"https://maps.googleapis.com/maps/api/staticmap?{qs}"
 
             # Fetch and return image

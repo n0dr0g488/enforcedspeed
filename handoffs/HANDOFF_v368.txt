@@ -1,0 +1,27 @@
+HANDOFF — EnforcedSpeed Web v368 (based on v366 baseline)
+
+Change scope (ONE change only)
+- Home right-rail Trending counties + Counties you follow tables: added an "Overage" column.
+- Overage values show the median ticket overage for that county over the last 365 days, formatted like "+7mph".
+
+Implementation notes
+- Backend computes counts (7d/30d/1y) as before.
+- Added a best-effort median overage calculation:
+  - Postgres: uses percentile_cont(0.5) within group (ORDER BY overage) with created_at >= now-365d.
+  - Non-Postgres fallback: fetches overage values for only the displayed counties and computes median in Python.
+- County/state labels still come from counties table (namelsad/stusps) so full names remain visible.
+
+Guardrails checked
+- No changes to ticket card static map endpoints or centering logic.
+- No changes to minimap custom pin sizing or right-rail layout structure.
+
+Local smoke test commands
+- python -m py_compile app.py
+- es-up
+- Verify: Home feed loads; ticket card static images still appear; right-rail minimap loads; tables show full county names + new Overage column.
+
+Going live (Render)
+- git status
+- git add -A
+- git commit -m "v368: add median overage column to trending/follow tables"
+- git push

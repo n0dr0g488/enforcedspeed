@@ -801,33 +801,33 @@ document.addEventListener('DOMContentLoaded', function(){
       {# Card 2: Trending + Followed (separate container, flush aligned) #}
       <div class="rail-card">
         <div class="rail-section">
-  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
       <div style="font-weight:600;">Trending counties</div>
     </div>
   </div>
 
   <div style="margin-top:10px;">
-    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:10px; padding:0 2px;">
-      <span style="width:34px; text-align:right;">7d</span>
-      <span style="width:34px; text-align:right;">30d</span>
-      <span style="width:34px; text-align:right;">1y</span>
-      <span style="width:64px; text-align:right;">Overage</span>
+    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:6px; padding:0 2px;">
+      <span style="width:28px; text-align:right;">7d</span>
+      <span style="width:28px; text-align:right;">30d</span>
+      <span style="width:28px; text-align:right;">1y</span>
+      <span style="width:56px; text-align:right;">Overage</span>
     </div>
 
     {% if trending_counties and trending_counties|length > 0 %}
       <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
         {% for c in trending_counties %}
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
               {{ c.label }}, {{ c.st }}
             </a>
 
-            <div style="display:flex; align-items:center; gap:10px; font-size:12px; font-variant-numeric:tabular-nums;">
-              <span style="width:34px; text-align:right;">{{ c.c7 }}</span>
-              <span style="width:34px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:34px; text-align:right;">{{ c.c365 }}</span>
-              <span style="width:64px; text-align:right;">{{ c.ovr }}</span>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-variant-numeric:tabular-nums;">
+              <span style="width:28px; text-align:right;">{{ c.c7 }}</span>
+              <span style="width:28px; text-align:right;">{{ c.c30 }}</span>
+              <span style="width:28px; text-align:right;">{{ c.c365 }}</span>
+              <span style="width:56px; text-align:right;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}
@@ -840,18 +840,18 @@ document.addEventListener('DOMContentLoaded', function(){
         </div>
 
         <div class="rail-section">
-  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
       <div style="font-weight:600;">Counties you follow</div>
     </div>
   </div>
 
   <div style="margin-top:10px;">
-    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:10px; padding:0 2px;">
-      <span style="width:34px; text-align:right;">7d</span>
-      <span style="width:34px; text-align:right;">30d</span>
-      <span style="width:34px; text-align:right;">1y</span>
-      <span style="width:64px; text-align:right;">Overage</span>
+    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:6px; padding:0 2px;">
+      <span style="width:28px; text-align:right;">7d</span>
+      <span style="width:28px; text-align:right;">30d</span>
+      <span style="width:28px; text-align:right;">1y</span>
+      <span style="width:56px; text-align:right;">Overage</span>
     </div>
 
     {% if not current_user.is_authenticated %}
@@ -859,16 +859,16 @@ document.addEventListener('DOMContentLoaded', function(){
     {% elif followed_counties and followed_counties|length > 0 %}
       <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
         {% for c in followed_counties %}
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
               {{ c.label }}, {{ c.st }}
             </a>
 
-            <div style="display:flex; align-items:center; gap:10px; font-size:12px; font-variant-numeric:tabular-nums;">
-              <span style="width:34px; text-align:right;">{{ c.c7 }}</span>
-              <span style="width:34px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:34px; text-align:right;">{{ c.c365 }}</span>
-              <span style="width:64px; text-align:right;">{{ c.ovr }}</span>
+            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-variant-numeric:tabular-nums;">
+              <span style="width:28px; text-align:right;">{{ c.c7 }}</span>
+              <span style="width:28px; text-align:right;">{{ c.c30 }}</span>
+              <span style="width:28px; text-align:right;">{{ c.c365 }}</span>
+              <span style="width:56px; text-align:right;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}

@@ -25,3 +25,5 @@ v366 (2026-02-16)
 
 v368 (2026-02-17)
 - Home right-rail Trending/Followed tables: add Overage column showing median overage (last 365d) per county.
+
+v369 (2026-02-17) — Right-rail tables: show full county names (no truncation) and tighten 7d/30d/1y/Overage column spacing.

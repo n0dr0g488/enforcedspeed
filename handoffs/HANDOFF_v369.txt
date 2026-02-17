@@ -1,0 +1,30 @@
+HANDOFF — EnforcedSpeed Web v369 (based on v368; one-change)
+
+Change made (scoped)
+- Home right-rail Trending counties + Counties you follow:
+  - County name links no longer truncate with ellipsis; they can wrap to show full name.
+  - Tightened spacing for the 7d / 30d / 1y / Overage numeric columns (reduced gaps + widths).
+
+Guardrails respected (no-touch)
+- Did NOT modify ticket card static map generation, centering logic, or custom pin sizing.
+- Did NOT modify minimap logic.
+- Did NOT modify trending/follow label resolver (still uses full names).
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v361-370.txt
+
+Local smoke test
+- python -m py_compile app.py
+- es-up
+- Verify:
+  - Home feed loads; ticket card static images still render
+  - Right-rail minimap renders
+  - Tables show full county names and tighter numeric columns
+
+Git (going live = push)
+git status
+git add .
+git commit -m "v369: right-rail tables show full county names + tighter column spacing"
+git push

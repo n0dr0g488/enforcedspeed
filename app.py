@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import requests
 
 def _get_county_filter_from_request():
     """Parse county filter from query params.

@@ -683,7 +683,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         return f"{proto}://{host}"
 
     base_url = _public_base_url()
-    icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
+    icon_url = f"{base_url}/static/img/pins/pin_selected_red_static.png"
 
     params = {
         'size': f"{int(width)}x{int(height)}",
@@ -2902,7 +2902,54 @@ GROUP BY UPPER(TRIM(stusps));
                     chosen.append((geoid2, c7b, c30b, c365b))
                     chosen_geoids.add(geoid2)
 
+            
+            def _median_overage_for_geoids(geoids_list):
+                """Best-effort median overage (ticketed - posted) per county geoid.
+
+                Uses Postgres percentile_cont when available. Never raises.
+                """
+                try:
+                    if not geoids_list:
+                        return {}
+                    # Only attempt on Postgres; other engines vary.
+                    try:
+                        dialect = (db.engine.name or '').lower()
+                    except Exception:
+                        dialect = ''
+                    if 'postgres' not in dialect:
+                        return {}
+                    from sqlalchemy import bindparam
+                    stmt = text(
+                        """
+                        SELECT county_geoid AS geoid,
+                               percentile_cont(0.5) WITHIN GROUP (ORDER BY (ticketed_speed - posted_speed)) AS med_over
+                        FROM speed_report
+                        WHERE is_deleted = false
+                          AND county_geoid IN :geoids
+                          AND posted_speed IS NOT NULL
+                          AND ticketed_speed IS NOT NULL
+                        GROUP BY county_geoid
+                        """
+                    ).bindparams(bindparam("geoids", expanding=True))
+                    rows2 = db.session.execute(stmt, {"geoids": list(geoids_list)}).mappings().all()
+                    out = {}
+                    for rr in rows2:
+                        g = str(rr.get("geoid") or "")
+                        if not g:
+                            continue
+                        try:
+                            v = rr.get("med_over")
+                            if v is None:
+                                continue
+                            out[g] = int(round(float(v)))
+                        except Exception:
+                            continue
+                    return out
+                except Exception:
+                    return {}
+
             # Attach labels for display.
+            med_over_map = _median_overage_for_geoids([g for (g, _c7, _c30, _c365) in chosen])
             for geoid, c7, c30, c365 in chosen:
                 label = geoid
                 st = ""
@@ -2918,7 +2965,7 @@ GROUP BY UPPER(TRIM(stusps));
                     pass
 
                 trending_counties.append(
-                    {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365}
+                    {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365, "avg_over": med_over_map.get(geoid)}
                 )
 
             # Followed counties for the current user.
@@ -2942,6 +2989,8 @@ GROUP BY UPPER(TRIM(stusps));
                         reverse=True,
                     )[:5]
 
+                    med_over_map2 = _median_overage_for_geoids(order_geoids)
+
                     for geoid in order_geoids:
                         c7, c30, c365, _ = agg.get(geoid, (0, 0, 0, None))
                         label = geoid
@@ -2957,7 +3006,7 @@ GROUP BY UPPER(TRIM(stusps));
                         except Exception:
                             pass
                         followed_counties.append(
-                            {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365}
+                            {"geoid": geoid, "label": label, "st": st, "c7": c7, "c30": c30, "c365": c365, "avg_over": med_over_map2.get(geoid)}
                         )
         except Exception:
             trending_counties = []
@@ -4823,7 +4872,7 @@ GROUP BY UPPER(TRIM(stusps));
                 proto = "https"
             base_url = f"{proto}://{host}"
 
-        icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
+        icon_url = f"{base_url}/static/img/pins/pin_selected_red_static.png"
 
         params = {
             "center": center,
@@ -4977,8 +5026,8 @@ GROUP BY UPPER(TRIM(stusps));
 
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
         # Padded slightly so WA/OR (and Maine) don't feel clipped.
-        visible_sw = "23.0,-127.5"
-        visible_ne = "50.5,-65.0"
+        visible_sw = "22.6,-128.5"
+        visible_ne = "51.0,-64.2"
 
         try:
             now_utc = datetime.utcnow()
@@ -5140,7 +5189,7 @@ GROUP BY UPPER(TRIM(stusps));
                 ("key", google_key),
             ]
 
-            pin_icon_url = url_for('static', filename='img/pins/pin_inside_deepred_static.png', _external=True)
+            pin_icon_url = url_for('static', filename='img/pins/pin_inside_midgray_static.png', _external=True, _scheme='https')
             for lat, lng in county_pts[:5]:
                 params.append(("markers", f"icon:{pin_icon_url}|{lat:.6f},{lng:.6f}"))
 

@@ -21,3 +21,10 @@ v365 (2026-02-16)
 v366 (2026-02-16)
 - Home right-rail: widen Trending/Followed county name column and tighten 7d/30d/1y columns.
 - Home minimap: use custom EnforcedSpeed pins (static map markers) and pad CONUS bounds slightly so WA/OR feel less clipped.
+
+v367 (2026-02-17)
+- Ticket cards: make State clickable to open /map focused + filtered to that state; state counts in parentheses are clickable too.
+- Map page: remove top title block + bottom meta line, add right-side panel (legend, region label, pins shown) and increase map height (no-scroll on laptop view).
+- Unify pin colors across static + minimap + interactive: selected = red; in-county context = mid-gray; out-of-county = ghosted mid-gray.
+- Home right-rail Trending + Followed tables: add “Avg. Ovr.” column (best-effort median overage; shows “—” if unavailable).
+- Home minimap: zoom out/pad CONUS bounds slightly more to prevent edge-clipping; force HTTPS static pin icon URL so Google uses custom pins reliably.

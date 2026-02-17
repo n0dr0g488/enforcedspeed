@@ -17,3 +17,7 @@ v364 (2026-02-16)
 
 v365 (2026-02-16)
 - Hotfix: ensure app boots by fixing v363 invalid if/elif in /api/home_minimap_staticmap and supporting PostGIS counties coordinate columns (center/centroid/geom).
+
+v366 (2026-02-16)
+- Home right-rail: widen Trending/Followed county name column and tighten 7d/30d/1y columns.
+- Home minimap: use custom EnforcedSpeed pins (static map markers) and pad CONUS bounds slightly so WA/OR feel less clipped.

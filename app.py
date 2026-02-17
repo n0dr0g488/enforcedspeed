@@ -4976,9 +4976,9 @@ GROUP BY UPPER(TRIM(stusps));
             return ("Missing GOOGLE_MAPS_API_KEY", 503)
 
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
-        # SW: near San Diego, CA coastline. NE: near northern Maine coastline.
-        visible_sw = "24.396308,-124.848974"
-        visible_ne = "49.384358,-66.885444"
+        # Padded slightly so WA/OR (and Maine) don't feel clipped.
+        visible_sw = "23.0,-127.5"
+        visible_ne = "50.5,-65.0"
 
         try:
             now_utc = datetime.utcnow()
@@ -5129,9 +5129,7 @@ GROUP BY UPPER(TRIM(stusps));
                     if geoid in coord_map:
                         county_pts.append(coord_map[geoid])
 
-            # If still nothing, return a plain US map.
-            # Use marker dots (no custom icon) to avoid Google icon fetch timeouts.
-            # Use marker dots (no custom icon) to avoid Google icon fetch timeouts.
+            # Build a small static map using the same custom pins as the rest of the site.
             params = [
                 ("size", "640x346"),
                 ("scale", "2"),
@@ -5142,8 +5140,9 @@ GROUP BY UPPER(TRIM(stusps));
                 ("key", google_key),
             ]
 
+            pin_icon_url = url_for('static', filename='img/pins/pin_inside_deepred_static.png', _external=True)
             for lat, lng in county_pts[:5]:
-                params.append(("markers", f"size:mid|color:0xb91c1c|{lat:.6f},{lng:.6f}"))
+                params.append(("markers", f"icon:{pin_icon_url}|{lat:.6f},{lng:.6f}"))
 
             # Build URL manually to allow repeated 'style' and 'markers' to allow repeated 'style' and 'markers'
             from urllib.parse import urlencode

@@ -28,3 +28,14 @@ v367 (2026-02-17)
 - Unify pin colors across static + minimap + interactive: selected = red; in-county context = mid-gray; out-of-county = ghosted mid-gray.
 - Home right-rail Trending + Followed tables: add “Avg. Ovr.” column (best-effort median overage; shows “—” if unavailable).
 - Home minimap: zoom out/pad CONUS bounds slightly more to prevent edge-clipping; force HTTPS static pin icon URL so Google uses custom pins reliably.
+
+v368 (2026-02-17)
+- Hotfix: fix minimap marker regression by keeping the Static Maps markers param format intact (literal icon:) and encoding only the icon URL; custom pins render again.
+- Hotfix: make Trending/Followed county labels robust across differing counties schemas by feature-detecting name/state columns (no more raw GEOIDs).
+- Hotfix: remove accidental duplicate right-rail card wrapper that could affect rail layout.
+
+
+v369 (2026-02-17)
+- Hotfix: restore ticket-card county static maps by feature-detecting county geometry source (counties.geom vs counties_geom.geom) and falling back gracefully when unavailable.
+- Hotfix: /api/county_staticmap now uses custom pin icon again (no default pins).
+- No changes to feed centering logic or pin sizing.

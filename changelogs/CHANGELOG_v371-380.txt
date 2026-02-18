@@ -4,3 +4,6 @@ v373 (2026-02-18) — Static Maps: restore custom pin icons in server proxy (reg
 v374 (2026-02-18) — Static Maps: fix marker query encoding so Google can fetch custom pin icons (avoid "icon%3A" / default pins + g.co/staticmaperror).
 
 v375 (2026-02-18) — Static Maps: simplify county outline polyline when extremely large to avoid g.co/staticmaperror while preserving required outline.
+
+
+v376 (2026-02-18) — Static Maps: support Cloudflare R2 static pin host via STATIC_PIN_BASE_URL (e.g. https://static.enforcedspeed.com/pins) for reliable Google icon fetches.

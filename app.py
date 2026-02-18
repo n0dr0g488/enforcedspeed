@@ -820,7 +820,31 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         return f"{proto}://{host}"
 
     base_url = _public_base_url()
-    icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
+
+    def _static_pin_base_url() -> str:
+        """Public URL base for Static Maps marker icon assets.
+
+        Custom marker icons are fetched by Google. Serving icon assets from the main app domain can
+        be unreliable if Cloudflare security/bot mitigation challenges non-browser clients.
+
+        Priority:
+          1) STATIC_PIN_BASE_URL (env or Flask config) — e.g. https://static.enforcedspeed.com/pins
+          2) fallback to app-served pins under the public base URL
+        """
+        try:
+            from flask import current_app
+            cfg = (current_app.config.get("STATIC_PIN_BASE_URL") or "").strip()
+        except Exception:
+            cfg = ""
+
+        envv = (os.environ.get("STATIC_PIN_BASE_URL") or "").strip()
+        val = (envv or cfg).rstrip("/")
+        if val and val.startswith("http"):
+            return val
+        return f"{base_url}/static/img/pins"
+
+    pin_base = _static_pin_base_url()
+    icon_url = f"{pin_base}/pin_inside_deepred_static.png"
 
     def _qs(items: list[tuple[str, str]]) -> str:
         """Query-string builder tuned for Google Static Maps.
@@ -5036,7 +5060,12 @@ GROUP BY UPPER(TRIM(stusps));
                 proto = "https"
             base_url = f"{proto}://{host}"
 
-        icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
+        # Prefer a dedicated public static asset domain (e.g. Cloudflare R2 custom domain)
+        # so Google can fetch the icon reliably.
+        pin_base = ((os.environ.get("STATIC_PIN_BASE_URL") or "").strip() or (getattr(current_app, "config", {}).get("STATIC_PIN_BASE_URL") if 'current_app' in locals() else "") or "").strip().rstrip("/")
+        if not (pin_base and pin_base.startswith("http")):
+            pin_base = f"{base_url}/static/img/pins"
+        icon_url = f"{pin_base}/pin_inside_deepred_static.png"
         enc_icon = urllib.parse.quote(icon_url, safe="")
 
         params = {

@@ -73,3 +73,8 @@ class Config:
     # Google Static Maps custom marker icons must be fetchable by Google from the public internet.
     # Example: https://enforcedspeed.com
     PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+
+    # Base URL for Static Maps custom pin icons. Prefer a dedicated static asset host
+    # (e.g. Cloudflare R2 custom domain) so Google can fetch icons reliably.
+    # Example: https://static.enforcedspeed.com/pins
+    STATIC_PIN_BASE_URL = os.environ.get("STATIC_PIN_BASE_URL", "").strip().rstrip("/")

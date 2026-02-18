@@ -1,0 +1,41 @@
+HANDOFF — EnforcedSpeed Web v376 (based on v375; one-change)
+
+Goal / bug
+- Ticket-card + minimap Static Maps were falling back to default Google pins and sometimes g.co/staticmaperror.
+- Debug showed icon fetch timeouts when the icon URL lived under the main app domain (Cloudflare/bot/WAF variability).
+
+Change made (scoped)
+- Added support for a dedicated public static icon host via STATIC_PIN_BASE_URL.
+  - Example value: https://static.enforcedspeed.com/pins
+  - County static map + /api/staticmap now build marker icon URLs from STATIC_PIN_BASE_URL when set.
+  - Fallback remains the app-served /static/img/pins path.
+
+What you must set in Render env (Web + Worker via Env Group)
+- STATIC_PIN_BASE_URL = https://static.enforcedspeed.com/pins
+
+Guardrails respected
+- Did NOT touch ticket map centering logic (county-centered unless pin-centered).
+- Did NOT change custom pin sizing logic.
+- Did NOT alter right-rail layout or table label resolver.
+- Kept county outline behavior (simplify only when huge).
+
+Files changed
+- app.py
+- config.py
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v376.txt
+
+Local smoke test
+- python -m py_compile app.py
+- es-up
+- Verify:
+  - Home feed loads
+  - Ticket card static maps render AND use custom pins
+  - Right-rail minimap renders with custom pins
+
+Git (going live = push)
+git status
+git add .
+git commit -m "v376: static map icons via R2 STATIC_PIN_BASE_URL"
+git push

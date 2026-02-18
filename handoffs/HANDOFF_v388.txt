@@ -1,0 +1,29 @@
+HANDOFF — EnforcedSpeed Web (v388, one-change-at-a-time, NO REGRESSIONS)
+
+Base
+- Based on v387 (minimap crop “bite” via img height > wrapper).
+
+Change in v388 (single scoped UI tweak)
+- Right-rail tables: tighten the 7d / 30d / 1y / Overage metric columns so long county,state labels fit better.
+- Replace “Overage” header with stacked “Avg.” over “Overage” to keep column narrow.
+- Applied consistently to BOTH:
+  - Trending counties
+  - Counties you follow
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v381-390.txt
+- handoffs/HANDOFF_v388.txt
+
+Guardrails preserved
+- Ticket card static maps still render and keep existing centering + pin sizing.
+- Right-rail panel remains flush/sharp style.
+- Trending/Follow entries keep county/state names (no GEOID fallback).
+- No expensive geometry recomputation changes.
+
+Smoke test checklist
+- Home feed loads
+- Minimap still loads/crops correctly
+- Trending counties: long label fits; metrics closer together
+- “Avg.” appears above “Overage”

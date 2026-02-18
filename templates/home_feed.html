@@ -818,11 +818,11 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 
   <div style="margin-top:10px;">
-    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:6px; padding:0 2px;">
-      <span style="width:28px; text-align:right;">7d</span>
-      <span style="width:28px; text-align:right;">30d</span>
-      <span style="width:28px; text-align:right;">1y</span>
-      <span style="width:56px; text-align:right;">Overage</span>
+    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:4px; padding:0 0;">
+      <span style="width:24px; text-align:right;">7d</span>
+      <span style="width:24px; text-align:right;">30d</span>
+      <span style="width:24px; text-align:right;">1y</span>
+      <span style="width:46px; text-align:right; line-height:1.05;"><span style="display:block; font-size:10px; font-weight:500; opacity:0.85;">Avg.</span><span style="display:block; font-size:11px; font-weight:600;">Overage</span></span>
     </div>
 
     {% if trending_counties and trending_counties|length > 0 %}
@@ -833,11 +833,11 @@ document.addEventListener('DOMContentLoaded', function(){
               {{ c.label }}, {{ c.st }}
             </a>
 
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-variant-numeric:tabular-nums;">
-              <span style="width:28px; text-align:right;">{{ c.c7 }}</span>
-              <span style="width:28px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:28px; text-align:right;">{{ c.c365 }}</span>
-              <span style="width:56px; text-align:right;">{{ c.ovr }}</span>
+            <div style="display:flex; align-items:center; gap:4px; font-size:12px; font-variant-numeric:tabular-nums;">
+              <span style="width:24px; text-align:right;">{{ c.c7 }}</span>
+              <span style="width:24px; text-align:right;">{{ c.c30 }}</span>
+              <span style="width:24px; text-align:right;">{{ c.c365 }}</span>
+              <span style="width:46px; text-align:right;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}
@@ -857,11 +857,11 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 
   <div style="margin-top:10px;">
-    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:6px; padding:0 2px;">
-      <span style="width:28px; text-align:right;">7d</span>
-      <span style="width:28px; text-align:right;">30d</span>
-      <span style="width:28px; text-align:right;">1y</span>
-      <span style="width:56px; text-align:right;">Overage</span>
+    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:4px; padding:0 0;">
+      <span style="width:24px; text-align:right;">7d</span>
+      <span style="width:24px; text-align:right;">30d</span>
+      <span style="width:24px; text-align:right;">1y</span>
+      <span style="width:46px; text-align:right; line-height:1.05;"><span style="display:block; font-size:10px; font-weight:500; opacity:0.85;">Avg.</span><span style="display:block; font-size:11px; font-weight:600;">Overage</span></span>
     </div>
 
     {% if not current_user.is_authenticated %}
@@ -874,11 +874,11 @@ document.addEventListener('DOMContentLoaded', function(){
               {{ c.label }}, {{ c.st }}
             </a>
 
-            <div style="display:flex; align-items:center; gap:6px; font-size:12px; font-variant-numeric:tabular-nums;">
-              <span style="width:28px; text-align:right;">{{ c.c7 }}</span>
-              <span style="width:28px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:28px; text-align:right;">{{ c.c365 }}</span>
-              <span style="width:56px; text-align:right;">{{ c.ovr }}</span>
+            <div style="display:flex; align-items:center; gap:4px; font-size:12px; font-variant-numeric:tabular-nums;">
+              <span style="width:24px; text-align:right;">{{ c.c7 }}</span>
+              <span style="width:24px; text-align:right;">{{ c.c30 }}</span>
+              <span style="width:24px; text-align:right;">{{ c.c365 }}</span>
+              <span style="width:46px; text-align:right;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}

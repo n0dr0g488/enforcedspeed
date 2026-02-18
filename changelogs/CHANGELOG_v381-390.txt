@@ -11,3 +11,8 @@ v384 — 2026-02-18 — Add /healthz endpoint for Render
 v387 — 2026-02-18 — Minimap crop “bite” (UI-only)
 - Home right-rail minimap crop now actually clips by rendering the image taller than the wrapper (height:130%) while wrapper stays fixed-height (235px).
 - Tune crop position via object-position (now 50% 42%) without changing backend map framing.
+
+v388 — 2026-02-18 — Tighten Trending/Follow headers + add Avg. label
+- Right-rail Trending counties header metrics (7d/30d/1y/Overage) tightened (narrower widths + smaller gaps) to give county/state label more room.
+- Overage header now stacked as “Avg.” over “Overage” without widening the column.
+- Applies consistently to both Trending counties and Counties you follow sections.

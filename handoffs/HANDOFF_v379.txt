@@ -1,0 +1,44 @@
+HANDOFF — EnforcedSpeed Web v379 (based on v378; one-change-at-a-time, NO REGRESSIONS)
+
+Change made (scoped)
+- Home right-rail minimap: CONUS-focused framing + more padding so West Coast and Maine are not clipped.
+  - Reduce rendered minimap height to save vertical space.
+  - Crop top/bottom (CSS) and nudge focus slightly north to avoid showing Cuba.
+  - Slightly expand/adjust Google Static Maps visible bounds (server-side) to keep coast + pins comfortably in-frame.
+
+Why
+- The minimap only needs to communicate CONUS context.
+- Cropping saves vertical space in the right rail.
+- Expanded bounds prevent pins/coastlines being cut off (WA/OR coast and Maine).
+
+Guardrails respected (no-touch)
+- Ticket card static maps still render on Home feed.
+- Ticket static map centering logic unchanged (county-centered unless explicitly pin-centered).
+- Custom pin sizing unchanged.
+- Right-rail layout remains flush/sharp (no wrapper duplication).
+- Trending/Follow tables still show county/state names (no GEOIDs).
+- No expensive geometry unions added.
+
+Files changed
+- app.py
+  - /api/home_minimap_staticmap: adjust CONUS visible bounds and request image size 640x360 (still scale=2)
+- templates/home_feed.html
+  - minimap <img>: height 346px -> 300px, add object-position for CONUS crop
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v379.txt
+
+Local smoke tests (required)
+- python -m py_compile app.py
+- es-up
+- Verify in browser:
+  - Home feed loads
+  - Ticket card static maps render (multiple cards)
+  - Right-rail minimap renders, no Cuba, and WA/OR + Maine are not clipped
+  - Trending list shows real county/state names
+
+Git (going live = commit + push to GitHub)
+git status
+git add .
+git commit -m "v379: CONUS crop + zoom-out padding for home minimap"
+git push

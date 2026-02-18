@@ -5297,10 +5297,12 @@ GROUP BY UPPER(TRIM(stusps));
         if not google_key:
             return ("Missing GOOGLE_MAPS_SERVER_KEY", 503)
 
-        # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
-        # Padded slightly so WA/OR (and Maine) don't feel clipped.
-        visible_sw = "23.0,-127.5"
-        visible_ne = "50.5,-65.0"
+        # Fixed CONUS-focused bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
+        # Goals:
+        # - Keep all CONUS pins comfortably in-frame (WA/OR coast + Maine) by padding west/east.
+        # - De-emphasize non-CONUS vertical space (avoid showing Cuba; only a small slice of Canada).
+        visible_sw = "24.2,-129.5"
+        visible_ne = "51.8,-63.0"
 
         try:
             now_utc = datetime.utcnow()
@@ -5453,7 +5455,9 @@ GROUP BY UPPER(TRIM(stusps));
 
             # Build a small static map using the same custom pins as the rest of the site.
             params = [
-                ("size", "640x346"),
+                # Request a slightly taller image than the rendered container so CSS can crop top/bottom
+                # while keeping pins crisp (scale=2).
+                ("size", "640x360"),
                 ("scale", "2"),
                 ("maptype", "roadmap"),
                 ("style", "feature:poi|visibility:off"),

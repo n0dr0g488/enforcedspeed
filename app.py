@@ -575,6 +575,146 @@ def _bbox_fits_zoom_pxpad(
     span_x = world_px * (lng_diff / 360.0)
     span_y = world_px * (y_diff / (2.0 * math.pi))
     return (span_x <= float(w)) and (span_y <= float(h))
+
+# --- Static Maps polyline simplification (to avoid g.co/staticmaperror on very detailed county outlines) ---
+# We keep outlines but simplify them only when a generated Static Maps URL would exceed safe length.
+_SIMPLIFIED_POLY_CACHE: dict[tuple[str, int], str] = {}
+
+def _decode_google_polyline(poly: str):
+    # Decode an encoded polyline string into a list of (lat, lng) tuples.
+    if not poly:
+        return []
+    index = 0
+    lat = 0
+    lng = 0
+    coords = []
+    length = len(poly)
+    while index < length:
+        shift = 0
+        result = 0
+        while True:
+            b = ord(poly[index]) - 63
+            index += 1
+            result |= (b & 0x1f) << shift
+            shift += 5
+            if b < 0x20:
+                break
+        dlat = ~(result >> 1) if (result & 1) else (result >> 1)
+        lat += dlat
+
+        shift = 0
+        result = 0
+        while True:
+            b = ord(poly[index]) - 63
+            index += 1
+            result |= (b & 0x1f) << shift
+            shift += 5
+            if b < 0x20:
+                break
+        dlng = ~(result >> 1) if (result & 1) else (result >> 1)
+        lng += dlng
+
+        coords.append((lat / 1e5, lng / 1e5))
+    return coords
+
+def _encode_google_polyline(coords):
+    # Encode a list of (lat, lng) tuples into a polyline string.
+    def _enc_value(v):
+        v = ~(v << 1) if v < 0 else (v << 1)
+        out = []
+        while v >= 0x20:
+            out.append(chr((0x20 | (v & 0x1f)) + 63))
+            v >>= 5
+        out.append(chr(v + 63))
+        return ''.join(out)
+
+    last_lat = 0
+    last_lng = 0
+    out = []
+    for lat, lng in coords:
+        ilat = int(round(lat * 1e5))
+        ilng = int(round(lng * 1e5))
+        out.append(_enc_value(ilat - last_lat))
+        out.append(_enc_value(ilng - last_lng))
+        last_lat, last_lng = ilat, ilng
+    return ''.join(out)
+
+def _dp_simplify(coords, eps):
+    # Douglas-Peucker simplification for lat/lng coords (approx planar).
+    if len(coords) <= 2:
+        return coords
+
+    lat0 = coords[0][0]
+    cos0 = math.cos(math.radians(lat0)) or 1.0
+
+    def dist_point_to_segment(p, a, b):
+        (py, px) = (p[0], p[1] * cos0)
+        (ay, ax) = (a[0], a[1] * cos0)
+        (by, bx) = (b[0], b[1] * cos0)
+        vx, vy = (bx - ax), (by - ay)
+        wx, wy = (px - ax), (py - ay)
+        c1 = vx * wx + vy * wy
+        if c1 <= 0:
+            return math.hypot(px - ax, py - ay)
+        c2 = vx * vx + vy * vy
+        if c2 <= c1:
+            return math.hypot(px - bx, py - by)
+        t = c1 / c2
+        projx = ax + t * vx
+        projy = ay + t * vy
+        return math.hypot(px - projx, py - projy)
+
+    keep = [False] * len(coords)
+    keep[0] = True
+    keep[-1] = True
+    stack = [(0, len(coords) - 1)]
+    while stack:
+        start, end = stack.pop()
+        max_dist = 0.0
+        idx = None
+        a = coords[start]
+        b = coords[end]
+        for i in range(start + 1, end):
+            d = dist_point_to_segment(coords[i], a, b)
+            if d > max_dist:
+                max_dist = d
+                idx = i
+        if idx is not None and max_dist > eps:
+            keep[idx] = True
+            stack.append((start, idx))
+            stack.append((idx, end))
+
+    return [c for c, k in zip(coords, keep) if k]
+
+def _simplify_polyline_to_maxlen(geoid: str, poly: str, max_len: int):
+    # Return a simplified polyline string whose encoded length is <= max_len when possible.
+    cache_key = (geoid, max_len)
+    if cache_key in _SIMPLIFIED_POLY_CACHE:
+        return _SIMPLIFIED_POLY_CACHE[cache_key]
+
+    coords = _decode_google_polyline(poly)
+    if len(coords) < 50:
+        _SIMPLIFIED_POLY_CACHE[cache_key] = poly
+        return poly
+
+    eps = 0.0005
+    best = poly
+    for _ in range(10):
+        simp = _dp_simplify(coords, eps)
+        if simp and coords[0] == coords[-1] and simp[0] != simp[-1]:
+            simp = list(simp) + [simp[0]]
+        enc = _encode_google_polyline(simp)
+        if len(enc) < len(best):
+            best = enc
+        if len(enc) <= max_len or len(simp) < 80:
+            best = enc
+            break
+        eps *= 2.0
+
+    _SIMPLIFIED_POLY_CACHE[cache_key] = best
+    return best
+
+
 def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None, pin_lng: float | None = None, *, width: int = 640, height: int = 340, center_on_pin: bool = False, use_custom_icon: bool = True) -> str:
     """Static map URL showing the county boundary (black outline + subtle fill) and an optional red pin.
 
@@ -695,9 +835,11 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         'key': key,
     }
 
-    # County outline (black + subtle fill). Note: we must URL-encode the polyline.
-    if poly:
-        params['path'] = f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly}"
+    # County outline (black + subtle fill). If the outline is extremely detailed, we may simplify
+    # it (while preserving the outline) to avoid Google returning g.co/staticmaperror.
+    poly_use = poly
+    if poly_use:
+        params['path'] = f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly_use}"
 
     # Optional pin
     if pin_lat is not None and pin_lng is not None:
@@ -4946,8 +5088,6 @@ GROUP BY UPPER(TRIM(stusps));
                 width=w,
                 height=h,
                 center_on_pin=center_on_pin,
-                # v372: restore custom static pin icon. The proxy keeps the key server-side,
-                # and icon URL encoding is already handled inside county_static_map_url.
                 use_custom_icon=True
             )
         else:

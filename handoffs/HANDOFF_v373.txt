@@ -1,0 +1,38 @@
+HANDOFF — EnforcedSpeed Web v373 (based on v371; one-change)
+
+Change made (scoped)
+- Fix ticket card + right-rail minimap static maps showing default Google pins + occasional g.co/staticmaperror.
+  - /api/county_staticmap now requests custom icon markers again (use_custom_icon=True).
+  - Added URL-length guard that preserves the county outline by auto-simplifying the encoded polyline
+    only when the generated Google Static Maps URL would exceed a safe length.
+
+Why
+- In v371, the proxy forced use_custom_icon=False which always produced default pins.
+- Some counties can generate very long Static Maps URLs; Google returns a staticmaperror tile when the
+  URL is too long. Outline is required, so we simplify (not drop) the outline when necessary.
+
+Guardrails respected
+- Did NOT touch home-feed static map centering rules (county-centered unless explicitly pin-centered).
+- Did NOT touch pin sizing assets.
+- Did NOT change right-rail layout or trending/follow naming logic.
+
+Files changed
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v373.txt
+
+Local smoke test
+- python -m py_compile app.py
+- es-up
+- Verify:
+  - Home feed loads fast
+  - Ticket card static images render and show custom pins
+  - Right-rail minimap renders and shows custom pins
+  - No g.co/staticmaperror tiles
+
+Git (going live = push)
+git status
+git add .
+git commit -m "v373: fix static map custom pins + outline simplification guard"
+git push

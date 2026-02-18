@@ -1,0 +1,28 @@
+HANDOFF — EnforcedSpeed Web v378 (based on v377; one-change)
+
+Change made (scoped)
+- Fix Render deploy “spinning / port scan timeout” by binding Gunicorn to Render’s $PORT in render.yaml:
+  startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+
+Why
+- Render’s port scanner expects your service to listen on the PORT env var. Without an explicit bind, deploy can hang and show “No open HTTP ports detected”.
+
+Guardrails respected (no-touch)
+- Did NOT change ticket card static map generation, centering logic, or custom pin sizing.
+- Did NOT change county polygon detail/simplification.
+- Did NOT change minimap logic (only deploy config).
+
+Files changed
+- render.yaml
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v378.txt
+
+Render check
+- After deploy, Render logs should show Gunicorn listening on 0.0.0.0:$PORT and the port scan should quickly detect the open port.
+
+Git (going live = push)
+git status
+git add .
+git commit -m "v378: bind gunicorn to $PORT in render.yaml to prevent deploy hang"
+git push

@@ -10,3 +10,6 @@ v376 (2026-02-18) — Static Maps: support Cloudflare R2 static pin host via STA
 
 
 v377 (2026-02-18) — Static Maps: home minimap proxy now uses STATIC_PIN_BASE_URL pin icon (R2) to avoid default pins + g.co/staticmaperror.
+
+v378 (2026-02-18)
+- Render deploy reliability: bind gunicorn to $PORT via render.yaml startCommand (prevents port-scan hang / spinning deploy).

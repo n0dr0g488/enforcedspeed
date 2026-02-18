@@ -1,7 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="home-shell">
+<style>
+  /* Map page: fill the viewport (no page scroll). Allow left/right panels to scroll internally if needed. */
+  html, body { height: 100%; }
+  body { overflow: hidden; }
+  .home-shell.map-shell { height: calc(100vh - 64px); } /* header is ~64px; keeps layout within viewport */
+  .home-shell.map-shell .home-left,
+  .home-shell.map-shell .home-center,
+  .home-shell.map-shell .home-right { height: 100%; }
+  .home-shell.map-shell .filters-rail { height: 100%; overflow: auto; }
+
+  /* Center map card fills available height */
+  .map-card { height: 100%; display: flex; flex-direction: column; padding: 12px; }
+  #esMap { flex: 1 1 auto; width: 100%; height: 100%; border-radius: 14px; overflow: hidden; }
+
+  /* Right panel cards */
+  .map-right { height: 100%; overflow: auto; padding-left: 0; }
+  .map-right .card { border-radius: 9px; }
+  .map-right .mini-ticket { padding: 12px; }
+  .map-right .mini-ticket .mini-title { font-weight: 600; margin: 0 0 4px 0; }
+  .map-right .mini-ticket .mini-sub { font-size: 13px; opacity: .85; }
+  .map-right .stat-card { padding: 12px; margin-top: 12px; }
+  .map-right .stat-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+  .map-right .stat-row:first-of-type { border-top: 0; }
+  .map-right .stat-k { opacity: .8; }
+  .map-right .stat-v { font-weight: 600; white-space: nowrap; }
+  .map-right .stat-title { font-weight: 600; margin: 0 0 8px 0; }
+  .map-right .speed-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+  .map-right .speed-table th { text-align: left; font-weight: 600; opacity: .85; }
+  .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
+</style>
+
+<div class="home-shell map-shell">
 
     <aside class="home-left" id="homeFiltersSidebar">
       <div class="filters-rail">
@@ -116,24 +148,69 @@
     </aside>
 
     <main class="home-center">
-      <div class="card ticket-card" style="padding:14px;">
-        <div style="margin-bottom:14px; text-align:center;">
-          <h1 style="margin:0;">EnforcedSpeed&#39;s Interactive Map</h1>
-          <div class="subtle" style="margin-top:6px; font-size:14px;">Shows speeding tickets with a pinned location.</div>
-        </div>
+      <div class="card ticket-card map-card">
 
         {% if not maps_api_key %}
           <div class="subtle" style="margin-top:12px;">
             Google Maps key not configured. Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map.
           </div>
         {% else %}
-          <div id="esMap" style="width:100%; aspect-ratio: 1 / 1; max-height:72vh; border-radius:14px; overflow:hidden;"></div>
-          <div class="subtle" id="esMapMeta" style="margin-top:10px;"></div>
+          <div id="esMap"></div>
         {% endif %}
       </div>
     </main>
 
-    <aside class="home-right"></aside>
+    <aside class="home-right map-right" aria-label="Selected ticket">
+      <div class="card mini-ticket" id="esSelectedTicketCard">
+        {% if selected_ticket %}
+          <div class="mini-title">{{ selected_ticket.road_name or 'Road' }}, {{ (selected_ticket.state or '')[:2] }}</div>
+          <div class="mini-sub">{{ selected_ticket.posted_speed }} → {{ selected_ticket.ticketed_speed }} mph
+            {% set _ov = (selected_ticket.ticketed_speed|int - selected_ticket.posted_speed|int) %}
+            <span style="opacity:.75;">(+{{ _ov }} mph)</span>
+          </div>
+          <div class="mini-sub" style="margin-top:6px;"><a href="{{ url_for('result', report_id=selected_ticket.id) }}">View ticket</a></div>
+        {% else %}
+          <div class="mini-title">Select a pin</div>
+          <div class="mini-sub">Click a pin on the map to see its ticket details here.</div>
+        {% endif %}
+      </div>
+
+      <div class="card stat-card" id="esCountyStatsCard">
+        <div class="stat-title">County stats</div>
+
+        <div class="stat-row">
+          <div class="stat-k">Pins shown</div>
+          <div class="stat-v" id="esMapMeta">—</div>
+        </div>
+
+        {% if county_stats and county_stats.ok %}
+          <div class="stat-row"><div class="stat-k">Total (all time)</div><div class="stat-v">{{ county_stats.total_all }}</div></div>
+          <div class="stat-row"><div class="stat-k">Last 7 days</div><div class="stat-v">{{ county_stats.total_7 }}</div></div>
+          <div class="stat-row"><div class="stat-k">Last 30 days</div><div class="stat-v">{{ county_stats.total_30 }}</div></div>
+          <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ county_stats.total_365 }}</div></div>
+
+          <div style="margin-top:10px; font-weight:600;">Avg overage by posted speed</div>
+          <table class="speed-table" aria-label="Average overage by posted speed">
+            <thead>
+              <tr><th>Posted</th><th>Avg over</th></tr>
+            </thead>
+            <tbody>
+              {% for row in county_stats.by_posted %}
+                <tr>
+                  <td>{{ row.posted }} mph</td>
+                  <td>+{{ row.avg_over }} mph</td>
+                </tr>
+              {% endfor %}
+              {% if (county_stats.by_posted|length) == 0 %}
+                <tr><td colspan="2" style="opacity:.75;">No data yet.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="mini-sub" style="margin-top:6px;">Filter to a county (or open from a ticket) to see county stats.</div>
+        {% endif %}
+      </div>
+    </aside>
 
 </div>
 
@@ -193,6 +270,18 @@
         try { m.setMap(null); } catch(e) {}
       }
       ES_MARKERS = [];
+    }
+
+    function esUpdateSelectedCard(p) {
+      const el = document.getElementById('esSelectedTicketCard');
+      if (!el || !p) return;
+      const title = `${p.road || 'Road'}, ${p.state || ''}`;
+      const over = (Number(p.ticketed) - Number(p.posted));
+      el.innerHTML = `
+        <div class="mini-title">${title}</div>
+        <div class="mini-sub">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over} mph)</span></div>
+        <div class="mini-sub" style="margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
+      `;
     }
 
     async function esLoadCountyGeomIfAny() {
@@ -388,6 +477,9 @@ async function esLoadPins(opts) {
       `;
       ES_INFO.setContent(html);
       ES_INFO.open({ anchor: m, map: ES_MAP });
+
+      // Also populate the right-side selected ticket card.
+      esUpdateSelectedCard(p);
     });
     ES_MARKERS.push(m);
   }

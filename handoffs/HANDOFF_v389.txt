@@ -1,0 +1,44 @@
+HANDOFF — EnforcedSpeed Web (v389)
+
+Change shipped (single scope)
+
+Interactive Map page layout overhaul to maximize map area:
+- Map page is now full-viewport (no page scroll). Left filter rail and right panel scroll internally only if needed.
+- Removed the big map title/subtitle and removed the “X pins shown (max 1500)” line under the map.
+- Added a right-side panel with:
+  1) Selected ticket mini-card (server-renders if ?ticket_id=..., and updates live on pin click)
+  2) County stats card:
+     - Pins shown (max 1500) moved here (JS writes into #esMapMeta)
+     - Total tickets in county: 7d / 30d / 1y / all-time
+     - Avg overage by posted speed (grouped by posted mph)
+
+Key implementation notes
+- Template: templates/map_page.html
+  - Uses .home-shell.map-shell + CSS to lock layout to viewport
+  - #esMap fills remaining height inside the center card
+  - Right panel uses #esSelectedTicketCard + #esCountyStatsCard
+  - Marker click handler now also updates the right-side selected ticket card
+
+- Backend: app.py map_view()
+  - Reads ?ticket_id=... to render selected_ticket
+  - Computes county_stats for:
+    - county filter (?county_geoid / ?county)
+    - OR focus_county_geoid
+    - OR selected_ticket.county_geoid fallback
+  - Stats are DB-light (simple counts + grouped avg), and only run when a county is in play
+
+Non-negotiable guardrails (kept)
+- Home feed ticket card static maps: unchanged.
+- Ticket static map centering: unchanged.
+- Custom pin sizing: unchanged.
+- Right-rail home minimap crop: unchanged.
+- Trending/Follow tables names (county/state): unchanged.
+
+Smoke tests
+- python -m py_compile app.py
+- Load /map (no scroll; map fills viewport)
+- Open /map?ticket_id=<id> and confirm mini-card shows the ticket
+- Click pins: mini-card updates; “Pins shown” count updates in right panel
+
+Going live
+- Going live = commit + push to GitHub (Render deploy)

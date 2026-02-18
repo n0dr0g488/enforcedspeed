@@ -16,3 +16,10 @@ v388 — 2026-02-18 — Tighten Trending/Follow headers + add Avg. label
 - Right-rail Trending counties header metrics (7d/30d/1y/Overage) tightened (narrower widths + smaller gaps) to give county/state label more room.
 - Overage header now stacked as “Avg.” over “Overage” without widening the column.
 - Applies consistently to both Trending counties and Counties you follow sections.
+
+v389 — 2026-02-18 — Interactive map full-viewport + right panel
+- Interactive map page now fills the viewport (no page scroll); side panels scroll internally if needed.
+- Removed map title/subtitle and the inline “pins shown” line to maximize map area.
+- Added right-side panel cards: selected ticket mini-card (updates on pin click) + county stats (7/30/365/all + avg overage by posted speed) when a county is in focus.
+- “Pins shown (max 1500)” now displays in the right panel under County stats.
+

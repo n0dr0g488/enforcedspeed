@@ -3374,6 +3374,83 @@ GROUP BY UPPER(TRIM(stusps));
             or hide_anon
         )
 
+        # Selected ticket (for the right-side mini card)
+        selected_ticket = None
+        selected_ticket_id = (request.args.get("ticket_id") or "").strip()
+        if selected_ticket_id.isdigit():
+            try:
+                selected_ticket = SpeedReport.query.get(int(selected_ticket_id))
+                if selected_ticket and getattr(selected_ticket, "is_deleted", False):
+                    selected_ticket = None
+            except Exception:
+                selected_ticket = None
+
+        # County stats for right panel
+        county_stats = None
+        focus_county_geoid = (request.args.get("focus_county_geoid") or "").strip()
+        stats_geoid = filter_county_geoid or focus_county_geoid
+        if (not stats_geoid) and selected_ticket and getattr(selected_ticket, "county_geoid", None):
+            stats_geoid = (selected_ticket.county_geoid or "").strip()
+
+        if stats_geoid:
+            try:
+                base = SpeedReport.query
+                base = base.filter(SpeedReport.is_deleted.is_(False))
+                base = base.filter(SpeedReport.lat.isnot(None)).filter(SpeedReport.lng.isnot(None))
+                base = base.filter(SpeedReport.county_geoid == stats_geoid)
+
+                now = datetime.utcnow()
+                def _count_since(days: int) -> int:
+                    return int(base.filter(SpeedReport.created_at >= (now - timedelta(days=days))).count())
+
+                total_all = int(base.count())
+                total_7 = _count_since(7)
+                total_30 = _count_since(30)
+                total_365 = _count_since(365)
+
+                by_rows = (
+                    db.session.query(
+                        SpeedReport.posted_speed,
+                        func.avg((SpeedReport.ticketed_speed - SpeedReport.posted_speed)),
+                    )
+                    .filter(SpeedReport.is_deleted.is_(False))
+                    .filter(SpeedReport.lat.isnot(None)).filter(SpeedReport.lng.isnot(None))
+                    .filter(SpeedReport.county_geoid == stats_geoid)
+                    .group_by(SpeedReport.posted_speed)
+                    .order_by(SpeedReport.posted_speed.asc())
+                    .all()
+                )
+
+                by_posted = []
+                for posted, avg_over in by_rows:
+                    if posted is None or avg_over is None:
+                        continue
+                    try:
+                        p_int = int(posted)
+                    except Exception:
+                        continue
+                    try:
+                        a_int = int(round(float(avg_over)))
+                    except Exception:
+                        continue
+                    by_posted.append({"posted": p_int, "avg_over": a_int})
+
+                county_stats = {
+                    "ok": True,
+                    "geoid": stats_geoid,
+                    "total_all": total_all,
+                    "total_7": total_7,
+                    "total_30": total_30,
+                    "total_365": total_365,
+                    "by_posted": by_posted,
+                }
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                county_stats = None
+
         return render_template(
             "map_page.html",
             hide_anon=hide_anon,
@@ -3397,6 +3474,8 @@ GROUP BY UPPER(TRIM(stusps));
             filter_sort=filter_sort,
             filters_active=filters_active,
             maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
+            selected_ticket=selected_ticket,
+            county_stats=county_stats,
         )
 
 

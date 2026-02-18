@@ -797,7 +797,7 @@ document.addEventListener('DOMContentLoaded', function(){
         {% if maps_api_key %}
           <a href="{{ url_for('map_view') }}" style="display:block; position:relative; width:100%;">
             <div class="minimap-crop">
-              <img src="{{ url_for('api_home_minimap_staticmap') }}" alt="Trending counties map">
+              <img src="{{ url_for('api_home_minimap_staticmap', v='386') }}" alt="Trending counties map">
             </div>
             <span class="subtle" style="position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.92); border:1px solid rgba(0,0,0,0.08); padding:4px 8px; border-radius:999px; font-size:12px; text-decoration:none;">Open full map</span>
           </a>

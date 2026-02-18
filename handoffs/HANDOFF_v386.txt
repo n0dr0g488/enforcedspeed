@@ -1,0 +1,10 @@
+HANDOFF — EnforcedSpeed Web (v386, one-change-at-a-time, NO REGRESSIONS)
+
+Change in this version (minimap only)
+- Force minimap visual change to take effect by cache-busting:
+  - home_feed.html calls api_home_minimap_staticmap with ?v=386
+  - api_home_minimap_staticmap forwards cb=386 to Google Static Maps
+  - response Cache-Control set to no-store
+- Keeps v385 minimap zoom+1 bounds and UI crop wrapper.
+
+Guardrails unchanged: ticket card static maps, centering logic, pin sizing, right-rail layout, table naming.

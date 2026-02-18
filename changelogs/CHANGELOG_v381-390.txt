@@ -11,3 +11,5 @@ v384 — 2026-02-18 — Add /healthz endpoint for Render
 v385 — 2026-02-18 — Home minimap: zoom in 1 + CONUS crop (UI)
 - Zooms the right-rail minimap in one step by tightening the CONUS visible bounds on the static map request.
 - Crops top/bottom in the UI (fixed-height wrapper + object-fit) to remove Mexico/Cuba and save vertical space.
+
+- v386 (2026-02-18): Minimap cache-bust so crop/zoom changes always take effect (no-store + ?v=386 + cb).

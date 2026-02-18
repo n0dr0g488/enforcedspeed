@@ -5467,6 +5467,7 @@ GROUP BY UPPER(TRIM(stusps));
                 ("style", "feature:poi|visibility:off"),
                 ("style", "feature:transit|visibility:off"),
                 ("visible", f"{visible_sw}|{visible_ne}"),
+                ("cb", (request.args.get("v") or "386")),
                 ("key", google_key),
             ]
 
@@ -5512,7 +5513,7 @@ GROUP BY UPPER(TRIM(stusps));
                 return (f"Upstream error {resp.status_code}", 502)
 
             out = Response(resp.content, mimetype=(resp.headers.get("Content-Type") or "image/png"))
-            out.headers["Cache-Control"] = "public, max-age=300"
+            out.headers["Cache-Control"] = "no-store, max-age=0"
             return out
 
         except Exception as e:

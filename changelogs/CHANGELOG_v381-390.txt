@@ -1,6 +1,7 @@
-CHANGELOG v381–390
+CHANGELOG v381–v390
 
-v381 (2026-02-18) — Render deploy hardening
-- Pin Render runtime to Python 3.11.11 (via render.yaml) (carried forward)
-- Harden build step: upgrade pip/setuptools/wheel, then install requirements with --prefer-binary to avoid long source builds
-- Pin wheel-sensitive deps to known-good versions to prevent source compilation on Render (pillow-heif==0.18.0, PyMuPDF==1.24.0)
+v382 (2026-02-18) — Home right-rail minimap: restore crispness + proper CONUS crop
+- Home minimap static map: request a taller, higher-resolution image (640x420, scale=2) so the UI can crop without blurring.
+- CONUS framing: adjust visible bounds northward (no Cuba) while keeping light Canada + extra east padding so Maine isn't clipped.
+- CSS crop focus: move object-position upward to match the intended CONUS-only view.
+

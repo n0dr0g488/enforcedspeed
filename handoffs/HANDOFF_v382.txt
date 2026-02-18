@@ -1,0 +1,44 @@
+HANDOFF — EnforcedSpeed Web (v382, one-change-at-a-time, NO REGRESSIONS)
+
+Goal (single change)
+- Fix the home right-rail minimap regression from v379: restore crisp resolution and achieve the intended CONUS crop (no Cuba) without clipping WA/OR coast or Maine.
+
+What changed (v382)
+1) Higher-resolution minimap image request (server)
+- /api/home_minimap_staticmap now requests size=640x420 with scale=2.
+- This provides more pixel density so the UI can crop to 300px tall without looking blurry.
+
+2) Better CONUS framing (server)
+- Adjusted the Google Static Maps visible box:
+  - SW: 25.0,-129.5
+  - NE: 50.8,-60.5
+- Biases view northward (keeps Cuba out), keeps a small slice of Canada, adds east padding so Maine doesn't get clipped.
+
+3) Crop focus (client)
+- Home right-rail minimap <img> uses object-fit:cover and object-position moved to 50% 28% (upward) to match the intended framing.
+
+Guardrails verified / unchanged
+- Ticket card static maps still render.
+- Ticket static map centering logic unchanged (county-centered unless pin-centered).
+- Custom pin sizing unchanged.
+- Right-rail panel remains flush/sharp.
+- Trending/Follow tables still show county/state names.
+
+Files changed
+- app.py
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v381-390.txt
+- handoffs/HANDOFF_v382.txt
+
+Local smoke test checklist
+- python -m py_compile app.py
+- es-up
+- Verify in browser:
+  - Home feed loads fast
+  - Right-rail minimap is crisp, no Cuba visible, WA/OR + Maine not clipped
+  - Ticket cards still show static maps
+
+Going live (Render)
+- Commit + push to GitHub triggers deploy.
+

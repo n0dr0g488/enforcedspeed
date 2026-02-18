@@ -5301,8 +5301,11 @@ GROUP BY UPPER(TRIM(stusps));
         # Goals:
         # - Keep all CONUS pins comfortably in-frame (WA/OR coast + Maine) by padding west/east.
         # - De-emphasize non-CONUS vertical space (avoid showing Cuba; only a small slice of Canada).
-        visible_sw = "24.2,-129.5"
-        visible_ne = "51.8,-63.0"
+        # NOTE: We intentionally bias the visible box to CONUS (no Cuba) while
+        # leaving a touch of Canada and extra west/east padding so WA/OR coast
+        # and Maine don't get clipped.
+        visible_sw = "25.0,-129.5"
+        visible_ne = "50.8,-60.5"
 
         try:
             now_utc = datetime.utcnow()
@@ -5457,7 +5460,9 @@ GROUP BY UPPER(TRIM(stusps));
             params = [
                 # Request a slightly taller image than the rendered container so CSS can crop top/bottom
                 # while keeping pins crisp (scale=2).
-                ("size", "640x360"),
+                # Request a taller image than the rendered container so CSS can crop
+                # top/bottom while staying crisp.
+                ("size", "640x420"),
                 ("scale", "2"),
                 ("maptype", "roadmap"),
                 ("style", "feature:poi|visibility:off"),

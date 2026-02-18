@@ -8,8 +8,6 @@ v383 — 2026-02-18 — Home minimap crop (UI-only)
 v384 — 2026-02-18 — Add /healthz endpoint for Render
 - Adds a fast, DB-independent /healthz route for reliable health checks during Render deploys.
 
-v385 — 2026-02-18 — Home minimap: zoom in 1 + CONUS crop (UI)
-- Zooms the right-rail minimap in one step by tightening the CONUS visible bounds on the static map request.
-- Crops top/bottom in the UI (fixed-height wrapper + object-fit) to remove Mexico/Cuba and save vertical space.
-
-- v386 (2026-02-18): Minimap cache-bust so crop/zoom changes always take effect (no-store + ?v=386 + cb).
+v387 — 2026-02-18 — Minimap crop “bite” (UI-only)
+- Home right-rail minimap crop now actually clips by rendering the image taller than the wrapper (height:130%) while wrapper stays fixed-height (235px).
+- Tune crop position via object-position (now 50% 42%) without changing backend map framing.

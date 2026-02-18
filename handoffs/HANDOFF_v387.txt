@@ -1,0 +1,34 @@
+HANDOFF — EnforcedSpeed Web (v387)
+
+Scope (one change only)
+- Fix home right-rail minimap cropping so it actually clips top/bottom (UI-only), without touching backend minimap framing/bounds.
+
+What changed
+- templates/home_feed.html:
+  - .minimap-crop wrapper height set to 235px.
+  - minimap <img> rendered taller than wrapper (height:130%) so overflow:hidden produces a real crop.
+  - object-position nudged to 50% 42% to bias crop upward (remove Cuba while keeping a thin Canada band).
+
+Guardrails (no regressions)
+- Ticket card static maps unchanged.
+- Ticket static map centering logic unchanged.
+- Custom pin sizing unchanged.
+- Right-rail flush/sharp panel style preserved.
+- Trending/Follow tables unchanged.
+
+Smoke test checklist
+- python -m py_compile app.py
+- Run es-up
+- Verify on Home:
+  - Ticket card static images render
+  - Right-rail minimap crops (top/bottom clipped)
+  - No console/server errors
+
+Going live
+- Commit + push to GitHub (Render deploys from Git).
+
+Files touched
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v381-390.txt
+- handoffs/HANDOFF_v387.txt

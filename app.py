@@ -5305,10 +5305,9 @@ GROUP BY UPPER(TRIM(stusps));
             return ("Missing GOOGLE_MAPS_SERVER_KEY", 503)
 
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
-        # v385: "zoom in" one level by tightening the visible box (then we crop in the UI).
-        # Keep enough padding so WA/OR and Maine are not clipped.
-        visible_sw = "25.0625,-122.8125"
-        visible_ne = "48.4375,-69.6875"
+        # Padded slightly so WA/OR (and Maine) don't feel clipped.
+        visible_sw = "23.0,-127.5"
+        visible_ne = "50.5,-65.0"
 
         try:
             now_utc = datetime.utcnow()
@@ -5467,7 +5466,6 @@ GROUP BY UPPER(TRIM(stusps));
                 ("style", "feature:poi|visibility:off"),
                 ("style", "feature:transit|visibility:off"),
                 ("visible", f"{visible_sw}|{visible_ne}"),
-                ("cb", (request.args.get("v") or "386")),
                 ("key", google_key),
             ]
 
@@ -5513,7 +5511,7 @@ GROUP BY UPPER(TRIM(stusps));
                 return (f"Upstream error {resp.status_code}", 502)
 
             out = Response(resp.content, mimetype=(resp.headers.get("Content-Type") or "image/png"))
-            out.headers["Cache-Control"] = "no-store, max-age=0"
+            out.headers["Cache-Control"] = "public, max-age=300"
             return out
 
         except Exception as e:

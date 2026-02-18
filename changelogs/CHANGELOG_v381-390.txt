@@ -1,0 +1,6 @@
+CHANGELOG v381–390
+
+v381 (2026-02-18) — Render deploy hardening
+- Pin Render runtime to Python 3.11.11 (via render.yaml) (carried forward)
+- Harden build step: upgrade pip/setuptools/wheel, then install requirements with --prefer-binary to avoid long source builds
+- Pin wheel-sensitive deps to known-good versions to prevent source compilation on Render (pillow-heif==0.18.0, PyMuPDF==1.24.0)

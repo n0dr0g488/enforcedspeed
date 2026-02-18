@@ -1,0 +1,33 @@
+HANDOFF — EnforcedSpeed Web (v381 — Render deploy hardening, NO UI/logic changes)
+
+Goal
+- Stop recurring Render “Deploying…” hangs by preventing slow/fragile source builds and keeping runtime stable.
+
+What changed (single scope: deploy reliability)
+1) render.yaml
+- buildCommand now upgrades pip/setuptools/wheel, then installs requirements with --prefer-binary:
+  python -m pip install --upgrade pip setuptools wheel && pip install --prefer-binary -r requirements.txt
+- startCommand remains:
+  gunicorn app:app --bind 0.0.0.0:$PORT
+- PYTHON_VERSION remains pinned to 3.11.11.
+
+2) requirements.txt
+- Pin wheel-sensitive dependencies to known-good versions to avoid source compilation:
+  pillow-heif==0.18.0
+  PyMuPDF==1.24.0
+
+Guardrails respected
+- No changes to ticket card static maps, centering logic, pin sizing, right-rail layout, or tables.
+
+Smoke test checklist
+- python -m py_compile app.py
+- Local: es-up
+- Prod: Deploy in Render, verify build logs show Python 3.11.11 and pip installing wheels quickly.
+
+Going live (definition)
+- Commit + push to GitHub (Render deploys from Git).
+
+If Render still “deploys” indefinitely
+- Check Render build logs to see whether it’s hanging in Build or Start.
+- If Build: look for any package compiling from source; pin it or force wheels.
+- If Start: check runtime logs for crash-loop (missing env vars, DB connect, etc.).

@@ -1,0 +1,32 @@
+HANDOFF — EnforcedSpeed Web v372 (based on v371; one-change)
+
+Change made (scoped)
+- Restore custom static pin icon on server-proxied Static Maps:
+  - Ticket card static maps
+  - Right-rail minimap (uses same /api/county_staticmap endpoint)
+
+Why
+- After moving Static Maps behind the proxy and locking keys down, the proxy route was still calling
+  county_static_map_url(..., use_custom_icon=False), which forces Google’s default marker.
+
+Guardrails respected
+- Did NOT change static map centering logic (county-centered unless explicitly pin-centered).
+- Did NOT change ticket card map URL generation (still /api/county_staticmap).
+- Did NOT change minimap layout or right-rail structure.
+
+Files changed
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v372.txt
+
+Smoke test
+- python -m py_compile app.py
+- Load Home feed: ticket static images show custom pin icon (not Google default)
+- Right-rail minimap pins show custom icon
+
+Git (going live = push)
+git status
+git add .
+git commit -m "v372: restore custom pin icons for static maps"
+git push

@@ -4946,7 +4946,9 @@ GROUP BY UPPER(TRIM(stusps));
                 width=w,
                 height=h,
                 center_on_pin=center_on_pin,
-                use_custom_icon=False
+                # v372: restore custom static pin icon. The proxy keeps the key server-side,
+                # and icon URL encoding is already handled inside county_static_map_url.
+                use_custom_icon=True
             )
         else:
             upstream = us_static_map_url(width=w, height=h)

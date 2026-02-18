@@ -1,1 +1,4 @@
 v371 (2026-02-17) — Static Maps: force server key (GOOGLE_MAPS_SERVER_KEY) for ticket + minimap proxies so web key can disable Static Maps API.
+
+
+v372 (2026-02-17) — Static Maps: restore custom pin icon for server-proxied ticket cards + right-rail minimap (use_custom_icon=True).

@@ -1,0 +1,37 @@
+HANDOFF — EnforcedSpeed Web v374 (based on v373; one-change)
+
+Problem
+- Home feed ticket-card static maps + right-rail minimap showed Google default pins and g.co/staticmaperror.
+- Root cause: query-string encoding was turning marker directives into invalid syntax (e.g., "icon:" becoming "icon%3A"), so Google never fetched the custom icon.
+
+Change made (scoped)
+- Static Maps URL building now preserves Google directive syntax (icon:, enc:) while still URL-encoding the icon URL itself.
+- Applied to:
+  - county_static_map_url() (ticket cards)
+  - /api/home_minimap_staticmap (right-rail minimap)
+  - mobile/static preview proxy endpoint block (same encoding pattern)
+
+Guardrails respected
+- Did NOT change ticket card centering rules.
+- Did NOT change custom pin sizes.
+- Did NOT change right-rail layout or table label resolution.
+
+Files changed
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v374.txt
+
+Smoke tests
+- python -m py_compile app.py
+- es-up
+- Verify:
+  - Home feed ticket card images render (no g.co/staticmaperror)
+  - Google logs show GET /static/img/pins/pin_inside_deepred_static.png from "Google-Static-Maps-API"
+  - Right-rail minimap uses custom pins
+
+Git (going live = commit + push)
+git status
+git add .
+git commit -m "v374: fix static map marker encoding so custom pins render"
+git push

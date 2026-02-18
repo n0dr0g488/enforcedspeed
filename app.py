@@ -58,6 +58,7 @@ from functools import wraps
 import json
 import urllib.parse
 import urllib.request
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from statistics import median
 from bisect import bisect_right
@@ -821,25 +822,34 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     base_url = _public_base_url()
     icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
 
-    params = {
-        'size': f"{int(width)}x{int(height)}",
-        'scale': '2',
-        'maptype': 'roadmap',
-        'center': f"{center_lat:.6f},{center_lng:.6f}",
-        'zoom': str(int(zoom_int)),
+    def _qs(items: list[tuple[str, str]]) -> str:
+        """Query-string builder tuned for Google Static Maps.
+
+        Critical: do NOT encode the marker/path directive syntax (e.g. 'icon:' / 'enc:'), and do NOT
+        turn 'icon:' into 'icon%3A'. We preserve ":/,|%" so Google parses marker/path directives.
+        """
+        return "&".join(
+            f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe=':/,|%')}"
+            for k, v in items
+        )
+
+    items: list[tuple[str, str]] = [
+        ('size', f"{int(width)}x{int(height)}"),
+        ('scale', '2'),
+        ('maptype', 'roadmap'),
+        ('center', f"{center_lat:.6f},{center_lng:.6f}"),
+        ('zoom', str(int(zoom_int))),
         # De-clutter slightly so roads/labels stand out.
-        'style': [
-            'feature:poi|visibility:off',
-            'feature:transit|visibility:off',
-        ],
-        'key': key,
-    }
+        ('style', 'feature:poi|visibility:off'),
+        ('style', 'feature:transit|visibility:off'),
+        ('key', key),
+    ]
 
     # County outline (black + subtle fill). If the outline is extremely detailed, we may simplify
     # it (while preserving the outline) to avoid Google returning g.co/staticmaperror.
     poly_use = poly
     if poly_use:
-        params['path'] = f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly_use}"
+        items.append(('path', f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly_use}"))
 
     # Optional pin
     if pin_lat is not None and pin_lng is not None:
@@ -847,13 +857,12 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         if use_custom_icon:
             # Custom icon markers can be rejected if Google cannot fetch the icon URL quickly/reliably.
             encoded_icon = urllib.parse.quote(icon_url, safe="")
-            params['markers'] = f"icon:{encoded_icon}|{center}"
+            items.append(('markers', f"icon:{encoded_icon}|{center}"))
         else:
             # Safe fallback (no custom icon) to avoid g.co/staticmaperror in proxy flows.
-            params['markers'] = center
+            items.append(('markers', center))
 
-    # Keep ':' and '/' readable in URLs (helps avoid edge-case parsing issues for icon: URLs)
-    return 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True, safe=':/,%')
+    return 'https://maps.googleapis.com/maps/api/staticmap?' + _qs(items)
 
 def us_static_map_url(*, width: int = 640, height: int = 640) -> str:
     """Static map URL of the United States (default preview before a county is selected)."""
@@ -5021,6 +5030,7 @@ GROUP BY UPPER(TRIM(stusps));
             base_url = f"{proto}://{host}"
 
         icon_url = f"{base_url}/static/img/pins/pin_inside_deepred_static.png"
+        enc_icon = urllib.parse.quote(icon_url, safe="")
 
         params = {
             "center": center,
@@ -5028,10 +5038,10 @@ GROUP BY UPPER(TRIM(stusps));
             "size": f"{int(w)}x{int(h)}",
             "scale": "2",
             "maptype": "roadmap",
-            "markers": f"icon:{icon_url}|{center}",
+            "markers": f"icon:{enc_icon}|{center}",
             "key": key,
         }
-        upstream = "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params, safe=':/')
+        upstream = "https://maps.googleapis.com/maps/api/staticmap?" + urllib.parse.urlencode(params, safe=':/,|%')
 
         try:
             req = urllib.request.Request(upstream, headers={"User-Agent": "EnforcedSpeedMobile/1.0"})
@@ -5418,12 +5428,18 @@ GROUP BY UPPER(TRIM(stusps));
 
             pin_icon_url = url_for('static', filename='img/pins/pin_inside_deepred_static.png', _external=True)
             for lat, lng in county_pts[:5]:
-                params.append(("markers", f"icon:{pin_icon_url}|{lat:.6f},{lng:.6f}"))
+                # IMPORTANT: Google requires the icon URL to be URL-encoded, but the marker directive
+                # itself must remain as literal 'icon:' (not 'icon%3A').
+                enc_icon = urllib.parse.quote(pin_icon_url, safe="")
+                params.append(("markers", f"icon:{enc_icon}|{lat:.6f},{lng:.6f}"))
 
-            # Build URL manually to allow repeated 'style' and 'markers' to allow repeated 'style' and 'markers'
-            from urllib.parse import urlencode
-            qs = urlencode(params, doseq=True)
-            url = f"https://maps.googleapis.com/maps/api/staticmap?{qs}"
+            # Build URL manually so we don't accidentally encode 'icon:' into 'icon%3A'.
+            def _qs(items: list[tuple[str, str]]) -> str:
+                return "&".join(
+                    f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe=':/,|%')}"
+                    for k, v in items
+                )
+            url = f"https://maps.googleapis.com/maps/api/staticmap?{_qs(params)}"
 
             # Fetch and return image
             resp = requests.get(url, timeout=12, headers={"User-Agent": "EnforcedSpeedWeb/1.0"})

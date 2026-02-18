@@ -2,3 +2,5 @@ v371 (2026-02-17) — Static Maps: force server key (GOOGLE_MAPS_SERVER_KEY) for
 
 v373 (2026-02-18) — Static Maps: restore custom pin icons in server proxy (regression fix).
 v374 (2026-02-18) — Static Maps: fix marker query encoding so Google can fetch custom pin icons (avoid "icon%3A" / default pins + g.co/staticmaperror).
+
+v375 (2026-02-18) — Static Maps: simplify county outline polyline when extremely large to avoid g.co/staticmaperror while preserving required outline.

@@ -1,0 +1,32 @@
+HANDOFF — EnforcedSpeed Web v375 (based on v374; one-change)
+
+Change made (scoped)
+- Static Maps (server-proxied ticket card maps + minimap): keep county outline required, but automatically simplify the county boundary encoded polyline when it exceeds a safe length budget.
+  - Prevents Google Static Maps from returning the "Map error: g.co/staticmaperror" tile caused by overly-long path polylines.
+  - Preserves custom pin icons (does not revert proxy/caching/server-key work).
+
+Guardrails respected
+- Did NOT touch ticket card centering logic (county-centered unless explicitly pin-centered).
+- Did NOT change custom pin sizing/assets.
+- Did NOT alter right-rail layout or table label logic.
+
+Files changed
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v375.txt
+
+Local smoke test
+- python -m py_compile app.py
+- es-up
+- Verify:
+  - Home feed: ticket card static maps render (no g.co/staticmaperror overlay)
+  - Custom pin icons appear (not Google default)
+  - County outline still present
+  - Right-rail minimap renders
+
+Git (going live = push)
+git status
+git add .
+git commit -m "v375: simplify static map county outline to prevent staticmaperror"
+git push

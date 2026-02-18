@@ -845,10 +845,17 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         ('key', key),
     ]
 
-    # County outline (black + subtle fill). If the outline is extremely detailed, we may simplify
-    # it (while preserving the outline) to avoid Google returning g.co/staticmaperror.
+    # County outline (black + subtle fill).
+    # IMPORTANT: Outline is required. However, Google Static Maps can return g.co/staticmaperror
+    # if the request URL becomes too large (county polylines can be huge). To prevent this while
+    # still keeping the outline, we simplify the encoded polyline when it's above a safe budget.
     poly_use = poly
     if poly_use:
+        # Budget for the encoded polyline itself (not the entire URL). Keeping this conservative
+        # preserves room for styles + markers while avoiding Static Maps URL limits.
+        POLY_MAXLEN = 3200
+        if len(poly_use) > POLY_MAXLEN:
+            poly_use = _simplify_polyline_to_maxlen(geoid, poly_use, POLY_MAXLEN)
         items.append(('path', f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly_use}"))
 
     # Optional pin

@@ -1,0 +1,26 @@
+HANDOFF — EnforcedSpeed Web (v384)
+
+Single change
+
+- Adds a fast, DB-independent health check route: GET /healthz -> "ok" (200).
+
+Why
+
+- Render deploys were intermittently getting stuck in the "No open HTTP ports detected" scanning phase despite Gunicorn listening.
+- A tiny health endpoint lets you set Render Health Check Path to /healthz (recommended) so deploy readiness is deterministic and does not depend on rendering the full home page.
+
+Files changed
+
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v381-390.txt
+- handoffs/HANDOFF_v384.txt
+
+Render action required (one-time)
+
+- In Render Web service settings, set Health Check Path to: /healthz
+- Keep Start Command: gunicorn app:app --bind 0.0.0.0:$PORT
+
+Guardrails preserved
+
+- No changes to ticket card static maps, centering logic, pin sizing, right-rail layout, or tables.

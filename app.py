@@ -1153,6 +1153,13 @@ def create_app() -> Flask:
                 "county_static_map_url": county_static_map_url}
 
 
+    # --- Health check (Render) ---
+    # Keep this endpoint fast and DB-independent so deploys never hang on health checks.
+    @app.get("/healthz")
+    def healthz():
+        return "ok", 200
+
+
     # --- County GIS (PostGIS) ---
     # ZIP 1 foundation: create table + indexes. Import happens via scripts (see scripts/import_counties_*).
     def ensure_counties_schema() -> None:

@@ -4,3 +4,6 @@ v383 — 2026-02-18 — Home minimap crop (UI-only)
 - Home right-rail minimap now crops top/bottom via a fixed-height wrapper (overflow hidden).
 - Underlying Google Static Maps framing/zoom/bounds remain unchanged (no minimap “zoom” tweaks).
 - Keeps flush/sharp right-rail styling; crop is controlled by CSS (easy to tune via height/object-position).
+
+v384 — 2026-02-18 — Add /healthz endpoint for Render
+- Adds a fast, DB-independent /healthz route for reliable health checks during Render deploys.

@@ -1,0 +1,47 @@
+HANDOFF — EnforcedSpeed Web (v385, one-change-at-a-time, NO REGRESSIONS)
+
+Goal (single change)
+
+Fix the right-rail Home minimap so it:
+- Zooms in one level (vs v384)
+- Crops to a CONUS-focused view (removes Mexico/Cuba) while saving vertical space
+- Does NOT change ticket card static maps, pin sizing, centering logic, or right-rail panel style
+
+What changed (v385)
+
+1) Minimap “zoom in 1” (server-side)
+- app.py: /api/home_minimap_staticmap now uses a tighter CONUS visible box:
+  - visible_sw: 25.0625,-122.8125
+  - visible_ne: 48.4375,-69.6875
+- Still uses visible=... so Google selects the zoom; we simply tightened the box.
+
+2) Minimap crop (UI-only)
+- templates/home_feed.html: crops the minimap with a fixed-height wrapper:
+  - .minimap-crop { height: 235px; overflow: hidden; }
+  - img uses object-fit: cover and object-position: 50% 42% (nudged upward to hide Mexico/Cuba)
+
+Files touched
+- app.py
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v381-390.txt
+- handoffs/HANDOFF_v385.txt
+
+Guardrails verified
+- Ticket card static maps untouched
+- Ticket static map centering logic untouched
+- Custom pin sizing untouched
+- Right-rail layout still flush/sharp (no wrapper duplication)
+- Trending/Follow tables untouched
+
+Local smoke tests
+- python -m py_compile app.py
+- es-up
+- Verify Home: ticket card static images render; right-rail minimap loads; tables show names.
+
+Render notes
+- Keep Render Start Command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path should be /healthz (added in v384)
+
+Going live
+- Commit + push to GitHub (Render deploys from Git).

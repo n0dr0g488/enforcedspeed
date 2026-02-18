@@ -5305,9 +5305,10 @@ GROUP BY UPPER(TRIM(stusps));
             return ("Missing GOOGLE_MAPS_SERVER_KEY", 503)
 
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
-        # Padded slightly so WA/OR (and Maine) don't feel clipped.
-        visible_sw = "23.0,-127.5"
-        visible_ne = "50.5,-65.0"
+        # v385: "zoom in" one level by tightening the visible box (then we crop in the UI).
+        # Keep enough padding so WA/OR and Maine are not clipped.
+        visible_sw = "25.0625,-122.8125"
+        visible_ne = "48.4375,-69.6875"
 
         try:
             now_utc = datetime.utcnow()

@@ -12,8 +12,9 @@
 
   /* Home right-rail minimap crop:
      Keep the underlying CONUS framing/zoom unchanged, but crop top/bottom to save vertical space. */
-  .minimap-crop{height:250px; overflow:hidden; background:#f3f4f6;}
-  .minimap-crop img{width:100%; height:100%; object-fit:cover; object-position:50% 44%; display:block;}
+  /* v385: keep minimap framing, zoom-in one step server-side, then crop to CONUS in UI */
+  .minimap-crop{height:235px; overflow:hidden; background:#f3f4f6;}
+  .minimap-crop img{width:100%; height:100%; object-fit:cover; object-position:50% 42%; display:block;}
 
 </style>
 

@@ -1,17 +1,15 @@
 services:
-  - type: web
-    name: enforcedspeed
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
-    autoDeploy: true
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.2
-      - key: FLASK_ENV
-        value: production
-      - key: SECRET_KEY
-        generateValue: true
-      # Render will usually provide DATABASE_URL automatically when you attach a Postgres DB.
-      # If not, add DATABASE_URL in the Render dashboard env vars.
+- type: web
+  name: enforcedspeed
+  env: python
+  plan: free
+  buildCommand: pip install -r requirements.txt
+  startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+  autoDeploy: true
+  envVars:
+  - key: PYTHON_VERSION
+    value: 3.11.11
+  - key: FLASK_ENV
+    value: production
+  - key: SECRET_KEY
+    generateValue: true

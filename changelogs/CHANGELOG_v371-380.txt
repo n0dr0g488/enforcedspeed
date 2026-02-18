@@ -16,3 +16,8 @@ v378 (2026-02-18)
 
 v379 (2026-02-18)
 - Home right-rail minimap: CONUS-focused framing (reduced vertical space, removes Cuba) and slightly wider bounds so West Coast + Maine pins are not clipped.
+
+
+## v380 (2026-02-18)
+- Render reliability: pin Python runtime to 3.11.11 (avoid 3.14 wheel/build issues).
+- Packaging: remove __pycache__/pyc from repo/zip.

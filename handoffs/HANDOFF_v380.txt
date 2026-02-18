@@ -1,0 +1,16 @@
+HANDOFF — EnforcedSpeed Web (v380, one-change-at-a-time, NO REGRESSIONS)
+
+Change in this version (single purpose)
+- Render deploy reliability: pin Python runtime to 3.11.11.
+  - Updated render.yaml env var PYTHON_VERSION=3.11.11
+  - Added .python-version (3.11.11) as a belt-and-suspenders safeguard
+- Removed accidental __pycache__/pyc artifacts from the packaged folder.
+
+Why
+- Render recently defaults to Python 3.14.x for newer services; some native deps (e.g., PyMuPDF, pillow-heif) can build slowly or fail without wheels, causing “spinning” deploys.
+
+Guardrails preserved
+- No changes to ticket card static maps, centering logic, pin sizing, right-rail layout, or Trending/Follow naming.
+
+Going live
+- Commit + push to GitHub to trigger Render deploy.

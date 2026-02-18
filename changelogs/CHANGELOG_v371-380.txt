@@ -13,6 +13,3 @@ v377 (2026-02-18) — Static Maps: home minimap proxy now uses STATIC_PIN_BASE_U
 
 v378 (2026-02-18)
 - Render deploy reliability: bind gunicorn to $PORT via render.yaml startCommand (prevents port-scan hang / spinning deploy).
-
-v379 (2026-02-18)
-- Home right-rail minimap: CONUS-focused framing (reduced vertical space, removes Cuba) and slightly wider bounds so West Coast + Maine pins are not clipped.

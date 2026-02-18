@@ -1,0 +1,38 @@
+HANDOFF — EnforcedSpeed Web (v383, one-change-at-a-time, NO REGRESSIONS)
+
+What changed (v383)
+- FIX: Home right-rail minimap now crops top/bottom in the UI to save vertical space, WITHOUT changing the underlying static-map framing/zoom.
+- Implemented exactly as requested: keep the existing CONUS “zoom” you liked, and crop between the black-line region by:
+  - wrapping the <img> in a fixed-height container (overflow:hidden)
+  - using object-fit:cover + object-position to nudge framing
+
+Key behavior / guardrails (MUST NOT REGRESS)
+- Ticket card static maps must continue to render on Home feed.
+- Ticket static map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays on ticket static maps (no “massive” pins).
+- Right-rail layout stays: flush/sharp panel style (no wrapper duplication).
+- Trending/Follow tables must keep county/state names (never fall back to raw GEOIDs).
+- Do not recompute expensive geometry per request (no runtime unions).
+
+Files changed
+- templates/home_feed.html
+  - Added CSS classes .minimap-crop and updated minimap markup to wrap the image.
+
+Tuning knobs (if user wants slightly different crop)
+- templates/home_feed.html:
+  - .minimap-crop{ height:250px; }
+  - .minimap-crop img{ object-position:50% 44%; }
+  Adjust height and the 2nd percentage (Y) only — DO NOT touch backend minimap bounds unless explicitly asked.
+
+Local workflow
+- Use es-up (runs app + worker).
+- If local site spins/hangs: confirm Docker Desktop + Postgres container is running (localhost:5433).
+
+Packaging rules
+- ZIP must have unique top-level folder: EnforcedSpeed_v383_2026-02-18_minimap_crop_wrapper/
+- Include updated VERSION.txt, changelog block, and this handoff.
+
+Going live (Render)
+- Going live = commit + push to GitHub (Render deploys from Git).
+- render.yaml start command must remain:
+  gunicorn app:app --bind 0.0.0.0:$PORT

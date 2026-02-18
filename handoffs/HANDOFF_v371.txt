@@ -1,0 +1,37 @@
+HANDOFF — EnforcedSpeed Web v371 (based on v370; one-change)
+Change made (scoped)
+- Static Maps key hygiene:
+  - All server-proxied Static Maps (ticket card /api/county_staticmap and right-rail minimap /api/home_minimap_staticmap)
+    now use ONLY GOOGLE_MAPS_SERVER_KEY.
+  - Removed fallback to GOOGLE_MAPS_API_KEY for these Static Maps URLs so you can disable Maps Static API on the web key safely.
+
+Why
+- You disabled Maps Static API on enforcedspeed-web-maps and static map pins fell back/defaulted.
+  That indicated some server Static Maps traffic was still using the web key.
+  v371 ensures the server proxy always uses the server key.
+
+Files changed
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v371-380.txt
+- handoffs/HANDOFF_v371.txt
+
+Render / Google Console checklist
+- enforcedspeed-web-maps (GOOGLE_MAPS_API_KEY):
+  - Application restriction: HTTP referrers (https://enforcedspeed.com/*, https://www.enforcedspeed.com/*)
+  - API restriction: Maps JavaScript API (and Places only if used)
+  - Maps Static API: can be DISABLED
+- EnforcedSpeed Server Static Maps (GOOGLE_MAPS_SERVER_KEY):
+  - Application restriction: None (ok)
+  - API restriction: Maps Static API ONLY
+  - Set hard quotas for cost control
+
+Smoke tests
+- Home feed loads; ticket static images render (Edge + Chrome)
+- Right-rail minimap renders (pins visible)
+- /map still loads (uses web key)
+Git (going live)
+git status
+git add .
+git commit -m "v371: static maps proxies use server key only"
+git push

@@ -588,14 +588,10 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     """
     try:
         from flask import current_app
-        # Prefer the server key (used elsewhere for Places/proxy calls).
-        # Fallback to GOOGLE_MAPS_API_KEY for older configs.
-        key = (
-            (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
-            or (current_app.config.get('GOOGLE_MAPS_API_KEY') or '').strip()
-        )
+        # Use ONLY the server key for Static Maps. Do not fall back to the browser key.
+        key = (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
     except Exception:
-        key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip() or (os.environ.get('GOOGLE_MAPS_API_KEY') or '').strip()
+        key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
 
     geoid = (county_geoid or '').strip()
     if not key or not geoid:
@@ -721,12 +717,10 @@ def us_static_map_url(*, width: int = 640, height: int = 640) -> str:
     """Static map URL of the United States (default preview before a county is selected)."""
     try:
         from flask import current_app
-        key = (
-            (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
-            or (current_app.config.get('GOOGLE_MAPS_API_KEY') or '').strip()
-        )
+        # Use ONLY the server key for Static Maps. Do not fall back to the browser key.
+        key = (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
     except Exception:
-        key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip() or (os.environ.get('GOOGLE_MAPS_API_KEY') or '').strip()
+        key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
 
     if not key:
         return ''
@@ -5111,9 +5105,9 @@ GROUP BY UPPER(TRIM(stusps));
         """
         debug = (request.args.get("debug") or "").strip() in ("1", "true", "yes")
 
-        google_key = os.getenv("GOOGLE_MAPS_API_KEY") or os.getenv("GOOGLE_STATIC_MAPS_API_KEY") or ""
+        google_key = (os.getenv("GOOGLE_MAPS_SERVER_KEY") or "").strip()
         if not google_key:
-            return ("Missing GOOGLE_MAPS_API_KEY", 503)
+            return ("Missing GOOGLE_MAPS_SERVER_KEY", 503)
 
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
         # Padded slightly so WA/OR (and Maine) don't feel clipped.

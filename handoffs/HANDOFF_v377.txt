@@ -1,0 +1,23 @@
+HANDOFF — EnforcedSpeed Web v377 (Home minimap custom pins via R2)
+
+Base
+- Built on v376.
+
+What changed (ONE change)
+- Home right-rail minimap static map proxy now uses STATIC_PIN_BASE_URL for its marker icon (Cloudflare R2 / static.enforcedspeed.com).
+  - This prevents Google Static Maps from timing out fetching the icon from enforcedspeed.com, which caused default pins + g.co/staticmaperror.
+
+Config required (Render Environment Group)
+- STATIC_PIN_BASE_URL=https://static.enforcedspeed.com/pins
+  (Dev fallback: https://pub-00fc0072ed934945b6d265c84f4e247d.r2.dev/pins)
+
+No regressions / guardrails respected
+- Ticket card static maps still render.
+- County-centered map logic unchanged.
+- No additional geometry computation.
+
+Deploy (Render)
+- Commit + push to GitHub triggers Render deploy.
+
+Local run
+- Use standard startup: es-up (already handles app + worker windows).

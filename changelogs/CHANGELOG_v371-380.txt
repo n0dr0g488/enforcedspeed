@@ -7,3 +7,6 @@ v375 (2026-02-18) — Static Maps: simplify county outline polyline when extreme
 
 
 v376 (2026-02-18) — Static Maps: support Cloudflare R2 static pin host via STATIC_PIN_BASE_URL (e.g. https://static.enforcedspeed.com/pins) for reliable Google icon fetches.
+
+
+v377 (2026-02-18) — Static Maps: home minimap proxy now uses STATIC_PIN_BASE_URL pin icon (R2) to avoid default pins + g.co/staticmaperror.

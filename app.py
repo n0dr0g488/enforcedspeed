@@ -5462,7 +5462,14 @@ GROUP BY UPPER(TRIM(stusps));
                 ("key", google_key),
             ]
 
-            pin_icon_url = url_for('static', filename='img/pins/pin_inside_deepred_static.png', _external=True)
+            # Prefer Cloudflare R2 pin host so Google Static Maps can fetch the icon reliably.
+            # Base URL should look like: https://static.enforcedspeed.com/pins
+            pin_base = (os.getenv('STATIC_PIN_BASE_URL') or '').strip().rstrip('/')
+            if pin_base:
+                pin_icon_url = f"{pin_base}/pin_inside_deepred_static.png"
+            else:
+                # Fallback to our own origin (works locally)
+                pin_icon_url = url_for('static', filename='img/pins/pin_inside_deepred_static.png', _external=True)
             for lat, lng in county_pts[:5]:
                 # IMPORTANT: Google requires the icon URL to be URL-encoded, but the marker directive
                 # itself must remain as literal 'icon:' (not 'icon%3A').

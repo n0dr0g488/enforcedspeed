@@ -1,0 +1,47 @@
+HANDOFF — EnforcedSpeed Web v370 (based on v369; one-change)
+
+Change made (scoped)
+- Ticket card static maps on Home feed now load via the server proxy endpoint:
+  - template switches from direct Google URL generation (county_static_map_url) to:
+    /api/county_staticmap?geoid=...&pin_lat=...&pin_lng=...&center_on_pin=0&w=640&h=640
+  - This keeps the Google Static Maps API key out of browsers (fixes Edge/Chrome referrer differences)
+  - Adds server-side caching for /api/county_staticmap:
+    - Redis cache when REDIS_URL is set
+    - Fallback file cache under /tmp/es_staticmap_cache
+    - Response headers: Cache-Control public, X-ES-Cache HIT/MISS
+
+Guardrails respected (no-touch)
+- Did NOT change ticket static map centering logic (still county-centered unless explicitly pin-centered).
+- Did NOT change custom pin sizing or pin assets.
+- Did NOT modify right-rail layout/minimap.
+- Did NOT change Trending/Follow tables label/name resolution.
+
+Files changed
+- templates/home_feed.html
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v361-370.txt
+
+Production (Google) steps
+- Create/rotate to a SERVER-only Static Maps key (recommended) and store it in Render as:
+  - GOOGLE_MAPS_SERVER_KEY (preferred) or GOOGLE_MAPS_API_KEY
+- Key restrictions guidance after proxy:
+  - Application restrictions can be None (key not shipped to browsers)
+  - BUT set API restriction: Static Maps API only
+  - Set strict Quotas (daily + per-minute) to hard-cap spend
+
+Smoke tests
+- python -m py_compile app.py
+- es-up
+- Verify in browser:
+  - Home feed loads fast
+  - Ticket card static images appear (multiple cards)
+  - Right-rail minimap loads (custom pins still show)
+  - Trending/Follow tables show real names, not GEOIDs
+  - Optional: open DevTools Network and confirm ticket static map IMG src begins with /api/county_staticmap (no maps.googleapis.com in the browser)
+
+Git (going live = push)
+- git status
+- git add .
+- git commit -m "v370: proxy + cache ticket card static maps"
+- git push

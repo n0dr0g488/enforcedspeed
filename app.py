@@ -4999,6 +4999,82 @@ GROUP BY UPPER(TRIM(stusps));
         if not upstream:
             abort(404)
 
+        # --- v370: server-side caching ---
+        # Cache by the final upstream URL so identical requests across users/browsers are fast
+        # and we don't repeatedly hit Google Static Maps.
+        cache_ttl_sec = 7 * 24 * 60 * 60  # 7 days
+        cache_key = None
+        try:
+            import hashlib
+            cache_key = "es:staticmap:" + hashlib.sha256(upstream.encode("utf-8")).hexdigest()
+        except Exception:
+            cache_key = None
+
+        def _cache_get(k: str):
+            """Return (content_type, bytes) or (None, None)."""
+            if not k:
+                return (None, None)
+            # Prefer Redis (shared across instances); fall back to local /tmp file cache.
+            rurl = (os.environ.get("REDIS_URL") or "").strip()
+            if rurl:
+                try:
+                    import redis
+                    r = redis.Redis.from_url(rurl, socket_timeout=2, socket_connect_timeout=2)
+                    blob = r.get(k)
+                    if blob:
+                        # Stored as: b"<content-type>\n" + image bytes
+                        i = blob.find(b"\n")
+                        if i > 0:
+                            ct = blob[:i].decode("utf-8", errors="ignore") or "image/png"
+                            return (ct, blob[i + 1 :])
+                except Exception:
+                    pass
+
+            try:
+                cache_dir = "/tmp/es_staticmap_cache"
+                os.makedirs(cache_dir, exist_ok=True)
+                p = os.path.join(cache_dir, k.replace(":", "_") + ".bin")
+                if os.path.exists(p):
+                    with open(p, "rb") as f:
+                        blob = f.read()
+                    i = blob.find(b"\n")
+                    if i > 0:
+                        ct = blob[:i].decode("utf-8", errors="ignore") or "image/png"
+                        return (ct, blob[i + 1 :])
+            except Exception:
+                pass
+
+            return (None, None)
+
+        def _cache_set(k: str, content_type: str, data: bytes):
+            if not k:
+                return
+            blob = (content_type or "image/png").encode("utf-8") + b"\n" + (data or b"")
+            rurl = (os.environ.get("REDIS_URL") or "").strip()
+            if rurl:
+                try:
+                    import redis
+                    r = redis.Redis.from_url(rurl, socket_timeout=2, socket_connect_timeout=2)
+                    r.setex(k, cache_ttl_sec, blob)
+                    return
+                except Exception:
+                    pass
+            try:
+                cache_dir = "/tmp/es_staticmap_cache"
+                os.makedirs(cache_dir, exist_ok=True)
+                p = os.path.join(cache_dir, k.replace(":", "_") + ".bin")
+                with open(p, "wb") as f:
+                    f.write(blob)
+            except Exception:
+                pass
+
+        ct_cached, data_cached = _cache_get(cache_key)
+        if data_cached:
+            out = Response(data_cached, mimetype=(ct_cached or "image/png"))
+            out.headers["Cache-Control"] = "public, max-age=86400"
+            out.headers["X-ES-Cache"] = "HIT"
+            return out
+
         try:
             req = urllib.request.Request(upstream, headers={"User-Agent": "EnforcedSpeedWeb/1.0"})
             with urllib.request.urlopen(req, timeout=12) as resp:
@@ -5007,8 +5083,11 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             abort(502)
 
+        _cache_set(cache_key, content_type, data)
+
         out = Response(data, mimetype=content_type)
         out.headers["Cache-Control"] = "public, max-age=86400"
+        out.headers["X-ES-Cache"] = "MISS"
         return out
 
 

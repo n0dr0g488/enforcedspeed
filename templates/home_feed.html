@@ -328,7 +328,10 @@
 {% set _pin_lat = r.lat if r.location_source in ['user_pin','user_pin_snapped','route_class:interstate','route_class:numbered','route_class:local','prefer_highway','nearest'] else None %}
 {% set _pin_lng = r.lng if _pin_lat is not none else None %}
 {% set _pinmode = False %}
-{% set _sm = county_static_map_url(r.county_geoid, _pin_lat, _pin_lng, width=640, height=640, center_on_pin=_pinmode) %}
+{# IMPORTANT (v370): Route ticket-card static maps through our own proxy endpoint so the
+   Google Static Maps API key is never exposed to browsers (avoids referrer differences across browsers)
+   and lets us cache responses server-side. #}
+{% set _sm = url_for('api_county_staticmap', geoid=r.county_geoid, pin_lat=_pin_lat, pin_lng=_pin_lng, center_on_pin=('1' if _pinmode else '0'), w=640, h=640) %}
 {% if _sm %}
 
   <div class="ticket-staticmap-frame">

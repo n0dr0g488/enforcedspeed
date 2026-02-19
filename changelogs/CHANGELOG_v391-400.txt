@@ -12,3 +12,17 @@ v391 (2026-02-18)
 [v393] Map page selection + rail overflow fix
 - Treat focus_county_geoid navigation the same as county_geoid filter so the right panel title matches the outlined county (not just the state).
 - Ensure the left filter rail does not show its own scrollbar by overriding the outer left-rail container overflow.
+
+[v394] Map page left rail + spacing (attempt)
+- Make Map page left filter panel include footer links/meta like Home and reduce scroll behavior.
+- Add additional bottom breathing room so the map container border isn’t flush with the viewport.
+
+[v395] Fix Map page Cookie Policy footer link
+- Fix footer link endpoint to use url_for('cookies') to prevent /map 500.
+
+[v396] Map page viewport lock + symmetric buffer (attempt)
+- Lock Map page to viewport and reduce unwanted scrolling; aim for symmetric map container spacing.
+
+[v397] Map page left rail parity + symmetric map buffer
+- Left rail now matches Home: footer links/meta always visible; filter content can scroll if needed but scrollbar is hidden.
+- Map container now has symmetric outer buffer (top/bottom) so the bottom border is clearly visible.

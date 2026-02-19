@@ -5,7 +5,7 @@
   /* Map page: fill the viewport (no page scroll). Allow left/right panels to scroll internally if needed. */
   html, body { height: 100%; }
   body { overflow: hidden; }
-  .home-shell.map-shell { height: calc(100vh - 64px); padding-bottom: 18px; box-sizing: border-box; } /* keep bottom breathing room so border is visible */
+  .home-shell.map-shell { height: calc(100vh - 64px); padding: 12px; box-sizing: border-box; } /* symmetric outer buffer */ /* keep bottom breathing room so border is visible */
   .home-shell.map-shell .home-left,
   .home-shell.map-shell .home-center,
   .home-shell.map-shell .home-right { height: 100%; }
@@ -17,7 +17,7 @@
   .home-shell.map-shell .filters-footer-links, .home-shell.map-shell .filters-footer-meta { margin-top: 10px; }
 
   /* Center map card fills available height */
-  .map-card { height: 100%; display: flex; flex-direction: column; padding: 12px; margin-bottom: 18px; }
+  .map-card { height: 100%; display: flex; flex-direction: column; padding: 12px; margin: 0; }
   #esMap { flex: 1 1 auto; width: 100%; height: 100%; border-radius: 14px; overflow: hidden; }
 
   /* Right panel cards */
@@ -36,6 +36,12 @@
   .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
   .map-right .speed-table th { text-align: left; font-weight: 600; opacity: .85; }
   .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
+
+  /* Map page left rail: scroll content if needed, but hide scrollbar (match Home look). Footer always visible. */
+  .home-shell.map-shell .filters-scroll { flex: 1 1 auto; overflow: auto; padding-right: 2px; }
+  .home-shell.map-shell .filters-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+  .home-shell.map-shell .filters-scroll::-webkit-scrollbar { width: 0; height: 0; }
+
 </style>
 
 <div class="home-shell map-shell">
@@ -45,6 +51,7 @@
         <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter Speeding Tickets</div>
+            <div class="filters-scroll">
             <div class="filterbar-row filterbar-row--stack">
 
               <div class="filterbar-item">
@@ -145,6 +152,8 @@
 <div class="filterbox-footer">
                 <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('map_view') }}">Clear</a>
               </div>
+
+                          </div>
 
               <div class="filters-footer-links">
                 <a href="{{ url_for('privacy') }}">Privacy</a>

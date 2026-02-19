@@ -1,0 +1,21 @@
+HANDOFF — EnforcedSpeed Web (v397)
+Change implemented (single scope)
+- Map page left filter panel now matches Home styling/behavior:
+  - Footer links/meta are always visible (Privacy / Terms / Cookies + © line).
+  - Filter content may scroll if needed, but the scrollbar is hidden so it does not appear.
+- Map container now has symmetric outer buffer so the bottom border is clearly visible (top/bottom gap matches).
+
+Files changed
+- templates/map_page.html
+- VERSION.txt
+- changelogs/CHANGELOG_v391-400.txt
+
+Guardrails respected
+- No changes to ticket card static maps centering/pins.
+- No changes to trending/follow naming logic.
+- No runtime state unions added.
+
+Render settings reminder
+- Start Command (UI): gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- PORT=10000
+- Health check: /healthz

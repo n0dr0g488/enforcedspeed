@@ -3288,6 +3288,12 @@ GROUP BY UPPER(TRIM(stusps));
         filter_state = (request.args.get("state") or "").strip().upper()
         filter_road = (request.args.get("road") or "").strip()
 
+        # If we arrived via a focus link (e.g., clicking a state from Home),
+        # treat focus_state as an implicit state filter so pins + stats match.
+        focus_state = (request.args.get("focus_state") or "").strip().upper()
+        if (not filter_state) and focus_state and re.fullmatch(r"[A-Z]{2}", focus_state or ""):
+            filter_state = focus_state
+
         filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
         filter_speed_limit_list = [v for v in filter_speed_limit_list if v != "any"]
         filter_speed_limit_list = list(dict.fromkeys(filter_speed_limit_list))
@@ -3392,21 +3398,61 @@ GROUP BY UPPER(TRIM(stusps));
             except Exception:
                 selected_ticket = None
 
-        # County stats for right panel
-        county_stats = None
-        focus_county_geoid = (request.args.get("focus_county_geoid") or "").strip()
-        stats_geoid = filter_county_geoid or focus_county_geoid
-        if (not stats_geoid) and selected_ticket and getattr(selected_ticket, "county_geoid", None):
-            stats_geoid = (selected_ticket.county_geoid or "").strip()
+        # Region stats for right panel (matches selected county/state)
+        region_stats = None
+        region_title = ""
 
-        if stats_geoid:
+        state_name_by_abbr = {abbr: name for (abbr, name) in STATE_PAIRS}
+
+        stats_scope = None  # "county" | "state"
+        stats_value = None
+
+        # Prefer an explicit/outlined county, then state, then fall back to the selected ticket's county.
+        if filter_county_geoid:
+            stats_scope = "county"
+            stats_value = filter_county_geoid
+            region_title = (filter_county_label or "").strip()
+        elif filter_state and re.fullmatch(r"[A-Z]{2}", filter_state or ""):
+            stats_scope = "state"
+            stats_value = filter_state
+            st_name = (state_name_by_abbr.get(filter_state) or "").strip()
+            region_title = f"{st_name} ({filter_state})" if st_name else filter_state
+        elif selected_ticket and getattr(selected_ticket, "county_geoid", None):
+            cg = (selected_ticket.county_geoid or "").strip()
+            if re.fullmatch(r"\d{5}", cg):
+                stats_scope = "county"
+                stats_value = cg
+
+        # Best-effort county label when falling back from selected_ticket
+        if stats_scope == "county" and stats_value and not region_title:
+            try:
+                row = db.session.execute(
+                    text('SELECT namelsad, name, stusps FROM counties WHERE geoid = :g LIMIT 1'),
+                    {'g': stats_value},
+                ).mappings().first()
+                if row:
+                    nm = (row.get('namelsad') or row.get('name') or '').strip()
+                    st = (row.get('stusps') or '').strip()
+                    region_title = f"{nm}, {st}".strip(', ')
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+
+        if stats_scope and stats_value:
             try:
                 base = SpeedReport.query
                 base = base.filter(SpeedReport.is_deleted.is_(False))
                 base = base.filter(SpeedReport.lat.isnot(None)).filter(SpeedReport.lng.isnot(None))
-                base = base.filter(SpeedReport.county_geoid == stats_geoid)
+
+                if stats_scope == "county":
+                    base = base.filter(SpeedReport.county_geoid == stats_value)
+                elif stats_scope == "state":
+                    base = base.filter(SpeedReport.state.ilike(f"{stats_value}%"))
 
                 now = datetime.utcnow()
+
                 def _count_since(days: int) -> int:
                     return int(base.filter(SpeedReport.created_at >= (now - timedelta(days=days))).count())
 
@@ -3415,15 +3461,21 @@ GROUP BY UPPER(TRIM(stusps));
                 total_30 = _count_since(30)
                 total_365 = _count_since(365)
 
-                by_rows = (
+                by_q = (
                     db.session.query(
                         SpeedReport.posted_speed,
                         func.avg((SpeedReport.ticketed_speed - SpeedReport.posted_speed)),
                     )
                     .filter(SpeedReport.is_deleted.is_(False))
                     .filter(SpeedReport.lat.isnot(None)).filter(SpeedReport.lng.isnot(None))
-                    .filter(SpeedReport.county_geoid == stats_geoid)
-                    .group_by(SpeedReport.posted_speed)
+                )
+                if stats_scope == "county":
+                    by_q = by_q.filter(SpeedReport.county_geoid == stats_value)
+                elif stats_scope == "state":
+                    by_q = by_q.filter(SpeedReport.state.ilike(f"{stats_value}%"))
+
+                by_rows = (
+                    by_q.group_by(SpeedReport.posted_speed)
                     .order_by(SpeedReport.posted_speed.asc())
                     .all()
                 )
@@ -3434,17 +3486,15 @@ GROUP BY UPPER(TRIM(stusps));
                         continue
                     try:
                         p_int = int(posted)
-                    except Exception:
-                        continue
-                    try:
                         a_int = int(round(float(avg_over)))
                     except Exception:
                         continue
                     by_posted.append({"posted": p_int, "avg_over": a_int})
 
-                county_stats = {
+                region_stats = {
                     "ok": True,
-                    "geoid": stats_geoid,
+                    "scope": stats_scope,
+                    "value": stats_value,
                     "total_all": total_all,
                     "total_7": total_7,
                     "total_30": total_30,
@@ -3456,7 +3506,7 @@ GROUP BY UPPER(TRIM(stusps));
                     db.session.rollback()
                 except Exception:
                     pass
-                county_stats = None
+                region_stats = None
 
         return render_template(
             "map_page.html",
@@ -3482,7 +3532,8 @@ GROUP BY UPPER(TRIM(stusps));
             filters_active=filters_active,
             maps_api_key=app.config.get("GOOGLE_MAPS_API_KEY") or "",
             selected_ticket=selected_ticket,
-            county_stats=county_stats,
+            region_title=region_title,
+            region_stats=region_stats,
         )
 
 
@@ -4413,6 +4464,11 @@ GROUP BY UPPER(TRIM(stusps));
         focus_state = (request.args.get("focus_state") or "").strip().upper()
         focus_county_geoid = (request.args.get("focus_county_geoid") or "").strip()
         selected_ticket_id = (request.args.get("ticket_id") or "").strip()
+
+        # If the user navigated to the map via a state focus link (e.g., clicking a state from Home),
+        # treat that focus as an implicit state filter so pins/stats match what is selected.
+        if (not filter_state) and focus_state and re.fullmatch(r"[A-Z]{2}", focus_state or ""):
+            filter_state = focus_state
 
         # Optional viewport bounds (when present, filter pins to the visible map)
         def _f(name: str):

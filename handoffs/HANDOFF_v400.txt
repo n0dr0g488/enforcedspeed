@@ -1,0 +1,62 @@
+HANDOFF — EnforcedSpeed Web (v400)
+
+Goal of v400 (single scoped change)
+Fix Map page right-panel stats so they always correspond to what’s selected (county vs state), and make the Clear button text weight match the rest of the UI.
+
+What was wrong
+- Navigating to /map via a state focus link (e.g., clicking “Virginia” from Home) outlined the state, but:
+  - The right-panel stats numbers were actually for the selected ticket’s COUNTY (fallback), not the state.
+  - “Pins shown” reflected ALL pins loaded (often nationwide), because focus_state did not act as a filter.
+  - The right-panel title showed only “VA” instead of the full state name.
+
+What changed
+1) Map page: state focus now behaves like a real selection for stats
+- app.py (map_view)
+  - If focus_state is present and no explicit state filter is set, we treat focus_state as the implicit filter_state.
+  - Right-panel stats are now computed by scope:
+    - County (county_geoid/focus_county_geoid) takes priority.
+    - Else State (state/focus_state).
+    - Else (only if nothing else is selected) fall back to selected ticket’s county.
+  - State title uses full name + abbreviation (e.g., “Virginia (VA)”).
+
+2) Map pins API: focus_state now filters pins when no explicit state filter exists
+- app.py (/api/map_pins)
+  - If focus_state is present and state= is not, we treat focus_state as state= for pin filtering.
+  - This makes “Pins shown” match the selected state instead of counting all pins.
+
+3) Map template updated to use the new region stats variables
+- templates/map_page.html
+  - Uses region_title + region_stats instead of county_stats.
+
+4) Clear button text weight reduced
+- templates/_mvp_styles.html
+  - .filterbar-clear font-weight reduced (was extremely bold).
+
+Files changed
+- app.py
+- templates/map_page.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- changelogs/CHANGELOG_v391-400.txt
+- handoffs/HANDOFF_v400.txt
+
+Non‑negotiable guardrails (do not regress)
+- Home feed ticket card static maps must render.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style.
+- Trending/Follow tables keep county/state names (never GEOIDs).
+- No runtime geometry unions per request.
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Verify:
+   - Home: ticket card static maps render.
+   - Map: click a STATE from Home → /map outlines state AND right stats show state totals + “Virginia (VA)” style title.
+   - Map: “Pins shown” matches the selected state count (not nationwide).
+   - Map: selecting a COUNTY switches stats to county totals.
+   - Clear button label is no longer overly bold.
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

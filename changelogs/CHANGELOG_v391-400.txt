@@ -36,3 +36,9 @@ v391 (2026-02-18)
 [v399] Rails full-height + Map rail alignment fix
 - Home + Statistics: make pinned left/right rails explicitly 100vh-based so the filter rail background truly fills to the bottom of the viewport ("infinite" feel) and footer links stay pinned.
 - Map page: remove outer shell padding (rails flush to left/top/bottom again) while keeping symmetric top/bottom buffer around the map card via center-column vertical padding.
+
+[v400] Map page state stats + Clear button weight
+- Map page right stats card now matches the selected scope (county vs state). State selection no longer falls back to the selected ticket’s county stats.
+- State title shows full name (e.g., Virginia (VA)) instead of just the abbreviation.
+- When arriving via focus_state navigation, treat focus_state as an implicit state filter so "Pins shown" matches the state.
+- Clear button text weight reduced to match other buttons.

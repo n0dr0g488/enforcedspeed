@@ -216,19 +216,18 @@
       </div>
 
       <div class="card stat-card" id="esCountyStatsCard">
-        {% set _focus_state = (request.args.get('focus_state') or '')|upper %}
-        <div class="stat-title">{% if filter_county_label %}{{ filter_county_label }}{% elif _focus_state %}{{ _focus_state }}{% elif filter_state %}{{ filter_state }}{% else %}Select a county or state{% endif %}</div>
+        <div class="stat-title">{% if region_title %}{{ region_title }}{% else %}Select a county or state{% endif %}</div>
 
         <div class="stat-row">
           <div class="stat-k">Pins shown</div>
           <div class="stat-v" id="esMapMeta">—</div>
         </div>
 
-        {% if county_stats and county_stats.ok %}
-          <div class="stat-row"><div class="stat-k">Total (all time)</div><div class="stat-v">{{ county_stats.total_all }}</div></div>
-          <div class="stat-row"><div class="stat-k">Last 7 days</div><div class="stat-v">{{ county_stats.total_7 }}</div></div>
-          <div class="stat-row"><div class="stat-k">Last 30 days</div><div class="stat-v">{{ county_stats.total_30 }}</div></div>
-          <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ county_stats.total_365 }}</div></div>
+        {% if region_stats and region_stats.ok %}
+          <div class="stat-row"><div class="stat-k">Total (all time)</div><div class="stat-v">{{ region_stats.total_all }}</div></div>
+          <div class="stat-row"><div class="stat-k">Last 7 days</div><div class="stat-v">{{ region_stats.total_7 }}</div></div>
+          <div class="stat-row"><div class="stat-k">Last 30 days</div><div class="stat-v">{{ region_stats.total_30 }}</div></div>
+          <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ region_stats.total_365 }}</div></div>
 
           <div style="margin-top:10px; font-weight:600;">Avg overage by posted speed</div>
           <table class="speed-table" aria-label="Average overage by posted speed">
@@ -236,13 +235,13 @@
               <tr><th>Posted</th><th>Avg over</th></tr>
             </thead>
             <tbody>
-              {% for row in county_stats.by_posted %}
+              {% for row in region_stats.by_posted %}
                 <tr>
                   <td>{{ row.posted }} mph</td>
                   <td>+{{ row.avg_over }} mph</td>
                 </tr>
               {% endfor %}
-              {% if (county_stats.by_posted|length) == 0 %}
+              {% if (region_stats.by_posted|length) == 0 %}
                 <tr><td colspan="2" style="opacity:.75;">No data yet.</td></tr>
               {% endif %}
             </tbody>

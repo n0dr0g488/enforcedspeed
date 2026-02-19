@@ -48,9 +48,10 @@
         position: fixed;
         left: 0;
         top: 62px;
+        bottom: 0;
         width: 275px;
-        max-height: calc(100vh - 104px);
-        overflow: auto;
+        max-height: none;
+        overflow: hidden; /* scroll handled inside .filters-scroll */
         align-self: start;
       }
 
@@ -62,6 +63,29 @@
         border-radius:0;
         box-shadow:none;
         padding:14px 14px 12px;
+
+        /* v398: make Home/Stats left rail fill the viewport height like Map page */
+        display:flex;
+        flex-direction:column;
+        height:100%;
+        box-sizing:border-box;
+        overflow:hidden;
+      }
+
+      .filters-scroll{
+        flex:1 1 auto;
+        min-height:0;
+        overflow:auto;
+        padding-right:2px;
+        scrollbar-width:none;
+        -ms-overflow-style:none;
+      }
+      .filters-scroll::-webkit-scrollbar{
+        width:0;
+        height:0;
+      }
+      .filters-footer{
+        margin-top:auto;
       }
 
 /* v310: Unify filter rail control typography (multi-select summaries + selects) */
@@ -118,10 +142,23 @@
         position: fixed;
         right: 0;
         top: 62px;
+        bottom: 0;
         width: 320px;
-        max-height: calc(100vh - 104px);
+        max-height: none;
         overflow: auto;
         align-self: start;
+      }
+
+      /* Hide rail scrollbars (scroll still works). */
+      .home-left,
+      .home-right{
+        scrollbar-width:none;
+        -ms-overflow-style:none;
+      }
+      .home-left::-webkit-scrollbar,
+      .home-right::-webkit-scrollbar{
+        width:0;
+        height:0;
       }
 
       /* Mobile / narrow screens: collapse rails. */
@@ -142,7 +179,9 @@
       /* When the viewport is too narrow for a pinned rail + centered feed, collapse the rail into the mobile toggle. */
       @media (max-width: 1100px){
         .home-shell{ padding: 16px 16px; }
-        .home-left{ position: static; width: auto; max-height: none; overflow: visible; }
+        .home-left{ position: static; width: auto; max-height: none; overflow: visible; bottom: auto; }
+        .filters-rail{ height:auto; overflow:visible; }
+        .filters-scroll{ overflow:visible; padding-right:0; }
         .home-right{ display:none; }
         .home-filters-toggle{ display:inline-block; }
       }

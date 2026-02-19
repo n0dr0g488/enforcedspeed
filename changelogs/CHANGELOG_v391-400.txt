@@ -26,3 +26,9 @@ v391 (2026-02-18)
 [v397] Map page left rail parity + symmetric map buffer
 - Left rail now matches Home: footer links/meta always visible; filter content can scroll if needed but scrollbar is hidden.
 - Map container now has symmetric outer buffer (top/bottom) so the bottom border is clearly visible.
+
+[v398] Full-height rails on Home/Stats + Map bottom buffer fix
+- Home + Statistics: left filter rail now extends flush to the bottom of the viewport (matches Map page look).
+  - Rail is a full-height flex column with a hidden-scrollbar scroll area and the footer links pinned to the bottom.
+- Map page: convert to in-flow 3-column flex layout inside a padded viewport-locked shell (no fixed side rails on Map page).
+  - Guarantees symmetric top/bottom outer padding so the map card bottom border is no longer flush/clipped.

@@ -2,26 +2,44 @@
 {% block content %}
 
 <style>
-  /* Map page: fill the viewport (no page scroll). Allow left/right panels to scroll internally if needed. */
+  /* Map page: lock to viewport (no page scroll) and keep symmetric outer padding. */
   html, body { height: 100%; }
   body { overflow: hidden; }
-  .home-shell.map-shell { height: calc(100vh - 64px); padding: 12px; box-sizing: border-box; } /* symmetric outer buffer */ /* keep bottom breathing room so border is visible */
-  .home-shell.map-shell .home-left,
-  .home-shell.map-shell .home-center,
-  .home-shell.map-shell .home-right { height: 100%; }
-  /* Match Home: no inner scrollbar on the left rail */
-  .home-shell.map-shell .home-left { overflow: hidden !important; max-height: none !important; }
-  .home-shell.map-shell .filters-rail { height: 100%; overflow: hidden !important; max-height: none !important; display: flex; flex-direction: column; } /* no inner scrollbar */
-  .home-shell.map-shell .filters-rail .filterbox { flex: 1 1 auto; }
-  .home-shell.map-shell .filters-footer-links { margin-top: auto; }
-  .home-shell.map-shell .filters-footer-links, .home-shell.map-shell .filters-footer-meta { margin-top: 10px; }
+  /* Map page already has footer links in the left rail; hide the base footer to avoid viewport math drift. */
+  .footer{ display:none; }
 
-  /* Center map card fills available height */
-  .map-card { height: 100%; display: flex; flex-direction: column; padding: 12px; margin: 0; }
-  #esMap { flex: 1 1 auto; width: 100%; height: 100%; border-radius: 14px; overflow: hidden; }
+  /* Layout: three columns inside a padded shell */
+  .home-shell.map-shell{
+    height: calc(100vh - 62px);
+    padding: 12px;
+    box-sizing: border-box;
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  /* Override global pinned rails: Map page uses in-flow columns so padding applies top/bottom. */
+  .home-shell.map-shell .home-left,
+  .home-shell.map-shell .home-right{
+    position: static !important;
+    top: auto !important;
+    bottom: auto !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+  .home-shell.map-shell .home-left{ width: 275px; overflow: hidden; }
+  .home-shell.map-shell .home-right{ width: 320px; }
+  .home-shell.map-shell .home-center{ flex: 1 1 auto; min-width: 0; min-height: 0; }
+
+  /* Center map card fills available height (and preserves outer padding). */
+  .map-card{ height: 100%; display: flex; flex-direction: column; padding: 12px; margin: 0; box-sizing: border-box; min-height: 0; }
+  #esMap{ flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; }
 
   /* Right panel cards */
-  .map-right { height: 100%; overflow: auto; padding-left: 0; }
+  .map-right{ height: 100%; overflow: auto; padding-left: 0; min-height: 0; }
+  .map-right{ scrollbar-width: none; -ms-overflow-style: none; }
+  .map-right::-webkit-scrollbar{ width: 0; height: 0; }
+
   .map-right .card { border-radius: 9px; }
   .map-right .mini-ticket { padding: 12px; }
   .map-right .mini-ticket .mini-title { font-weight: 600; margin: 0 0 4px 0; }
@@ -36,139 +54,127 @@
   .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
   .map-right .speed-table th { text-align: left; font-weight: 600; opacity: .85; }
   .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
-
-  /* Map page left rail: scroll content if needed, but hide scrollbar (match Home look). Footer always visible. */
-  .home-shell.map-shell .filters-scroll { flex: 1 1 auto; overflow: auto; padding-right: 2px; }
-  .home-shell.map-shell .filters-scroll { scrollbar-width: none; -ms-overflow-style: none; }
-  .home-shell.map-shell .filters-scroll::-webkit-scrollbar { width: 0; height: 0; }
-
 </style>
 
 <div class="home-shell map-shell">
-
     <aside class="home-left" id="homeFiltersSidebar">
       <div class="filters-rail">
-        <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
-          <div class="filterbox">
-            <div class="filterbox-title">Filter Speeding Tickets</div>
-            <div class="filters-scroll">
-            <div class="filterbar-row filterbar-row--stack">
+        <div class="filters-scroll">
+          <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
+            <div class="filterbox">
+              <div class="filterbox-title">Filter Speeding Tickets</div>
+              <div class="filterbar-row filterbar-row--stack">
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-state">State</label>
-                <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
-                  <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
-                  {% for opt in state_filter_options %}
-                    <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-                            <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-county">County</label>
-                <div class="filter-autocomplete-wrap">
-                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
-                  <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
-                  <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
-                </div>
-              </div>
-
-<div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-<div class="filterbar-item filterbar-item--tight">
-  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
-    <label class="switch">
-      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
-      <span class="slider"></span>
-    </label>
-  </div>
-</div>
-
-
-
-              <div class="filterbar-item">
-  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
-  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
-    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
-    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
-    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
-    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
-  </select>
-</div>
-
-              <div class="filterbar-item">
-  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
-  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
-    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
-    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
-    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
-    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
-  </select>
-</div>
-              
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-date">Date</label>
-                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
-                  {% for o in date_options %}
-                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-sort">Sort by</label>
-                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
-                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
-                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
-                  <option value="most_over" {% if filter_sort in ['most_over', 'least_strict'] %}selected{% endif %}>Highest overage</option>
-                  <option value="least_over" {% if filter_sort == 'least_over' or filter_sort == 'least_strict' %}selected{% endif %}>Least over</option>
-                </select>
-              </div>
-
-              
-
-<div class="filterbar-item filterbar-item--tight">
-{% if is_admin %}
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
-                  <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
-                    <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
-                    <option value="include" {% if deleted_mode == 'include' %}selected{% endif %}>Include</option>
-                    <option value="only" {% if deleted_mode == 'only' %}selected{% endif %}>Only</option>
+                <div class="filterbar-item">
+                  <label class="filterbar-label" for="filter-state">State</label>
+                  <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
+                    <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
+                    {% for opt in state_filter_options %}
+                      <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
+                    {% endfor %}
                   </select>
                 </div>
-                {% endif %}
-              </div>
 
-<div class="filterbox-footer">
-                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('map_view') }}">Clear</a>
-              </div>
+                <div class="filterbar-item">
+                  <label class="filterbar-label" for="filter-county">County</label>
+                  <div class="filter-autocomplete-wrap">
+                    <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
+                    <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
+                    <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
+                  </div>
+                </div>
 
-                          </div>
+                <div class="filterbar-item filterbar-item--tight">
+                  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+                    <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
+                    <label class="switch">
+                      <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
 
-              <div class="filters-footer-links">
-                <a href="{{ url_for('privacy') }}">Privacy</a>
-                <span>·</span>
-                <a href="{{ url_for('terms') }}">Terms</a>
-                <span>·</span>
-            <a href="{{ url_for('cookies') }}">Cookie Policy</a>
-              </div>
-              <div class="filters-footer-meta">
-                <div>© 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC</div>
-              </div>
+                <div class="filterbar-item filterbar-item--tight">
+                  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+                    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
+                    <label class="switch">
+                      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
 
+                <div class="filterbar-item">
+                  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
+                  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
+                    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
+                    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
+                    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
+                    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
+                  </select>
+                </div>
+
+                <div class="filterbar-item">
+                  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
+                  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
+                    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
+                    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
+                    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
+                    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
+                  </select>
+                </div>
+
+                <div class="filterbar-item">
+                  <label class="filterbar-label" for="filter-date">Date</label>
+                  <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
+                    {% for o in date_options %}
+                      <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="filterbar-item">
+                  <label class="filterbar-label" for="filter-sort">Sort by</label>
+                  <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
+                    <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
+                    <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
+                    <option value="most_over" {% if filter_sort in ['most_over', 'least_strict'] %}selected{% endif %}>Highest overage</option>
+                    <option value="least_over" {% if filter_sort == 'least_over' or filter_sort == 'least_strict' %}selected{% endif %}>Least over</option>
+                  </select>
+                </div>
+
+                <div class="filterbar-item filterbar-item--tight">
+                  {% if is_admin %}
+                    <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
+                      <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
+                      <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
+                        <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
+                        <option value="include" {% if deleted_mode == 'include' %}selected{% endif %}>Include</option>
+                        <option value="only" {% if deleted_mode == 'only' %}selected{% endif %}>Only</option>
+                      </select>
+                    </div>
+                  {% endif %}
+                </div>
+
+                <div class="filterbox-footer">
+                  <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('map_view') }}">Clear</a>
+                </div>
+
+              </div>
             </div>
+          </form>
+        </div>
+
+        <div class="filters-footer">
+          <div class="filters-footer-links">
+            <a href="{{ url_for('privacy') }}">Privacy</a>
+            <span class="dot">·</span>
+            <a href="{{ url_for('terms') }}">Terms</a>
+            <span class="dot">·</span>
+            <a href="{{ url_for('cookies') }}">Cookie Policy</a>
           </div>
-        </form>
+          <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC</div>
+        </div>
       </div>
     </aside>
 

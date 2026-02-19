@@ -1,0 +1,53 @@
+HANDOFF — EnforcedSpeed Web (v398)
+
+What changed (single scoped change: layout/spacing)
+
+1) Home + Statistics left filter rail now matches Map page “flush to bottom” look.
+- Changed the fixed left rail to use top:62px + bottom:0 (no extra bottom gap).
+- Made .filters-rail a full-height flex column:
+  - .filters-scroll is the scroll area (scrollbar hidden)
+  - .filters-footer is pinned to the bottom
+- Updated templates:
+  - templates/home_feed.html
+  - templates/strictness.html
+  - templates/map_page.html (left rail structure updated to match)
+
+2) Map page bottom buffer fix (symmetric top/bottom outer padding)
+- Root cause: fixed-position side rails + 100% height children can “eat” the shell padding and visually clip the bottom spacing.
+- Fix: Map page now uses an in-flow 3-column flex layout inside a viewport-locked padded shell.
+  - Side rails are NOT fixed on Map page anymore (only on Home/Stats).
+  - The shell has padding:12px on all sides and a height of calc(100vh - 62px), so the bottom padding always renders.
+
+Files changed
+- templates/_mvp_styles.html
+- templates/home_feed.html
+- templates/strictness.html
+- templates/map_page.html
+- VERSION.txt
+- changelogs/CHANGELOG_v391-400.txt
+- handoffs/HANDOFF_v398.txt
+
+Non‑negotiable guardrails (do not regress)
+- Home feed ticket card static maps must render.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style.
+- Trending/Follow tables keep county/state names (never GEOIDs).
+- No runtime geometry unions per request.
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Verify:
+   - Home: left filter panel extends flush to bottom; footer links pinned at bottom; filters still work.
+   - Statistics: left filter panel extends flush to bottom; footer links pinned at bottom.
+   - Map page: visible, symmetric outer padding (top and bottom) around the map card; bottom border is clearly visible.
+   - No console/server errors.
+   - Home ticket card static maps still render; minimap still renders; Trending shows names.
+
+Render / Going live
+- Going live = git commit + git push to GitHub (Render deploys from Git).
+- If Render “spins”: confirm Start Command + PORT=10000 + /healthz, then clear build cache once.
+
+Notes
+- Map page now hides the base footer (footer links are in the left rail).

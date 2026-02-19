@@ -5,6 +5,7 @@
 
   <aside class="home-left" id="homeFiltersSidebar">
     <div class="filters-rail">
+      <div class="filters-scroll">
       <form method="get" action="{{ url_for('strictness') }}" class="filterbar" id="strictnessFilters">
           <div class="filterbox">
             <div class="filterbox-title">Filter Speeding Tickets</div>
@@ -115,15 +116,18 @@
           </div>
 
 </form>
+      </div>
 
-      <div class="filters-footer-links">
+      <div class="filters-footer">
+        <div class="filters-footer-links">
         <a href="{{ url_for('privacy') }}">Privacy</a>
         <span class="dot">·</span>
         <a href="{{ url_for('terms') }}">Terms</a>
           <span class="dot">·</span>
           <a href="{{ url_for('cookies') }}">Cookie Policy</a>
       </div>
-      <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC</div>
+        <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Developed by Conor Gordon · Mindra LLC</div>
+      </div>
     </div>
   </aside>
 

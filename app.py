@@ -4249,6 +4249,139 @@ GROUP BY UPPER(TRIM(stusps));
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "counties_unavailable"}), 200
+
+
+    @app.get("/api/state_geom/<stusps>")
+    def api_state_geom(stusps: str):
+        """Return GeoJSON geometry for a state (for the interactive map boundary focus).
+
+        IMPORTANT: Do NOT compute expensive unions per request.
+        We cache the computed union geometry (Redis if available, else /tmp) so each state
+        is only computed once per cache TTL.
+        """
+
+        st = (stusps or "").strip().upper()
+        if len(st) != 2 or (not st.isalpha()):
+            return jsonify({"ok": False, "error": "bad_state"}), 400
+
+        cache_key = f"es:state_geom:v1:{st}"
+        cache_ttl_sec = 30 * 24 * 60 * 60  # 30 days
+
+        # --- cache helpers (Redis preferred; /tmp fallback) ---
+        def _cache_get_json(k: str):
+            if not k:
+                return None
+            rurl = (os.environ.get("REDIS_URL") or "").strip()
+            if rurl:
+                try:
+                    import redis
+                    r = redis.Redis.from_url(rurl, socket_timeout=2, socket_connect_timeout=2)
+                    blob = r.get(k)
+                    if blob:
+                        try:
+                            return json.loads(blob.decode("utf-8", errors="ignore"))
+                        except Exception:
+                            return None
+                except Exception:
+                    pass
+
+            try:
+                cache_dir = "/tmp/es_state_geom_cache"
+                p = os.path.join(cache_dir, f"{k.replace(':','_')}.json")
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8") as f:
+                        return json.load(f)
+            except Exception:
+                pass
+            return None
+
+        def _cache_set_json(k: str, obj: dict):
+            if not k or not obj:
+                return
+            s = None
+            try:
+                s = json.dumps(obj)
+            except Exception:
+                s = None
+            if not s:
+                return
+
+            rurl = (os.environ.get("REDIS_URL") or "").strip()
+            if rurl:
+                try:
+                    import redis
+                    r = redis.Redis.from_url(rurl, socket_timeout=2, socket_connect_timeout=2)
+                    r.setex(k, cache_ttl_sec, s.encode("utf-8"))
+                except Exception:
+                    pass
+
+            try:
+                cache_dir = "/tmp/es_state_geom_cache"
+                os.makedirs(cache_dir, exist_ok=True)
+                p = os.path.join(cache_dir, f"{k.replace(':','_')}.json")
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(s)
+            except Exception:
+                pass
+
+        cached = _cache_get_json(cache_key)
+        if cached and isinstance(cached, dict) and cached.get("ok") and cached.get("geojson"):
+            return jsonify(cached)
+
+        # One-time compute (per TTL) from county geometries.
+        try:
+            row = db.session.execute(
+                text(
+                    """
+                    SELECT
+                        ST_AsGeoJSON(ST_UnaryUnion(ST_Collect(geom))) AS geom_json,
+                        ST_Y(ST_PointOnSurface(ST_UnaryUnion(ST_Collect(geom)))) AS centroid_lat,
+                        ST_X(ST_PointOnSurface(ST_UnaryUnion(ST_Collect(geom)))) AS centroid_lng
+                    FROM counties
+                    WHERE stusps = :st
+                    """
+                ),
+                {"st": st},
+            ).mappings().first()
+
+            if not row or not row.get("geom_json"):
+                return jsonify({"ok": False, "error": "not_found"}), 404
+
+            try:
+                geom = json.loads(row["geom_json"])
+            except Exception:
+                geom = None
+            if not geom:
+                return jsonify({"ok": False, "error": "geom_unavailable"}), 200
+
+            feature = {
+                "type": "Feature",
+                "properties": {"stusps": st},
+                "geometry": geom,
+            }
+
+            payload = {
+                "ok": True,
+                "stusps": st,
+                "centroid": {
+                    "lat": float(row.get("centroid_lat")) if row.get("centroid_lat") is not None else None,
+                    "lng": float(row.get("centroid_lng")) if row.get("centroid_lng") is not None else None,
+                },
+                "geojson": {"type": "FeatureCollection", "features": [feature]},
+            }
+
+            _cache_set_json(cache_key, payload)
+            return jsonify(payload)
+        except Exception as e:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            try:
+                print(f"[STATE GEOM API ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "state_geom_unavailable"}), 200
     @app.get("/api/map_pins")
     def api_map_pins():
         """Return map pins filtered like the feed, but only tickets with lat/lng."""

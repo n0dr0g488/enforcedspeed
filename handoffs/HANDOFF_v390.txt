@@ -1,0 +1,38 @@
+HANDOFF — EnforcedSpeed Web (v390)
+
+Goal (one change)
+
+Enable clicking a STATE on a ticket card to focus the interactive map on that state with the same outline + subtle shaded fill behavior as county focus.
+
+What changed
+
+1) New API endpoint: /api/state_geom/<ST>
+- Returns GeoJSON FeatureCollection for the state boundary.
+- Computes the state boundary as a union of county geometries ONE TIME per state, then caches.
+- Cache strategy:
+  - Prefer Redis (REDIS_URL) with TTL 30 days
+  - Fallback to /tmp file cache (/tmp/es_state_geom_cache)
+- This prevents expensive runtime unions on every request.
+
+2) Frontend
+- map_page.html already contained state-focus loader (esLoadStateGeomIfAny) that fetches /api/state_geom/<ST> and applies the same style as county.
+- With this endpoint now present, existing state links (focus_state=XX) will render state boundary just like county.
+
+Non-negotiable guardrails
+- No runtime unions per request: state unions are cached.
+- No regressions to:
+  - Home ticket card static maps
+  - Home right-rail minimap
+  - Trending/Follow tables names
+
+Smoke tests
+- python -m py_compile app.py
+- es-up
+- Home feed: click STATE name → opens /map?focus_state=XX&ticket_id=...
+- Interactive map shows state outlined + shaded (same style as county).
+
+Files modified
+- app.py
+- VERSION.txt
+- changelogs/CHANGELOG_v381-390.txt
+- handoffs/HANDOFF_v390.txt

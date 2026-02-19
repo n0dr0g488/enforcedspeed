@@ -23,3 +23,8 @@ v389 — 2026-02-18 — Interactive map full-viewport + right panel
 - Added right-side panel cards: selected ticket mini-card (updates on pin click) + county stats (7/30/365/all + avg overage by posted speed) when a county is in focus.
 - “Pins shown (max 1500)” now displays in the right panel under County stats.
 
+v390 — 2026-02-18 — State boundary focus on interactive map (cached union)
+- Enables interactive map to outline + shade a focused state (same style as county) when arriving with focus_state/state.
+- Adds /api/state_geom/<ST> endpoint returning GeoJSON for the state boundary.
+- Expensive state union is cached (Redis when available; otherwise /tmp) so it is not recomputed per request.
+

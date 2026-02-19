@@ -8,3 +8,7 @@ v391 (2026-02-18)
 - Remove left filter rail inner scrollbar (match Home rail)
 - Allow scroll-wheel zoom without CTRL on interactive map (gestureHandling=greedy)
 - Right panel stats header shows selected county/state (or prompt when none); remove helper text
+
+[v393] Map page selection + rail overflow fix
+- Treat focus_county_geoid navigation the same as county_geoid filter so the right panel title matches the outlined county (not just the state).
+- Ensure the left filter rail does not show its own scrollbar by overriding the outer left-rail container overflow.

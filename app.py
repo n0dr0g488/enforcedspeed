@@ -13,7 +13,14 @@ def _get_county_filter_from_request():
     NOTE: County GEOIDs are 5 digits (statefp+countyfp). We validate to avoid
     accidentally treating the visible label text as a GEOID.
     """
-    geoid = (request.args.get('county_geoid') or request.args.get('county') or '').strip()
+    # Accept both explicit filters (?county_geoid=) and focus navigation (?focus_county_geoid=)
+    # so the map page can accurately reflect what is outlined/selected.
+    geoid = (
+        request.args.get('county_geoid')
+        or request.args.get('county')
+        or request.args.get('focus_county_geoid')
+        or ''
+    ).strip()
     label = ''
 
     # Validate county GEOID (5 digits). If it isn't, ignore it.

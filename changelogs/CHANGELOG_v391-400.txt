@@ -32,3 +32,7 @@ v391 (2026-02-18)
   - Rail is a full-height flex column with a hidden-scrollbar scroll area and the footer links pinned to the bottom.
 - Map page: convert to in-flow 3-column flex layout inside a padded viewport-locked shell (no fixed side rails on Map page).
   - Guarantees symmetric top/bottom outer padding so the map card bottom border is no longer flush/clipped.
+
+[v399] Rails full-height + Map rail alignment fix
+- Home + Statistics: make pinned left/right rails explicitly 100vh-based so the filter rail background truly fills to the bottom of the viewport ("infinite" feel) and footer links stay pinned.
+- Map page: remove outer shell padding (rails flush to left/top/bottom again) while keeping symmetric top/bottom buffer around the map card via center-column vertical padding.

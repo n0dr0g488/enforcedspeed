@@ -1,0 +1,54 @@
+HANDOFF — EnforcedSpeed Web (v399)
+
+Goal of v399 (single scoped change)
+Fix the left-rail layout regressions from v398:
+- Home + Statistics: left filter rail must truly extend flush to the bottom of the viewport (“infinite” feel).
+- Map page: left rail must be flush with the left edge + flush under the header + extend to the bottom again (no outer shell padding), while KEEPING the map card’s symmetric top/bottom buffer.
+
+What changed
+1) Home + Statistics: make pinned rails explicitly viewport-height
+- Root cause of v398 failure: .filters-rail used height:100%, but the fixed rail height wasn’t explicitly set (top/bottom doesn’t reliably give a resolvable % height for descendants in all cases).
+- Fix:
+  - templates/_mvp_styles.html
+    - .home-left and .home-right now use:
+      - top:62px
+      - height: calc(100vh - 62px)
+    - .filters-rail keeps height:100% and is a flex column; added min-height:0 for clean flex/scroll behavior.
+
+2) Map page: rails flush again, map buffer preserved
+- v398 made the Map page shell padded, which caused the rails to look “inset” and shortened.
+- Fix:
+  - templates/map_page.html
+    - .home-shell.map-shell now has NO outer padding (rails flush to edges again) and height: calc(100vh - 62px).
+    - Only the CENTER column gets vertical padding (12px) so the map card has symmetric top/bottom outer buffer.
+    - Map still uses in-flow 3-column flex (not fixed rails) so the viewport math is stable.
+    - Base footer remains hidden on Map page (footer links already live in the left rail).
+
+Files changed
+- templates/_mvp_styles.html
+- templates/map_page.html
+- VERSION.txt
+- changelogs/CHANGELOG_v391-400.txt
+- handoffs/HANDOFF_v399.txt
+
+Non‑negotiable guardrails (do not regress)
+- Home feed ticket card static maps must render.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style.
+- Trending/Follow tables keep county/state names (never GEOIDs).
+- No runtime geometry unions per request.
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Verify:
+   - Home: left filter rail background extends to bottom; footer links pinned at bottom; no weird inset gaps.
+   - Statistics: same as Home.
+   - Map: left rail is flush (no outer inset), extends to bottom; map card has equal top/bottom buffer and bottom border visible.
+   - Home ticket card static maps still render (multiple cards).
+   - Right-rail minimap loads and pins render.
+   - Trending/Follow tables show names (not GEOIDs).
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

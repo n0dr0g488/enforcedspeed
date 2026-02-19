@@ -48,8 +48,8 @@
         position: fixed;
         left: 0;
         top: 62px;
-        bottom: 0;
         width: 275px;
+        height: calc(100vh - 62px);
         max-height: none;
         overflow: hidden; /* scroll handled inside .filters-scroll */
         align-self: start;
@@ -70,6 +70,7 @@
         height:100%;
         box-sizing:border-box;
         overflow:hidden;
+        min-height:0;
       }
 
       .filters-scroll{
@@ -142,8 +143,8 @@
         position: fixed;
         right: 0;
         top: 62px;
-        bottom: 0;
         width: 320px;
+        height: calc(100vh - 62px);
         max-height: none;
         overflow: auto;
         align-self: start;

@@ -2,36 +2,45 @@
 {% block content %}
 
 <style>
-  /* Map page: lock to viewport (no page scroll) and keep symmetric outer padding. */
+  /* Map page: lock to viewport (no page scroll). */
   html, body { height: 100%; }
   body { overflow: hidden; }
   /* Map page already has footer links in the left rail; hide the base footer to avoid viewport math drift. */
   .footer{ display:none; }
 
-  /* Layout: three columns inside a padded shell */
+  /* Layout: viewport-locked 3-column shell.
+     - Rails stay flush (no outer padding on the shell)
+     - Only the CENTER column gets vertical padding to create the symmetric top/bottom buffer around the map card.
+  */
   .home-shell.map-shell{
     height: calc(100vh - 62px);
-    padding: 12px;
+    padding: 0;
     box-sizing: border-box;
     display: flex;
     gap: 12px;
     align-items: stretch;
   }
 
-  /* Override global pinned rails: Map page uses in-flow columns so padding applies top/bottom. */
+  /* Override global pinned rails: Map page uses in-flow columns so the shell can control height. */
   .home-shell.map-shell .home-left,
   .home-shell.map-shell .home-right{
     position: static !important;
     top: auto !important;
     bottom: auto !important;
     max-height: none !important;
-    height: auto !important;
+    height: 100% !important;
   }
   .home-shell.map-shell .home-left{ width: 275px; overflow: hidden; }
   .home-shell.map-shell .home-right{ width: 320px; }
-  .home-shell.map-shell .home-center{ flex: 1 1 auto; min-width: 0; min-height: 0; }
+  .home-shell.map-shell .home-center{
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 0;
+    box-sizing: border-box;
+  }
 
-  /* Center map card fills available height (and preserves outer padding). */
+  /* Center map card fills available height (center column provides the outer buffer). */
   .map-card{ height: 100%; display: flex; flex-direction: column; padding: 12px; margin: 0; box-sizing: border-box; min-height: 0; }
   #esMap{ flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; }
 

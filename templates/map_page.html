@@ -5,11 +5,11 @@
   /* Map page: fill the viewport (no page scroll). Allow left/right panels to scroll internally if needed. */
   html, body { height: 100%; }
   body { overflow: hidden; }
-  .home-shell.map-shell { height: calc(100vh - 64px); } /* header is ~64px; keeps layout within viewport */
+  .home-shell.map-shell { height: calc(100vh - 64px); padding-bottom: 12px; box-sizing: border-box; } /* keep bottom breathing room so border is visible */
   .home-shell.map-shell .home-left,
   .home-shell.map-shell .home-center,
   .home-shell.map-shell .home-right { height: 100%; }
-  .home-shell.map-shell .filters-rail { height: 100%; overflow: auto; }
+  .home-shell.map-shell .filters-rail { height: 100%; overflow: hidden; } /* match Home: no inner scrollbar */
 
   /* Center map card fills available height */
   .map-card { height: 100%; display: flex; flex-direction: column; padding: 12px; }
@@ -176,7 +176,8 @@
       </div>
 
       <div class="card stat-card" id="esCountyStatsCard">
-        <div class="stat-title">County stats</div>
+        {% set _focus_state = (request.args.get('focus_state') or '')|upper %}
+        <div class="stat-title">{% if filter_county_label %}{{ filter_county_label }}{% elif _focus_state %}{{ _focus_state }}{% elif filter_state %}{{ filter_state }}{% else %}Select a county or state{% endif %}</div>
 
         <div class="stat-row">
           <div class="stat-k">Pins shown</div>
@@ -207,7 +208,7 @@
             </tbody>
           </table>
         {% else %}
-          <div class="mini-sub" style="margin-top:6px;">Filter to a county (or open from a ticket) to see county stats.</div>
+          
         {% endif %}
       </div>
     </aside>
@@ -498,6 +499,7 @@ window.esInitMap = async function() {
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
+    gestureHandling: "greedy",
   });
   ES_INFO = new google.maps.InfoWindow();
 

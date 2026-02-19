@@ -3,3 +3,8 @@ CHANGELOG v391–400
 v391 (2026-02-18)
 - Fix Render crash: remove duplicate Flask route registration for /api/state_geom/<stusps> (endpoint name collision).
 
+[v392] Map page polish
+- Add bottom breathing room so map card border isn’t flush with viewport
+- Remove left filter rail inner scrollbar (match Home rail)
+- Allow scroll-wheel zoom without CTRL on interactive map (gestureHandling=greedy)
+- Right panel stats header shows selected county/state (or prompt when none); remove helper text

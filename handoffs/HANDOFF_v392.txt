@@ -1,0 +1,27 @@
+HANDOFF — EnforcedSpeed Web (v392)
+
+Change summary
+- Interactive Map page polish:
+  - Map card now has bottom breathing room so border is visible (not flush with viewport edge)
+  - Left filter rail no longer has an inner scrollbar (matches Home filter rail)
+  - Mouse wheel zoom works without holding CTRL (Google Maps gestureHandling=greedy)
+  - Right panel stats header now reflects the selected county/state, or shows 'Select a county or state' when none
+  - Removed the extra helper sentence under stats when no county is selected
+
+Files changed
+- templates/map_page.html
+- VERSION.txt
+- changelogs/CHANGELOG_v391-400.txt
+- handoffs/HANDOFF_v392.txt
+
+Guardrails
+- No changes to ticket card static maps, minimap, trending tables, or geometry caching.
+
+Local smoke test
+- python -m py_compile app.py
+- es-up
+- Open /map and verify:
+  - No page scroll, but map card border visible at bottom
+  - Left filter panel has no internal scrollbar
+  - Mouse wheel zoom works without CTRL
+  - Stats header shows county name when filtered, state when state-focused, prompt otherwise

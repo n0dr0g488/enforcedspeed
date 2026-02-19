@@ -1,0 +1,26 @@
+HANDOFF — EnforcedSpeed Web (v391)
+
+Goal (single change)
+- Fix failed Render deploy caused by Flask AssertionError: duplicate endpoint mapping for api_state_geom.
+
+What changed
+- app.py: removed the second duplicate definition of @app.get("/api/state_geom/<stusps>") that overwrote the existing endpoint.
+
+Why
+- Flask disallows registering two view functions with the same endpoint name; Gunicorn crashed at import time on Render.
+
+Guardrails
+- No changes to ticket card static maps, minimap behavior, right-rail styling, or Trending/Follow tables.
+
+Smoke test
+- python -m py_compile app.py
+- Start locally via es-up; confirm /healthz returns 200.
+- On Render, deploy should boot (no AssertionError) and /map state focus can be tested once deployed.
+
+Going live
+- Commit + push to GitHub (Render deploys from Git).
+
+Render settings (keep locked)
+- Start Command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- PORT=10000
+- Health Check Path: /healthz

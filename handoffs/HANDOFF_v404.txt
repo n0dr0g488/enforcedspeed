@@ -1,0 +1,40 @@
+HANDOFF — EnforcedSpeed Web (v404)
+
+Goal of v404 (single scoped change)
+Stop the Home feed from snapping back to the top after Like / Comment / Reply / Delete-comment actions.
+
+Root cause
+- These actions are standard POST forms that redirect back to the Home feed.
+- After redirect, the browser resets scroll position to the top.
+- Additionally, the Enter-to-submit helper used form.submit(), which bypasses submit event listeners.
+
+What changed
+- templates/home_feed.html
+  - Added id="ticket-{{ r.id }}" to each ticket card so we can restore to the exact card.
+  - Added a small scroll-preservation helper:
+    - On submit of Like / Add Comment / Delete Comment forms, store scroll + card id in sessionStorage.
+    - On page load, restore scroll (prefer card scrollIntoView).
+  - Updated the Enter-to-submit helper to:
+    - Save scroll state first
+    - Use requestSubmit() when available (fallback to submit())
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v404.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Home feed:
+   - Like a post: page should return to the same card (no jump to top)
+   - Post a comment/reply: no jump to top
+   - Delete a comment: no jump to top
+4) Verify NO regressions:
+   - Ticket card static maps still render
+   - Right-rail minimap renders
+   - Trending/Follow tables show names (not GEOIDs)
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

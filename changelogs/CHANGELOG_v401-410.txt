@@ -13,3 +13,7 @@ v402 — 2026-02-20 — Ticket card links parity (counts + map)
 v403 — 2026-02-20 — Remove PYTHON_VERSION from render.yaml
 - render.yaml: removed the PYTHON_VERSION env var override (3.14.2) to avoid Render selecting an unsupported runtime.
 - No application logic or UI changes.
+
+v404 — 2026-02-20 — Preserve scroll position on Like/Comment
+- Home feed: liking, posting a comment/reply, or deleting a comment no longer jumps the page back to the top after the POST/redirect.
+- Implementation: store the current scroll/card position in sessionStorage on submit, then restore it after reload.

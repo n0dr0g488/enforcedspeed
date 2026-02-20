@@ -246,7 +246,7 @@
   {% set state_name = (r.state.split(' - ')[-1] if ' - ' in r.state else r.state) %}
   {% set state_focus_url = (url_for('map_view', focus_state=state_code, ticket_id=r.id) if state_code else None) %}
   {% set county_focus_url = (url_for('map_view', focus_state=state_code, focus_county_geoid=r.county_geoid, ticket_id=r.id) if (r.county_geoid and r.county_name) else None) %}
-  <div class="card ticket-card{% if r.is_deleted %} ticket-card--deleted{% endif %}" style="margin-top:16px;">
+  <div id="ticket-{{ r.id }}" class="card ticket-card{% if r.is_deleted %} ticket-card--deleted{% endif %}" style="margin-top:16px;">
 
   
 
@@ -714,6 +714,53 @@
     }catch(e){}
   }
 
+  // --- Preserve scroll position across POST/redirect actions (Like / Comment / Delete) ---
+  // The home feed posts back to the server and redirects to the same URL.
+  // Without this, the browser returns to the top after the redirect.
+  function esRememberScrollFromNode(node){
+    try{
+      var card = (node && node.closest) ? node.closest('.ticket-card') : null;
+      if(card && card.id){ sessionStorage.setItem('es_home_restore_target', card.id); }
+      sessionStorage.setItem('es_home_restore_y', String(window.scrollY || 0));
+      sessionStorage.setItem('es_home_restore_ts', String(Date.now()));
+    }catch(e){}
+  }
+  function esClearRememberedScroll(){
+    try{
+      sessionStorage.removeItem('es_home_restore_target');
+      sessionStorage.removeItem('es_home_restore_y');
+      sessionStorage.removeItem('es_home_restore_ts');
+    }catch(e){}
+  }
+  function esBindPreserveScroll(){
+    try{
+      var forms = document.querySelectorAll('form[action*="toggle_like"], form[action*="add_comment"], form[action*="delete_comment"]');
+      forms.forEach(function(f){
+        f.addEventListener('submit', function(){ esRememberScrollFromNode(f); }, {capture:true});
+      });
+    }catch(e){}
+  }
+  function esRestoreRememberedScroll(){
+    try{
+      var ts = parseInt(sessionStorage.getItem('es_home_restore_ts') || '0', 10);
+      if(!ts) return;
+      if(Date.now() - ts > 60000){ esClearRememberedScroll(); return; }
+      var targetId = sessionStorage.getItem('es_home_restore_target');
+      var y = parseInt(sessionStorage.getItem('es_home_restore_y') || '0', 10);
+      esClearRememberedScroll();
+
+      setTimeout(function(){
+        try{
+          if(targetId){
+            var el = document.getElementById(targetId);
+            if(el){ el.scrollIntoView({block:'center'}); return; }
+          }
+          if(!isNaN(y) && y > 0){ window.scrollTo(0, y); }
+        }catch(e){}
+      }, 50);
+    }catch(e){}
+  }
+
   // Enter submits, Shift+Enter adds a new line (comments + replies only)
   (function bindEnterToSubmit(){
     try{
@@ -724,12 +771,21 @@
           if(e.key === 'Enter' && !e.shiftKey){
             e.preventDefault();
             var form = t.closest('form');
-            if(form){ form.submit(); }
+            if(form){
+              try{ esRememberScrollFromNode(t); }catch(e){}
+              if(form.requestSubmit){ form.requestSubmit(); }
+              else{ form.submit(); }
+            }
           }
         }
       });
     }catch(e){}
   })();
+
+  document.addEventListener('DOMContentLoaded', function(){
+    try{ esBindPreserveScroll(); }catch(e){}
+    try{ esRestoreRememberedScroll(); }catch(e){}
+  });
 
   // Note: comment/reply boxes are closed by default on page load.
 </script>

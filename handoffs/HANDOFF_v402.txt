@@ -1,0 +1,41 @@
+HANDOFF — EnforcedSpeed Web (v402)
+
+Goal of v402 (single scoped change)
+Ticket card clickability parity on Home feed:
+- The (count) next to the State and County name should link exactly like the corresponding State/County name.
+- The ticket static map thumbnail should be clickable and route exactly like clicking the County name.
+
+What changed
+- templates/home_feed.html
+  - Precomputed two URLs per ticket card:
+    - state_focus_url (same destination as the State name link)
+    - county_focus_url (same destination as the County name link)
+  - Wrapped the State and County (count) in anchors pointing to the same URL as their corresponding names.
+  - Wrapped the static map <img> in an anchor that routes to county_focus_url (falls back to state_focus_url if county is missing).
+  - Added minimal CSS so the count-link looks identical to the old non-link styling.
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v402.txt
+
+Non‑negotiable guardrails (do not regress)
+- Home feed ticket card static maps must render.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style.
+- Trending/Follow tables keep county/state names (never GEOIDs).
+- No runtime geometry unions per request.
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Verify:
+   - Home: ticket card static maps render.
+   - Home: clicking State name and its (count) goes to identical map focus.
+   - Home: clicking County name and its (count) goes to identical map focus.
+   - Home: clicking the ticket static map image routes to the same destination as the County link.
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

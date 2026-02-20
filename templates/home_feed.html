@@ -244,6 +244,8 @@
 {% for r in reports %}
   {% set state_code = (r.state.split(' - ')[0] if ' - ' in r.state else r.state) %}
   {% set state_name = (r.state.split(' - ')[-1] if ' - ' in r.state else r.state) %}
+  {% set state_focus_url = (url_for('map_view', focus_state=state_code, ticket_id=r.id) if state_code else None) %}
+  {% set county_focus_url = (url_for('map_view', focus_state=state_code, focus_county_geoid=r.county_geoid, ticket_id=r.id) if (r.county_geoid and r.county_name) else None) %}
   <div class="card ticket-card{% if r.is_deleted %} ticket-card--deleted{% endif %}" style="margin-top:16px;">
 
   
@@ -266,10 +268,24 @@
         {# Under-username metadata line (State / County / Road). #}
         <div class="ticket-submeta">
           {# State click should focus the interactive map without forcing a state filter. #}
-          <span class="ticket-submeta-item"><a class="ticket-state-link" href="{{ url_for('map_view', focus_state=state_code, ticket_id=r.id) }}">{{ state_name }}</a> <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span></span>
+          <span class="ticket-submeta-item">
+            {% if state_focus_url %}
+              <a class="ticket-state-link" href="{{ state_focus_url }}">{{ state_name }}</a>
+              <a class="ticket-submeta-count" href="{{ state_focus_url }}">({{ state_ticket_counts.get(r.state, 0) }})</a>
+            {% else %}
+              {{ state_name }} <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span>
+            {% endif %}
+          </span>
           <span class="ticket-submeta-sep">·</span>
           {# County click should focus the interactive map without forcing a county filter. #}
-          <span class="ticket-submeta-item">{% if r.county_geoid and r.county_name %}<a class="ticket-county-link" href="{{ url_for('map_view', focus_state=(r.state[:2] if r.state else ''), focus_county_geoid=r.county_geoid, ticket_id=r.id) }}">{{ r.county_name }}</a>{% else %}{{ r.county_name or '—' }}{% endif %} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span></span>
+          <span class="ticket-submeta-item">
+            {% if county_focus_url %}
+              <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }}</a>
+              <a class="ticket-submeta-count" href="{{ county_focus_url }}">({{ county_ticket_counts.get(r.county_geoid, 0) }})</a>
+            {% else %}
+              {{ r.county_name or '—' }} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span>
+            {% endif %}
+          </span>
           <span class="ticket-submeta-sep">·</span>
           <span class="ticket-submeta-item">{{ format_road_bucket(r.road_name) }}</span>
         </div>
@@ -353,7 +369,14 @@
     {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
       <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">Refine pin</button>
     {% endif %}
-    <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+    {% set map_focus_url = county_focus_url or state_focus_url %}
+    {% if map_focus_url %}
+      <a class="ticket-staticmap-link" href="{{ map_focus_url }}">
+        <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+      </a>
+    {% else %}
+      <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+    {% endif %}
   </div>
   </div>
 {% endif %}
@@ -571,7 +594,9 @@
   .ticket-county-link{color:inherit;text-decoration:none}
   .ticket-county-link:hover{text-decoration:underline}
   .ticket-submeta{margin-top:4px;font-size:12.5px;color:#6b7280;display:flex;gap:6px;flex-wrap:wrap}
-  .ticket-submeta-count{font-weight:600;color:#4b5563}
+  .ticket-submeta-count{font-weight:600;color:#4b5563;text-decoration:none}
+  .ticket-submeta-count:hover{text-decoration:underline}
+  .ticket-staticmap-link{display:block;width:100%;height:100%}
   .ticket-submeta-sep{opacity:.8}
   .user-link{text-decoration:none;color:inherit}
   .user-link:hover{text-decoration:underline}

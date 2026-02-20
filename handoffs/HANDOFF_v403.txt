@@ -1,0 +1,29 @@
+HANDOFF — EnforcedSpeed Web (v403)
+
+Goal of v403 (single scoped change)
+Remove the PYTHON_VERSION override from render.yaml so Render does not attempt to use an unsupported Python runtime.
+
+What changed
+- render.yaml
+  - Removed:
+    - key: PYTHON_VERSION
+      value: 3.14.2
+  - This prevents blueprint-driven deploys from pinning to an invalid runtime.
+
+Files changed
+- render.yaml
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v403.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Verify Home feed + Map page load normally.
+
+Render notes
+- If your Render web service is blueprint-driven (uses render.yaml), removing PYTHON_VERSION prevents runtime mismatch startup failures.
+- If your Render service is NOT blueprint-driven, this change is harmless.
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

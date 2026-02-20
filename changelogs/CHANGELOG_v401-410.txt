@@ -9,3 +9,7 @@ v402 — 2026-02-20 — Ticket card links parity (counts + map)
 - Home feed: the (count) next to State and County is now clickable and routes to the same map focus as the name.
 - Home feed: the ticket static map thumbnail is now clickable and routes to the same map focus as the County link (falls back to State if needed).
 
+
+v403 — 2026-02-20 — Remove PYTHON_VERSION from render.yaml
+- render.yaml: removed the PYTHON_VERSION env var override (3.14.2) to avoid Render selecting an unsupported runtime.
+- No application logic or UI changes.

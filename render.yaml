@@ -7,8 +7,6 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.14.2
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY

@@ -1,0 +1,7 @@
+CHANGELOG — EnforcedSpeed (v401–v410)
+
+v401 — 2026-02-19 — Map page overlay rails centering
+- Map page now uses the same "overlay rails" layout as Home (fixed left/right rails).
+- Center map column is once again centered to the viewport, aligning perfectly with the header search bar.
+- Preserves full-height rails and the symmetric top/bottom buffer around the map card.
+

@@ -1,0 +1,43 @@
+HANDOFF — EnforcedSpeed Web (v401)
+
+Goal of v401 (single scoped change)
+Fix Map page centering so the header search bar and the map column are centered together (match Home page behavior).
+
+What was wrong
+- Map page temporarily switched to an in-flow 3-column flex layout.
+- That caused the map column to be centered BETWEEN the two rails instead of being viewport-centered.
+- Result: header search (viewport-centered to the 720px column) no longer lined up with the map.
+
+What changed
+- templates/map_page.html
+  - Removed the in-flow 3-column flex layout overrides.
+  - Map page now uses the same "overlay rails" model as Home:
+    - Left/right rails stay fixed to the viewport edges (global CSS).
+    - Center map column remains truly viewport-centered (720px column), aligning with the header search.
+    - Center column is still viewport-locked (no page scroll) and keeps the symmetric top/bottom buffer around the map card.
+
+Files changed
+- templates/map_page.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v401.txt
+
+Non‑negotiable guardrails (do not regress)
+- Home feed ticket card static maps must render.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style.
+- Trending/Follow tables keep county/state names (never GEOIDs).
+- No runtime geometry unions per request.
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Verify:
+   - Home: ticket card static maps render.
+   - Map: header search bar visually lines up with the centered map column (same as Home).
+   - Map: rails remain flush to edges and full-height.
+   - Map: bottom buffer around map card still visible.
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

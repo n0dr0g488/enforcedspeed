@@ -5,43 +5,36 @@
   /* Map page: lock to viewport (no page scroll). */
   html, body { height: 100%; }
   body { overflow: hidden; }
+
   /* Map page already has footer links in the left rail; hide the base footer to avoid viewport math drift. */
   .footer{ display:none; }
 
-  /* Layout: viewport-locked 3-column shell.
-     - Rails stay flush (no outer padding on the shell)
-     - Only the CENTER column gets vertical padding to create the symmetric top/bottom buffer around the map card.
+  /* v401: Map page uses the SAME "overlay rails" layout as Home.
+     - Left/right rails remain fixed (from global CSS)
+     - Center column stays truly centered to the viewport (aligns with header search)
+     - Center column is viewport-locked for a full-height map with symmetric top/bottom buffer
   */
   .home-shell.map-shell{
+    position: relative;
     height: calc(100vh - 62px);
-    padding: 0;
+    padding: 0 20px;
     box-sizing: border-box;
-    display: flex;
-    gap: 12px;
-    align-items: stretch;
+    overflow: hidden;
   }
 
-  /* Override global pinned rails: Map page uses in-flow columns so the shell can control height. */
-  .home-shell.map-shell .home-left,
-  .home-shell.map-shell .home-right{
-    position: static !important;
-    top: auto !important;
-    bottom: auto !important;
-    max-height: none !important;
-    height: 100% !important;
-  }
-  .home-shell.map-shell .home-left{ width: 275px; overflow: hidden; }
-  .home-shell.map-shell .home-right{ width: 320px; }
+  /* Center map column: fixed 720px column, vertically fills the viewport area. */
   .home-shell.map-shell .home-center{
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
+    height: 100%;
     padding: 12px 0;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
   }
 
-  /* Center map card fills available height (center column provides the outer buffer). */
-  .map-card{ height: 100%; display: flex; flex-direction: column; padding: 12px; margin: 0; box-sizing: border-box; min-height: 0; }
+  /* Map card fills available height; the shell padding provides the outer buffer. */
+  .map-card{ flex: 1 1 auto; display: flex; flex-direction: column; padding: 12px; margin: 0; box-sizing: border-box; min-height: 0; }
   #esMap{ flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; }
 
   /* Right panel cards */

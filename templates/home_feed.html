@@ -386,7 +386,7 @@
           {% set lc = like_counts.get(r.id, 0) %}
 
           {% if current_user.is_authenticated %}
-            <form method="post" action="{{ url_for('toggle_like', report_id=r.id) }}" style="margin:0;display:inline;">
+            <form method="post" action="{{ url_for('toggle_like', report_id=r.id) }}" class="js-preserve-scroll" style="margin:0;display:inline;">
               {{ like_form.hidden_tag() }}
               <input type="hidden" name="next" value="{{ request.full_path }}">
               <button type="submit" class="action-btn">
@@ -443,7 +443,7 @@
                 {% if current_user.is_authenticated %}
                   <a class="action-link" href="#" onclick="openReplyWithMention({{ c.id }}, {{ c.id }}, '{{ c.user.username|e }}'); return false;">Reply</a>
                   {% if current_user.id == c.user_id %}
-                    <form method="post" action="{{ url_for('delete_comment', comment_id=c.id) }}" style="display:inline; margin-left:10px;">
+                    <form method="post" action="{{ url_for('delete_comment', comment_id=c.id) }}" class="js-preserve-scroll" style="display:inline; margin-left:10px;">
                       {{ delete_comment_form.hidden_tag() }}
                       <button type="submit" style="background:none;border:none;padding:0;margin:0;color:inherit;cursor:pointer;">Delete</button>
                       <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -473,9 +473,10 @@
                           <div class="subtle" style="margin-top:4px;">
                             <a class="action-link" href="#" onclick="openReplyWithMention({{ root_id }}, {{ rc.id }}, '{{ rc.user.username|e }}'); return false;">Reply</a>
                             {% if current_user.id == rc.user_id %}
-                              <form method="post" action="{{ url_for('delete_comment', comment_id=rc.id) }}" style="display:inline; margin-left:10px;">
+                              <form method="post" action="{{ url_for('delete_comment', comment_id=rc.id) }}" class="js-preserve-scroll" style="display:inline; margin-left:10px;">
                                 {{ delete_comment_form.hidden_tag() }}
-                                <button type="submit" style="background:none;border:none;padding:0;margin:0;color:inherit;cursor:pointer;">Delete</button>
+                                  <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <button type="submit" style="background:none;border:none;padding:0;margin:0;color:inherit;cursor:pointer;">Delete</button>
                               </form>
                             {% endif %}
                           </div>
@@ -491,7 +492,7 @@
               {{ render_replies(c.id, 1, c.id, []) }}
               {% if current_user.is_authenticated %}
                 <div id="replybox-{{ c.id }}" style="display:none; margin-top:10px; margin-left:18px;">
-                  <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}">
+                  <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll">
                     {# Render CSRF only. We'll provide parent_id manually to avoid duplicate fields. #}
                     {{ comment_form.csrf_token }}
                     <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -516,7 +517,7 @@
 
       {% if current_user.is_authenticated %}
         <div id="commentbox-{{ r.id }}" style="display:none; margin-top:12px;">
-          <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}">
+          <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll">
             {# Render CSRF only. We'll provide parent_id manually to avoid duplicate fields. #}
             {{ comment_form.csrf_token }}
             <input type="hidden" name="next" value="{{ request.full_path }}">
@@ -734,7 +735,7 @@
   }
   function esBindPreserveScroll(){
     try{
-      var forms = document.querySelectorAll('form[action*="toggle_like"], form[action*="add_comment"], form[action*="delete_comment"]');
+      var forms = document.querySelectorAll('form.js-preserve-scroll');
       forms.forEach(function(f){
         f.addEventListener('submit', function(){ esRememberScrollFromNode(f); }, {capture:true});
       });

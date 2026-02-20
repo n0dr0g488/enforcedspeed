@@ -17,3 +17,8 @@ v403 — 2026-02-20 — Remove PYTHON_VERSION from render.yaml
 v404 — 2026-02-20 — Preserve scroll position on Like/Comment
 - Home feed: liking, posting a comment/reply, or deleting a comment no longer jumps the page back to the top after the POST/redirect.
 - Implementation: store the current scroll/card position in sessionStorage on submit, then restore it after reload.
+
+v405 — 2026-02-20 — Fix preserve-scroll bindings
+- Home feed: preserve-scroll now binds reliably by using a CSS class on Like/Comment/Delete forms (instead of matching URL substrings).
+- Home feed: delete reply (nested) forms now include the hidden next=... field so redirects return to the same page state.
+

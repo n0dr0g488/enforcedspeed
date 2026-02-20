@@ -1,0 +1,44 @@
+HANDOFF — EnforcedSpeed Web (v405)
+
+Goal of v405 (single scoped fix)
+Make the v404 “preserve scroll on Like/Comment/Delete” behavior actually trigger reliably.
+
+Root cause of v404 not working
+- The JS bound submit listeners using action substring matches:
+    form[action*="toggle_like"], form[action*="add_comment"], ...
+- But the actual Flask routes are:
+    /like/<id>
+    /comment/<id>
+    /comment/<id>/delete
+  so those substring selectors never matched, and the handler never ran.
+
+What changed
+- templates/home_feed.html
+  - Added class="js-preserve-scroll" to:
+    - Like form
+    - Comment + Reply forms
+    - Delete comment forms (including nested replies)
+  - Updated JS binding to:
+    document.querySelectorAll('form.js-preserve-scroll')
+  - Added hidden next={{ request.full_path }} to nested reply delete forms so redirects preserve the current page/filters.
+
+Files changed
+- templates/home_feed.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v405.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Home feed:
+   - Like a post: should return to the same card (no jump to top)
+   - Post a comment/reply: no jump to top
+   - Delete a comment (top-level + nested): no jump to top
+4) Verify NO regressions:
+   - Ticket card static maps still render
+   - Right-rail minimap renders
+   - Trending/Follow tables show names (not GEOIDs)
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

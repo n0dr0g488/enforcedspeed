@@ -1,0 +1,38 @@
+HANDOFF — EnforcedSpeed Web (v406)
+
+Goal of v406 (Stage 3)
+Polish the top of the Home feed:
+1) Make the "Welcome to EnforcedSpeed" block use the same rounded feed-card styling as ticket cards.
+2) Add a thin, Facebook-style CTA card: "+ Post your ticket" linking to Submit a Ticket.
+
+What changed
+- templates/home_feed.html
+  - Replaced the Welcome block wrapper (was incorrectly using .filters-rail) with a standard .card wrapper.
+  - Added a thin CTA card directly below the Welcome block:
+      "Post your ticket" with a plus-in-circle icon, linking to url_for('submit').
+
+- templates/_mvp_styles.html
+  - Added small CSS helpers:
+    - .home-welcome-card padding (keeps the Welcome card compact)
+    - .post-cta-card layout + icon styling
+
+Files changed
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v406.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Home feed:
+   - Welcome block is rounded like ticket cards (not a rail-styled rectangle).
+   - "Post your ticket" thin card appears under Welcome and links to Submit a Ticket.
+4) Verify NO regressions:
+   - Ticket card static maps still render
+   - Right-rail minimap renders
+   - Like/comment does NOT jump to top (v405 behavior intact)
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

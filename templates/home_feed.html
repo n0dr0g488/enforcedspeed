@@ -224,20 +224,20 @@
       <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Filters</button>
 
       {# --- Welcome tile --- #}
-      <div class="filters-rail">
-    <div class="home-intro" style="margin: 0;">
-      <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
-
-      <div class="home-intro-body">
-        EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.
+      <div class="card home-welcome-card" style="margin:0;">
+        <div class="home-intro">
+          <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
+          <div class="home-intro-body">
+            EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.
+          </div>
+        </div>
       </div>
 
-{% if is_admin %}
-      </span>
-    {% endif %}
-
-    </div>
-  </div>
+      {# --- Post CTA (thin card) --- #}
+      <a class="card post-cta-card" href="{{ url_for('submit') }}">
+        <div class="post-cta-icon">+</div>
+        <div class="post-cta-text">Post your ticket</div>
+      </a>
 
       {# Feed starts immediately below welcome card. #}
 

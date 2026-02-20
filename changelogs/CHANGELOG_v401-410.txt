@@ -22,3 +22,7 @@ v405 — 2026-02-20 — Fix preserve-scroll bindings
 - Home feed: preserve-scroll now binds reliably by using a CSS class on Like/Comment/Delete forms (instead of matching URL substrings).
 - Home feed: delete reply (nested) forms now include the hidden next=... field so redirects return to the same page state.
 
+
+v406 — 2026-02-20 — Home feed CTA + welcome card styling
+- Home feed: "Welcome to EnforcedSpeed" block is now a standard rounded feed card (matches ticket cards).
+- Home feed: added a thin "Post your ticket" (+) CTA card below the welcome block linking to Submit a Ticket.

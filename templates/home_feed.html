@@ -223,20 +223,22 @@
       {# Mobile-only toggle button for the filter sidebar #}
       <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Filters</button>
 
-      {# --- Welcome tile --- #}
-      <div class="card home-welcome-card" style="margin:0;">
+      {# --- Welcome tile (clickable CTA) --- #}
+      {% set submit_url = url_for('submit') %}
+      {% if current_user.is_authenticated %}
+        {% set welcome_url = submit_url %}
+      {% else %}
+        {% set welcome_url = url_for('register', next=submit_url) %}
+      {% endif %}
+
+      <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
         <div class="home-intro">
           <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
+          <div class="home-intro-cta">Click this tile to create an account and post your ticket.</div>
           <div class="home-intro-body">
             EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.
           </div>
         </div>
-      </div>
-
-      {# --- Post CTA (thin card) --- #}
-      <a class="card post-cta-card" href="{{ url_for('submit') }}">
-        <div class="post-cta-icon">+</div>
-        <div class="post-cta-text">Post your ticket</div>
       </a>
 
       {# Feed starts immediately below welcome card. #}

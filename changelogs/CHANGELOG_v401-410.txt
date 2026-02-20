@@ -26,3 +26,8 @@ v405 — 2026-02-20 — Fix preserve-scroll bindings
 v406 — 2026-02-20 — Home feed CTA + welcome card styling
 - Home feed: "Welcome to EnforcedSpeed" block is now a standard rounded feed card (matches ticket cards).
 - Home feed: added a thin "Post your ticket" (+) CTA card below the welcome block linking to Submit a Ticket.
+
+v407 — 2026-02-20 — Merge Welcome + CTA into one tile
+- Home feed: removed the separate thin "Post your ticket" card.
+- Home feed: the Welcome card is now clickable; routes to Submit if logged in, otherwise to Create Account and then on to Submit via next=/submit.
+- Home feed: added a short CTA line under the title and tightened the welcome card spacing/line-height.

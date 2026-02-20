@@ -1,0 +1,45 @@
+HANDOFF — EnforcedSpeed Web (v407)
+
+Goal of v407
+Merge the Home feed intro + CTA into a single clickable Welcome tile:
+- Remove the separate thin "+ Post your ticket" card.
+- Make the Welcome card itself the CTA:
+  - If logged in → goes directly to Submit Ticket.
+  - If logged out → goes to Create Account and then continues to Submit Ticket via next=/submit.
+- Add a short CTA line under the title and tighten spacing so the tile stays compact.
+
+What changed
+- templates/home_feed.html
+  - Removed the thin post-CTA card.
+  - Converted the Welcome card into an <a> (clickable tile).
+  - Uses a safe next param: /register?next=/submit when logged out.
+  - Added CTA line text: "Click this tile to create an account and post your ticket."
+
+- templates/_mvp_styles.html
+  - Removed post-CTA card CSS.
+  - Added welcome tile link styling + hover affordance.
+  - Tightened Welcome card padding and line-height.
+
+Files changed
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v407.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Home feed:
+   - Only ONE intro tile at the top (no separate thin CTA card).
+   - Clicking the Welcome tile:
+     - Logged out: lands on Create Account, then after registration goes to /submit.
+     - Logged in: goes straight to /submit.
+   - Like/comment still does NOT jump to top (v405).
+4) Verify NO regressions:
+   - Ticket card static maps still render
+   - Right-rail minimap renders
+   - Trending/follow tables show names (not GEOIDs)
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

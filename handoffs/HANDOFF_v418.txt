@@ -1,0 +1,25 @@
+HANDOFF — EnforcedSpeed Web (v418)
+
+Goal
+- Make Render deploy verification unambiguous.
+
+What changed
+1) /healthz returns build + pid
+- Response now: ok v418 pid=<number>
+- This proves whether the NEW deploy instance is the one answering health checks.
+
+2) render.yaml pins healthCheckPath
+- Added: healthCheckPath: /healthz
+- Prevents drift if you ever re-sync via Render Blueprint.
+
+Render guardrails (DO NOT DRIFT)
+- Start Command (Render UI): gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health Check Path (Render UI): /healthz
+- Do NOT set PORT manually anywhere (service env vars or Environment Group).
+
+Verification
+- Visit /healthz and confirm it shows: ok v418 pid=...
+- During deploy, logs should show GET /healthz 200 with response bytes > 2.
+
+Git
+- Render deploys from GitHub, so changes go live after commit + push.

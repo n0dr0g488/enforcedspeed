@@ -41,3 +41,7 @@ v416
 v417
 - Fix v416 deploy regression: corrected indentation at end of create_app() (schema bootstrap gate + return app) that caused SyntaxError: 'return' outside function on Render.
 - Added/kept guardrail: run python -m py_compile app.py before pushing to GitHub to catch syntax errors pre-deploy.
+
+v418
+- Deploy observability: /healthz now returns "ok v### pid=..." so you can confirm the NEW build is responding during deploy.
+- Blueprint safety: render.yaml now includes healthCheckPath: /healthz so it can’t drift.

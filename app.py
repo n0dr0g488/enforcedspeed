@@ -4,6 +4,15 @@ from __future__ import annotations
 import os
 import requests
 
+# Used by /healthz to prove which build is serving traffic (deploy troubleshooting).
+_ES_VERSION = "unknown"
+try:
+    _ver_path = os.path.join(os.path.dirname(__file__), "VERSION.txt")
+    with open(_ver_path, "r", encoding="utf-8") as _vf:
+        _ES_VERSION = (_vf.read() or "").strip() or "unknown"
+except Exception:
+    _ES_VERSION = "unknown"
+
 def _get_county_filter_from_request():
     """Parse county filter from query params.
 
@@ -1194,7 +1203,7 @@ def create_app() -> Flask:
     # Keep this endpoint fast and DB-independent so deploys never hang on health checks.
     @app.get("/healthz")
     def healthz():
-        return "ok", 200
+        return f"ok {_ES_VERSION} pid={os.getpid()}", 200
 
 
     # --- County GIS (PostGIS) ---

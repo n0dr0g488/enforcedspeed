@@ -1,4 +1,4 @@
-HANDOFF — EnforcedSpeed Web (v416)
+HANDOFF — EnforcedSpeed Web (v418)
 
 Primary change
 - Render deploy stability hardening:
@@ -21,4 +21,8 @@ Smoke tests
 - Map page loads; title pill works; zoom buttons work
 
 Packaging
-- ZIP has unique top-level folder name and VERSION.txt updated to v416.
+- ZIP has unique top-level folder name and VERSION.txt updated to v418.
+
+Deploy observability (v418)
+- /healthz returns "ok v### pid=..." so you can prove which build is responding during deploys.
+- render.yaml includes healthCheckPath: /healthz to prevent drift.

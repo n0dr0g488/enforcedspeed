@@ -1,0 +1,28 @@
+HANDOFF — EnforcedSpeed Web (v411)
+
+Purpose
+- Fix Render “spinning deploy” where logs show repeated GET / 200 while Render reports:
+  "No open HTTP ports detected on 0.0.0.0".
+
+Root cause (most likely)
+- App was doing DB schema bootstrap during create_app() startup (ensure_counties_schema()).
+- If Postgres is slow/locked/waking up, Gunicorn may not bind to $PORT quickly enough → Render times out port detection.
+
+What changed (v411)
+- Disabled DB schema work at boot by default.
+- Added env gate:
+  ES_BOOTSTRAP_DB_ON_START=1  (ONLY when you intentionally need additive schema setup; keep OFF in production)
+
+Render must-haves (do not drift)
+- Start Command (Render UI):
+  gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path: /healthz
+- Prefer NOT setting PORT manually; let Render provide $PORT.
+
+Smoke tests
+- Local: python -m py_compile app.py
+- Run es-up
+- Verify Home loads, ticket card static maps render, right-rail minimap loads, Trending tables show names, Map page loads.
+
+Git deploy
+- Going live = commit + push to GitHub (Render deploys from Git).

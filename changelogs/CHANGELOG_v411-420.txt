@@ -1,0 +1,12 @@
+CHANGELOG v411–v420
+
+v411 (created, not deployed)
+- Render hardening idea: avoid doing any DB schema/bootstrap work at web process startup; gate behind ES_BOOTSTRAP_DB_ON_START=1.
+  (Ultimately PORT env var was the real cause of the “spinning deploy” symptom.)
+
+v412
+- Interactive Map pin color scheme updated to match the site-wide intent:
+  - Selected pin: deep red
+  - In-focus context pins: mid-gray
+  - Out-of-focus context pins: same gray, ghosted
+- Added local ghosted pin asset (pin_outside_ghostgray.png) used by the interactive map.

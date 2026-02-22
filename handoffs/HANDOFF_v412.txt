@@ -1,0 +1,47 @@
+HANDOFF — EnforcedSpeed Web (v412)
+
+What changed in v412 (single-scope stage)
+- Stage 6 (Color scheme on interactive map pins):
+  - Selected pin is now deep red (same as primary pin).
+  - Pins inside the current focus (state/county) are mid-gray.
+  - Pins outside the focus are the same gray but ghosted.
+  - Removed use of the yellow selected pin on the interactive map.
+- Added local asset used by the interactive map:
+  - static/img/pins/pin_outside_ghostgray.png (+ _static copy)
+
+Files touched
+- templates/map_page.html
+- static/img/pins/pin_outside_ghostgray.png
+- static/img/pins/pin_outside_ghostgray_static.png
+- VERSION.txt
+- changelogs/CHANGELOG_v411-420.txt
+- handoffs/HANDOFF_v412.txt
+
+Guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering logic stays county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays flush/sharp (no wrapper duplication).
+- Trending/Follow tables must keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time.
+
+Render / deployment hygiene (IMPORTANT)
+- Do NOT set PORT manually in Render (remove PORT from service env vars AND any Environment Group).
+  Render provides $PORT dynamically; app must bind to 0.0.0.0:${PORT}.
+- Start Command (Render UI):
+  gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path: /healthz
+
+Smoke tests
+- python -m py_compile app.py
+- es-up
+- Verify:
+  - Home feed loads; ticket card static maps show.
+  - Home minimap shows.
+  - Map page loads; zoom buttons still work; title pill still works.
+  - Interactive pins: selected is red; in-focus pins are gray; out-of-focus pins are ghost gray.
+
+Packaging rules
+- ZIP must have unique top-level root folder.
+- Include VERSION.txt + changelog block + handoff.
+- After ZIP link: include git add/commit/push.

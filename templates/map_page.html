@@ -317,14 +317,14 @@
     let ES_PINS_DEBOUNCE;
 
     // Pin style (Option 3: classic teardrop + thicker outline)
-    // Colors requested:
-    // - Selected: Deep red
-    // - Inside focus: Rose
-    // - Outside focus: Warm gray
+    // Pin colors (unified scheme across site):
+    // - Selected: Deep red (the primary pin)
+    // - In-focus context: Mid-gray
+    // - Out-of-focus context: Same gray, ghosted
     const ES_PIN_COLORS = {
-      selected: '#eab308', // selected ticket
-      inside: '#dc2626',   // inside focus (non-selected)
-      outside: '#a1a1aa'   // outside focus (within viewport)
+      selected: '#dc2626', // deep red
+      inside:   '#a1a1aa', // mid gray
+      outside:  '#d4d4d8'  // ghost gray
     };
 
     function esSvgPinDataUrl(fill) {
@@ -348,9 +348,12 @@
       if (ES_PIN_ICON_CACHE[k]) return ES_PIN_ICON_CACHE[k];
       // Use hosted PNG assets (so Static Maps + interactive map can share the exact same art).
       const url = ({
-        selected: '/static/img/pins/pin_selected_yellow.png',
-        inside:   '/static/img/pins/pin_inside_deepred.png',
-        outside:  '/static/img/pins/pin_outside_warmgray.png'
+        // Selected pin is deep red.
+        selected: '/static/img/pins/pin_inside_deepred.png',
+        // In-focus context pins are mid-gray.
+        inside:   '/static/img/pins/pin_outside_warmgray.png',
+        // Out-of-focus context pins are the same gray, ghosted.
+        outside:  '/static/img/pins/pin_outside_ghostgray.png'
       }[k] || '/static/img/pins/pin_inside_deepred.png');
       // Keep sizing consistent across all colors.
       const scaledSize = new google.maps.Size(36, 36);

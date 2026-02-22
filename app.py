@@ -7162,6 +7162,8 @@ def strictness_rows(
     return app
 
 app = create_app()
+# Alias for some WSGI servers
+application = app
 
 
 if __name__ == "__main__":

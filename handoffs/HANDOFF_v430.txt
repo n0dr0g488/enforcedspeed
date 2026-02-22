@@ -1,0 +1,23 @@
+HANDOFF — EnforcedSpeed Web (v430)
+
+What happened
+- Production is stuck on v428 because the new build fails to boot with:
+  gunicorn.errors.AppImportError: Failed to find application object: 'app'
+
+Root cause
+- Gunicorn is not reliably importing the repo's app.py in Render's environment.
+
+Fix in v430
+- Add wsgi.py entrypoint (wsgi:app).
+- Update render.yaml startCommand to:
+  gunicorn --chdir /opt/render/project/src wsgi:app --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
+- Keep v429 strictness_rows restoration (Statistics page works again).
+
+Deploy steps (non-negotiable)
+1) Copy ZIP CONTENTS into repo root (no nesting).
+2) git add -A && git commit -m "v430: Render boot fix (wsgi entrypoint) + strictness works" && git push
+3) Render Web Service: set Start Command to the same as above (if UI overrides blueprint), then deploy latest.
+4) Verify /healthz shows ok v430 pid=...
+
+Guardrails
+- No regressions: ticket static maps, minimap, county names, etc.

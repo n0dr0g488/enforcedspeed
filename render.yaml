@@ -1,16 +1,15 @@
 services:
-  - type: web
-    name: enforcedspeed
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --chdir /opt/render/project/src wsgi:app --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
-    healthCheckPath: /healthz
-    autoDeploy: true
-    envVars:
-      - key: FLASK_ENV
-        value: production
-      - key: SECRET_KEY
-        generateValue: true
-      # Render will usually provide DATABASE_URL automatically when you attach a Postgres DB.
-      # If not, add DATABASE_URL in the Render dashboard env vars.
+- type: web
+  name: enforcedspeed
+  env: python
+  plan: free
+  buildCommand: pip install -r requirements.txt
+  startCommand: gunicorn --chdir /opt/render/project/src enforcedspeed_wsgi:app --bind
+    0.0.0.0:$PORT --access-logfile - --error-logfile -
+  healthCheckPath: /healthz
+  autoDeploy: true
+  envVars:
+  - key: FLASK_ENV
+    value: production
+  - key: SECRET_KEY
+    generateValue: true

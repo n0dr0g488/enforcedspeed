@@ -1,0 +1,6 @@
+CHANGELOG — EnforcedSpeed (v431–v440)
+
+v431 (2026-02-22)
+- Render boot fix: avoid module-name collision by using `enforcedspeed_wsgi.py` as the Gunicorn entrypoint.
+- render.yaml startCommand updated to `gunicorn ... enforcedspeed_wsgi:app ...`.
+- Keeps prior Stage 9 deliverables (avatars, profile photo upload + SafeSearch, client-side optimize, strictness fix).

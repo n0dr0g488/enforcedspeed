@@ -1,0 +1,27 @@
+HANDOFF — EnforcedSpeed Web (v431 — Render boot fix)
+
+Problem
+- Render deploys were failing with: `gunicorn.errors.AppImportError: Failed to find application object: 'app'`.
+- Even after switching Start Command to `wsgi:app`, deploy still failed.
+
+Root cause
+- The module name `wsgi` can collide with other importable modules/packages named `wsgi` on Render’s Python path.
+- Gunicorn was importing a different `wsgi` module (or one without `app`), so `wsgi:app` could not resolve.
+
+Fix in v431
+- Adds `enforcedspeed_wsgi.py` at repo root:
+    from app import create_app
+    app = create_app()
+- Updates `render.yaml` startCommand to use:
+    gunicorn --chdir /opt/render/project/src enforcedspeed_wsgi:app --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
+
+What YOU must set in Render
+- Web Service → Settings → Start Command MUST match the above (Render dashboard overrides render.yaml).
+- Root Directory should be blank (repo root) unless you intentionally deploy from a subfolder.
+
+Smoke check
+- After deploy: https://enforcedspeed.com/healthz should show `ok v431 pid=...`.
+- `/strictness` (Statistics) should load (no 500).
+
+Guardrails
+- No regressions to ticket-card static maps, minimap behavior, or county/state names.

@@ -723,7 +723,7 @@ def _simplify_polyline_to_maxlen(geoid: str, poly: str, max_len: int):
     return best
 
 
-def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None, pin_lng: float | None = None, *, width: int = 640, height: int = 340, center_on_pin: bool = False, use_custom_icon: bool = True) -> str:
+def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None, pin_lng: float | None = None, *, width: int = 640, height: int = 340, center_on_pin: bool = False, use_custom_icon: bool = True, inside_points: list[tuple[float,float]] | None = None, outside_points: list[tuple[float,float]] | None = None) -> str:
     """Static map URL showing the county boundary (black outline + subtle fill) and an optional red pin.
 
     If center_on_pin=True (and a pin is provided), the map center is set to the pin location.
@@ -853,6 +853,10 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     pin_base = _static_pin_base_url()
     icon_url = f"{pin_base}/pin_inside_deepred_static.png"
 
+    # Context marker icons (for multi-pin Static Maps):
+    icon_inside_url = f"{pin_base}/pin_outside_warmgray.png"
+    icon_outside_url = f"{pin_base}/pin_outside_ghostgray.png"
+
     def _qs(items: list[tuple[str, str]]) -> str:
         """Query-string builder tuned for Google Static Maps.
 
@@ -889,16 +893,34 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
             poly_use = _simplify_polyline_to_maxlen(geoid, poly_use, POLY_MAXLEN)
         items.append(('path', f"fillcolor:0x00000017|color:0x000000ff|weight:1|enc:{poly_use}"))
 
-    # Optional pin
+    # Optional pin + context pins
+    # We group markers by icon so we only pay the icon URL once per group.
+    # Keep marker counts conservative to avoid hitting Static Maps URL limits.
+    def _fmt_pt(lat: float, lng: float) -> str:
+        return f"{float(lat):.6f},{float(lng):.6f}"
+
+    # Selected pin (deep red)
     if pin_lat is not None and pin_lng is not None:
-        center = f"{pin_lat:.6f},{pin_lng:.6f}"
+        sel_center = _fmt_pt(pin_lat, pin_lng)
         if use_custom_icon:
-            # Custom icon markers can be rejected if Google cannot fetch the icon URL quickly/reliably.
             encoded_icon = urllib.parse.quote(icon_url, safe="")
-            items.append(('markers', f"icon:{encoded_icon}|{center}"))
+            items.append(('markers', f"icon:{encoded_icon}|{sel_center}"))
         else:
-            # Safe fallback (no custom icon) to avoid g.co/staticmaperror in proxy flows.
-            items.append(('markers', center))
+            items.append(('markers', sel_center))
+
+    # In-county context pins (mid-gray)
+    pts_in = [p for p in (inside_points or []) if p and len(p) == 2]
+    if pts_in:
+        pts_in = pts_in[:18]
+        encoded_icon = urllib.parse.quote(icon_inside_url, safe="")
+        items.append(('markers', f"icon:{encoded_icon}|" + "|".join(_fmt_pt(a,b) for a,b in pts_in)))
+
+    # Out-of-county context pins (ghost gray)
+    pts_out = [p for p in (outside_points or []) if p and len(p) == 2]
+    if pts_out:
+        pts_out = pts_out[:18]
+        encoded_icon = urllib.parse.quote(icon_outside_url, safe="")
+        items.append(('markers', f"icon:{encoded_icon}|" + "|".join(_fmt_pt(a,b) for a,b in pts_out)))
 
     return 'https://maps.googleapis.com/maps/api/staticmap?' + _qs(items)
 
@@ -3390,6 +3412,11 @@ GROUP BY UPPER(TRIM(stusps));
         # Selected ticket (for the right-side mini card)
         selected_ticket = None
         selected_ticket_id = (request.args.get("ticket_id") or "").strip()
+
+        # When context_mode=1, we keep the focus selection (county/state) for coloring,
+        # but we DO NOT hard-filter pins down to only that focus area.
+        # This is what enables: selected (red) + in-focus (gray) + out-of-focus (ghost) on the map.
+        context_mode = (request.args.get("context_mode") == "1")
         if selected_ticket_id.isdigit():
             try:
                 selected_ticket = SpeedReport.query.get(int(selected_ticket_id))
@@ -4465,10 +4492,14 @@ GROUP BY UPPER(TRIM(stusps));
         focus_county_geoid = (request.args.get("focus_county_geoid") or "").strip()
         selected_ticket_id = (request.args.get("ticket_id") or "").strip()
 
-        # If the user navigated to the map via a state focus link (e.g., clicking a state from Home),
-        # treat that focus as an implicit state filter so pins/stats match what is selected.
-        if (not filter_state) and focus_state and re.fullmatch(r"[A-Z]{2}", focus_state or ""):
-            filter_state = focus_state
+        # When context_mode=1, we keep the focus selection (county/state) for coloring,
+        # but we DO NOT hard-filter pins down to only that focus area.
+        # This is what enables: selected (red) + in-focus (gray) + out-of-focus (ghost) on the map.
+        context_mode = (request.args.get("context_mode") == "1")
+
+        # NOTE: We do NOT implicitly convert focus_state into a state filter here.
+        # Focus is used for inside/outside coloring, while filters control which pins are loaded.
+        # This allows ghosted out-of-focus pins to remain visible for context.
 
         # Optional viewport bounds (when present, filter pins to the visible map)
         def _f(name: str):
@@ -4485,6 +4516,18 @@ GROUP BY UPPER(TRIM(stusps));
         east = _f("east")
         west = _f("west")
         viewport_mode = (north is not None and south is not None and east is not None and west is not None)
+
+        if viewport_mode:
+            # Clamp to visible viewport to reduce payload and keep pin context local to what the user is looking at.
+            try:
+                n_ = max(north, south)
+                s_ = min(north, south)
+                e_ = max(east, west)
+                w_ = min(east, west)
+                q = q.filter(SpeedReport.lat <= n_).filter(SpeedReport.lat >= s_)
+                q = q.filter(SpeedReport.lng <= e_).filter(SpeedReport.lng >= w_)
+            except Exception:
+                pass
 
 
         filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
@@ -4531,7 +4574,9 @@ GROUP BY UPPER(TRIM(stusps));
             q = q.filter(SpeedReport.state.ilike(f"{filter_state}%"))
 
         # County filter (GEOID)
-        if filter_county_geoid:
+        # On the interactive map we often want county focus WITHOUT hard-filtering pins to that county
+        # so we can show out-of-county pins in a ghosted style for context.
+        if filter_county_geoid and not context_mode:
             q = q.filter(SpeedReport.county_geoid == filter_county_geoid)
 
         # Map pin filter (only tickets with a user-placed pin)
@@ -4669,7 +4714,9 @@ GROUP BY UPPER(TRIM(stusps));
                 }
             )
 
-        return jsonify({"ok": True, "count": len(pins), "pins": pins, "selected_id": selected_id_norm})
+        inside_count = sum(1 for p in pins if p.get("inside_focus"))
+
+        return jsonify({"ok": True, "count": len(pins), "inside_count": inside_count, "pins": pins, "selected_id": selected_id_norm})
 
 
 
@@ -5344,6 +5391,77 @@ GROUP BY UPPER(TRIM(stusps));
 
             center_on_pin = (request.args.get("center_on_pin") == "1")
 
+            # Context pins (optional): when ctx=1 and report_id is provided, include
+            # additional pins for the same state so the user can see in-county (gray) vs out-of-county (ghost).
+            inside_pts = []
+            outside_pts = []
+            ctx_mode = (request.args.get('ctx') == '1')
+            report_id_raw = (request.args.get('report_id') or request.args.get('ticket_id') or '').strip()
+            report_id = None
+            try:
+                if report_id_raw:
+                    report_id = int(report_id_raw)
+            except Exception:
+                report_id = None
+
+            if ctx_mode and report_id is not None and pin_lat is not None and pin_lng is not None:
+                try:
+                    # In-county context: other tickets in the same county with pins.
+                    q_in = (SpeedReport.query
+                            .filter(SpeedReport.county_geoid == geoid)
+                            .filter(SpeedReport.lat.isnot(None))
+                            .filter(SpeedReport.lng.isnot(None))
+                            .filter(SpeedReport.id != report_id)
+                            .order_by(SpeedReport.created_at.desc())
+                            .limit(40))
+                    inside_pts = [(float(r.lat), float(r.lng)) for r in q_in.all() if r.lat is not None and r.lng is not None]
+                    # Drop any point that is essentially the selected pin (prevents double-stacking).
+                    inside_pts = [(a,b) for (a,b) in inside_pts if (abs(a - pin_lat) > 1e-6 or abs(b - pin_lng) > 1e-6)]
+
+                    # Out-of-county context: tickets in the same state but different county,
+                    # biased toward nearby points so they are likely to appear in the county-framed map.
+                    st = None
+                    try:
+                        rep = SpeedReport.query.get(report_id)
+                        if rep and rep.state:
+                            st = normalize_state_group(rep.state)
+                    except Exception:
+                        st = None
+
+                    if st:
+                        # Try a tight bounding box first; widen once if we don't get enough.
+                        def fetch_out(delta):
+                            return (SpeedReport.query
+                                    .filter(SpeedReport.lat.isnot(None))
+                                    .filter(SpeedReport.lng.isnot(None))
+                                    .filter(SpeedReport.state.ilike(f"{st}%"))
+                                    .filter(SpeedReport.county_geoid != geoid)
+                                    .filter(SpeedReport.id != report_id)
+                                    .filter(SpeedReport.lat <= (pin_lat + delta))
+                                    .filter(SpeedReport.lat >= (pin_lat - delta))
+                                    .filter(SpeedReport.lng <= (pin_lng + delta))
+                                    .filter(SpeedReport.lng >= (pin_lng - delta))
+                                    .order_by(SpeedReport.created_at.desc())
+                                    .limit(120)
+                                    .all())
+
+                        cand = fetch_out(0.70)
+                        if len(cand) < 12:
+                            cand = fetch_out(1.50)
+
+                        # Sort by distance to selected pin and keep a small set.
+                        def dist2(r):
+                            try:
+                                return (float(r.lat) - pin_lat)**2 + (float(r.lng) - pin_lng)**2
+                            except Exception:
+                                return 9e9
+                        cand_sorted = sorted(cand, key=dist2)
+                        outside_pts = [(float(r.lat), float(r.lng)) for r in cand_sorted if r.lat is not None and r.lng is not None]
+                        outside_pts = [(a,b) for (a,b) in outside_pts if (abs(a - pin_lat) > 1e-6 or abs(b - pin_lng) > 1e-6)]
+                except Exception:
+                    inside_pts = []
+                    outside_pts = []
+
             upstream = county_static_map_url(
                 geoid,
                 pin_lat,
@@ -5351,7 +5469,9 @@ GROUP BY UPPER(TRIM(stusps));
                 width=w,
                 height=h,
                 center_on_pin=center_on_pin,
-                use_custom_icon=True
+                use_custom_icon=True,
+                inside_points=inside_pts,
+                outside_points=outside_pts
             )
         else:
             upstream = us_static_map_url(width=w, height=h)

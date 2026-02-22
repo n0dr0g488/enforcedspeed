@@ -10,3 +10,12 @@ v412
   - In-focus context pins: mid-gray
   - Out-of-focus context pins: same gray, ghosted
 - Added local ghosted pin asset (pin_outside_ghostgray.png) used by the interactive map.
+
+v413
+- Interactive Map: out-of-focus (ghost) pins now appear correctly by loading context pins beyond the focus polygon.
+  - Added context_mode=1 support to /api/map_pins and show “in focus” count in the map meta line.
+  - Added viewport bounds filtering to /api/map_pins so the context stays local to what you’re viewing.
+- Home feed ticket-card static maps: now include context pins using the same color scheme:
+  - Selected pin: deep red
+  - In-county context pins: mid-gray
+  - Out-of-county context pins: ghost gray

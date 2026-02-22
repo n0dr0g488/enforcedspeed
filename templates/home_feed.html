@@ -364,7 +364,7 @@
 {# IMPORTANT (v370): Route ticket-card static maps through our own proxy endpoint so the
    Google Static Maps API key is never exposed to browsers (avoids referrer differences across browsers)
    and lets us cache responses server-side. #}
-{% set _sm = url_for('api_county_staticmap', geoid=r.county_geoid, pin_lat=_pin_lat, pin_lng=_pin_lng, center_on_pin=('1' if _pinmode else '0'), w=640, h=640) %}
+{% set _sm = url_for('api_county_staticmap', geoid=r.county_geoid, pin_lat=_pin_lat, pin_lng=_pin_lng, center_on_pin=('1' if _pinmode else '0'), w=640, h=640, ctx='1', report_id=r.id) %}
 {% if _sm %}
 
   <div class="ticket-staticmap-frame">

@@ -536,6 +536,11 @@ async function esLoadPins(opts) {
     params.set('focus_county_geoid', String(ES_FOCUS.value));
   }
 
+  // context_mode=1 tells the API to keep focus for coloring but NOT hard-filter pins to the focus area.
+  if (ES_FOCUS && ES_FOCUS.type && ES_FOCUS.value) {
+    params.set('context_mode', '1');
+  }
+
   const url = '/api/map_pins?' + params.toString();
   const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
   const data = await res.json();
@@ -547,7 +552,13 @@ async function esLoadPins(opts) {
 
   esClearMarkers();
   const pins = data.pins || [];
-  if (meta) meta.textContent = pins.length + ' pins shown (max 1500).';
+  if (meta) {
+    if (data.inside_count != null && ES_FOCUS && ES_FOCUS.type && ES_FOCUS.value) {
+      meta.textContent = String(data.inside_count) + ' in focus • ' + pins.length + ' pins shown (max 1500).';
+    } else {
+      meta.textContent = pins.length + ' pins shown (max 1500).';
+    }
+  }
 
   const selectedId = (data.selected_id != null) ? String(data.selected_id) : null;
 

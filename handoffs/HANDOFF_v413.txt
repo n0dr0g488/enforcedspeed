@@ -1,0 +1,47 @@
+HANDOFF — EnforcedSpeed Web (v413)
+
+Goal (bugfix on v412)
+- Make ghosted (out-of-focus) pins actually appear on the Interactive Map.
+- Make Home feed ticket-card static maps show the same 3-tier pin scheme:
+  Selected = red, in-county = mid-gray, out-of-county = ghost gray.
+
+What was wrong in v412
+1) Interactive Map: out-of-focus pins never appeared because the pins query was still effectively limited to the focus area (and/or county filter), so everything returned was “inside.”
+2) Home ticket-card static maps still only rendered the single red pin (no context pins).
+
+What changed in v413
+A) Interactive Map (pins)
+- templates/map_page.html
+  - Adds context_mode=1 to /api/map_pins requests when a focus exists.
+  - Map meta line now shows: “<inside_count> in focus • <total> pins shown”.
+- app.py /api/map_pins
+  - Adds context_mode=1: when enabled, do NOT hard-filter pins to the focused county (county_geoid filter is ignored for pin loading).
+  - Removes implicit “focus_state becomes filter_state” behavior (focus is for coloring, filters are explicit).
+  - Adds viewport bounds filtering (north/south/east/west) to keep results local and fast.
+  - Returns inside_count in the JSON so UI can show in-focus count.
+
+B) Home feed ticket-card static maps (context pins)
+- templates/home_feed.html
+  - Adds ctx=1 & report_id=<ticket id> to /api/county_staticmap URL.
+- app.py /api/county_staticmap + county_static_map_url
+  - Supports multi-marker Static Maps:
+    - Selected pin uses pin_inside_deepred_static.png
+    - In-county pins use pin_outside_warmgray.png
+    - Out-of-county pins use pin_outside_ghostgray.png
+  - Context pins are limited (conservative caps) to avoid Static Maps URL limits.
+
+Non‑negotiable guardrails (still)
+- Do NOT regress ticket card static maps rendering.
+- Do NOT change county-centered static map framing logic.
+- No runtime expensive geometry unions.
+
+Render deploy note (important)
+- Do NOT set PORT manually in Render. Let Render provide $PORT.
+- Start Command should remain:
+  gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path: /healthz
+
+Smoke tests
+- Home feed: multiple ticket cards show static maps, and now you should see gray/ghost context pins + red selected.
+- Map page: when focused on a county/state, you should now see ghosted pins outside the polygon.
+- No new 500s.

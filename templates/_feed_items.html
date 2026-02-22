@@ -17,6 +17,7 @@
       {% if r.user %}
         {% set user_count = user_ticket_counts.get(r.user_id, 0) %}
         <div class="ticket-userline">
+          <img class="ticket-avatar" src="{{ user_avatar_url(r.user) }}" alt="">
           <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
           <span class="ticket-usercount">({{ user_count }})</span>
 
@@ -192,7 +193,10 @@
           {% for c in top_comments %}
             <div id="comment-{{ c.id }}" class="subtle" style="margin-top:6px; display:none;">
               <strong style="color:#111827;">
-                <a href="{{ url_for('profile', username=c.user.username) }}" style="color:inherit;text-decoration:none;">{{ c.user.username }}</a>
+                <span class="comment-userline">
+                  <img class="comment-avatar" src="{{ user_avatar_url(c.user) }}" alt="">
+                  <a href="{{ url_for('profile', username=c.user.username) }}" style="color:inherit;text-decoration:none;">{{ c.user.username }}</a>
+                </span>
               </strong>
               <span class="subtle">
                 · <span class="js-localtime" data-utc="{{ c.created_at.isoformat() }}Z">{{ c.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
@@ -225,7 +229,10 @@
                       {% set d = depth if depth < 2 else 2 %}
                       <div id="comment-{{ rc.id }}" class="subtle" style="margin-top:6px; margin-left:{{ 18 * d }}px; display:none;">
                         <strong style="color:#111827;">
-                          <a href="{{ url_for('profile', username=rc.user.username) }}" style="color:inherit;text-decoration:none;">{{ rc.user.username }}</a>
+                          <span class="comment-userline">
+                            <img class="comment-avatar" src="{{ user_avatar_url(rc.user) }}" alt="">
+                            <a href="{{ url_for('profile', username=rc.user.username) }}" style="color:inherit;text-decoration:none;">{{ rc.user.username }}</a>
+                          </span>
                         </strong>
                         <span class="subtle"> · <span class="js-localtime" data-utc="{{ rc.created_at.isoformat() }}Z">{{ rc.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span></span>
                         <div style="margin-top:2px;">{{ rc.body }}</div>

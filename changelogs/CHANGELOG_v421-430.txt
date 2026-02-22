@@ -25,3 +25,8 @@ v424
   - Applied automatically when opening Home or Statistics with no filters.
   - Clear button now uses ?clear=1 to bypass defaults and show everything.
 
+
+v425
+- Profile: added built-in system avatars (picker + display across the site).
+  - Users can pick from ~30 avatars on their profile.
+  - Avatar shows next to usernames on posts/comments and in the header “My Profile” button.

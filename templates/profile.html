@@ -4,10 +4,13 @@
   <div class="wrap">
     <div class="card">
 <div class="row">
-        <div>
-          <h1 style="margin:0;">@{{ profile_user.username }}</h1>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user) }}" alt="" style="width:48px;height:48px;border-radius:999px;object-fit:cover;background:#e5e7eb;flex:0 0 auto;">
+          <div>
+            <h1 style="margin:0;">@{{ profile_user.username }}</h1>
           <div class="subtle" style="margin-top:6px;">
             Joined: {{ profile_user.created_at.strftime("%b %d, %Y") }}
+          </div>
           </div>
         </div>
 
@@ -35,7 +38,119 @@
       </div>
 
 
+      
       {% if current_user.is_authenticated and current_user.id == profile_user.id %}
+        <div class="list" style="margin-top:14px;">
+          <h3 style="margin: 14px 0 10px;">Avatar (optional)</h3>
+
+          <div class="item">
+            <form id="esAvatarForm" method="post" action="{{ url_for('profile', username=profile_user.username) }}" style="margin:0;">
+              {{ avatar_form.csrf_token }}
+              <input type="hidden" name="form_name" value="avatar">
+              {{ avatar_form.avatar_key(id="esAvatarKey") }}
+            </form>
+
+            <div class="subtle" style="margin-bottom:10px;">
+              Pick a built-in avatar. (Profile photo uploads come later.)
+            </div>
+
+            <div id="esAvatarGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap:10px; max-width:520px;">
+              {% for a in system_avatars %}
+                {% set k = a.key %}
+                {% set f = a.file %}
+                <button type="button"
+                        class="es-avatar-choice{% if k == selected_avatar_key %} is-selected{% endif %}"
+                        data-key="{{ k }}"
+                        style="padding:0; border:2px solid {% if k == selected_avatar_key %}#111827{% else %}transparent{% endif %}; border-radius:999px; background:transparent; cursor:pointer; width:56px; height:56px; display:flex; align-items:center; justify-content:center;">
+                  <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}"
+                       alt="{{ a.label }}"
+                       style="width:52px;height:52px;border-radius:999px;object-fit:cover;background:#e5e7eb;display:block;">
+                </button>
+              {% endfor %}
+            </div>
+
+            <div class="subtle" style="margin-top:10px;">
+              Click an avatar to save. It will appear next to your name across the site.
+            </div>
+          </div>
+        </div>
+
+        <script>
+          (function(){
+            const grid = document.getElementById('esAvatarGrid');
+            const keyInput = document.getElementById('esAvatarKey');
+            const form = document.getElementById('esAvatarForm');
+            if(!grid || !keyInput || !form) return;
+
+            function _get(name){
+              const el = form.querySelector(`input[name="${name}"]`);
+              return el ? (el.value || '') : '';
+            }
+
+            function setSelected(key){
+              const buttons = grid.querySelectorAll('.es-avatar-choice');
+              buttons.forEach(btn => {
+                const k = btn.getAttribute('data-key') || '';
+                const on = (k === key);
+                btn.classList.toggle('is-selected', on);
+                btn.style.borderColor = on ? '#111827' : 'transparent';
+              });
+            }
+
+            grid.addEventListener('click', async function(e){
+              const btn = e.target && e.target.closest ? e.target.closest('.es-avatar-choice') : null;
+              if(!btn) return;
+
+              const key = (btn.getAttribute('data-key') || '').trim();
+              if(!key) return;
+
+              setSelected(key);
+              keyInput.value = key;
+
+              try{
+                const csrf = _get('csrf_token');
+                const body = new URLSearchParams();
+                body.set('csrf_token', csrf);
+                body.set('avatar_key', key);
+
+                const resp = await fetch('{{ url_for("api_profile_avatar") }}', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  credentials: 'same-origin',
+                  body: body.toString(),
+                });
+
+                const data = await resp.json().catch(()=>null);
+
+                if(resp.status === 401 && data && data.login_url){
+                  window.location.href = data.login_url;
+                  return;
+                }
+
+                if(!data || !data.ok){
+                  return;
+                }
+
+                // Update header avatar (My Profile)
+                const headImg = document.querySelector('.header-nav .nav-user .avatar img');
+                if(headImg && data.avatar_url){
+                  headImg.src = data.avatar_url + '?v=' + Date.now();
+                }
+
+                // Update profile header avatar
+                const profImg = document.getElementById('profileAvatarImg');
+                if(profImg && data.avatar_url){
+                  profImg.src = data.avatar_url + '?v=' + Date.now();
+                }
+              }catch(err){
+                // best-effort
+              }
+            });
+          })();
+        </script>
+      {% endif %}
+
+{% if current_user.is_authenticated and current_user.id == profile_user.id %}
         <div class="list" style="margin-top:14px;">
           <h3 style="margin: 14px 0 10px;">Vehicle (optional)</h3>
 

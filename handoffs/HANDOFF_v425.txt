@@ -1,0 +1,40 @@
+HANDOFF — EnforcedSpeed Web (v425)
+
+Current live target
+- /healthz is the source of truth for what’s live (ok v### pid=...).
+- Going live = git add/commit/push (Render deploys from GitHub).
+
+What shipped in v425 (Stage 9.5A — System avatars)
+- Added ~30 built-in “system avatars” stored in-repo under static/img/avatars/.
+- Users pick an avatar on their profile (members-only).
+- Avatar shows:
+  - next to username on Home feed posts
+  - next to username on comments/replies
+  - in the header next to “My Profile”
+
+Implementation notes
+- User model: added users.avatar_key (nullable). Stored values: a01–a30.
+- Avatar list is driven by static/img/avatars/manifest.json.
+- Avatar helper exposed to templates: user_avatar_url(user) + system_avatars().
+
+Non-negotiable guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style (no wrapper duplication).
+- Trending/Follow tables must keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time (cache/precompute only).
+- One theme per ZIP.
+
+Render deploy SOP (avoid “spinning deploy” confusion)
+- Health check path: /healthz
+- Start command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Never set PORT in Render env vars (Render supplies it).
+- If /healthz shows the new version → it’s live.
+
+Next stage (9.5B — Profile photo upload + Vision SafeSearch)
+- Add ability to upload ONE profile photo (optional) + SafeSearch moderation.
+- Recommended flow: scan-first synchronous (don’t store bad images in R2).
+- Likely storage:
+  - Keep system avatars in repo (or later copy to existing static bucket).
+  - Use ONE bucket/prefix for user profile photos (new bucket optional).

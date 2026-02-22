@@ -222,6 +222,19 @@ class ProfileCarForm(FlaskForm):
     submit = SubmitField("Save")
 
 
+class AvatarPickForm(FlaskForm):
+    """Pick a built-in system avatar (v425)."""
+
+    avatar_key = HiddenField(
+        validators=[
+            DataRequired(),
+            Length(max=50),
+            Regexp(r"^a\d{2}$", message="Invalid avatar."),
+        ]
+    )
+    submit = SubmitField("Save")
+
+
 class ChangePasswordForm(FlaskForm):
     current_password = PasswordField("Current Password", validators=[DataRequired()])
     new_password = PasswordField("New Password", validators=[DataRequired(), Length(min=8, max=128)])

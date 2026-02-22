@@ -316,7 +316,11 @@
   /* Header layout: username on the left, OCR pill top-right aligned to username line. */
   .ticket-headwrap{display:block}
   .ticket-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-  .ticket-userline{display:flex;align-items:baseline;gap:6px}
+  .ticket-userline{display:flex;align-items:center;gap:8px}
+  .ticket-avatar{width:22px;height:22px;border-radius:999px;object-fit:cover;display:block;background:#e5e7eb;flex:0 0 auto}
+  .comment-userline{display:inline-flex;align-items:center;gap:6px}
+  .comment-avatar{width:18px;height:18px;border-radius:999px;object-fit:cover;display:inline-block;background:#e5e7eb;vertical-align:middle}
+
   .ticket-usercount{font-size:13px;font-weight:600;color:#6b7280}
   .ticket-ocr{align-self:flex-start;margin-top:0;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}
   .ticket-info{border:1px solid #e5e7eb;background:#fff;border-radius:999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer}

@@ -13,6 +13,70 @@ try:
 except Exception:
     _ES_VERSION = "unknown"
 
+
+# -----------------------------------------------------------------------------
+# SYSTEM AVATARS (v425)
+#
+# Stage 9.5A: Built-in avatar picker (30 options) stored in-repo under:
+#   static/img/avatars/
+# Users store a simple key (e.g., "a01") on their profile. We render the avatar
+# anywhere a username is shown (feed, comments, header, profile).
+# -----------------------------------------------------------------------------
+
+_DEFAULT_SYSTEM_AVATAR_KEY = "a01"
+_system_avatar_manifest: list[dict] | None = None
+_system_avatar_keys: set[str] | None = None
+
+def _load_system_avatar_manifest() -> list[dict]:
+    global _system_avatar_manifest, _system_avatar_keys
+    if _system_avatar_manifest is not None and _system_avatar_keys is not None:
+        return _system_avatar_manifest
+
+    manifest_path = os.path.join(
+        os.path.dirname(__file__),
+        "static",
+        "img",
+        "avatars",
+        "manifest.json",
+    )
+
+    manifest: list[dict] = []
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                for it in data:
+                    if not isinstance(it, dict):
+                        continue
+                    key = (it.get("key") or "").strip()
+                    file = (it.get("file") or "").strip()
+                    label = (it.get("label") or "").strip()
+                    if key and file:
+                        manifest.append({"key": key, "file": file, "label": label or key})
+    except Exception:
+        # Non-fatal: fall back to a single default avatar key.
+        manifest = [{"key": _DEFAULT_SYSTEM_AVATAR_KEY, "file": f"{_DEFAULT_SYSTEM_AVATAR_KEY}.png", "label": "Avatar"}]
+
+    _system_avatar_manifest = manifest
+    _system_avatar_keys = {it["key"] for it in manifest if it.get("key")}
+    if _DEFAULT_SYSTEM_AVATAR_KEY not in _system_avatar_keys:
+        _system_avatar_keys.add(_DEFAULT_SYSTEM_AVATAR_KEY)
+        _system_avatar_manifest.insert(0, {"key": _DEFAULT_SYSTEM_AVATAR_KEY, "file": f"{_DEFAULT_SYSTEM_AVATAR_KEY}.png", "label": "Avatar"})
+    return _system_avatar_manifest
+
+def system_avatar_keys() -> set[str]:
+    _load_system_avatar_manifest()
+    return _system_avatar_keys or {_DEFAULT_SYSTEM_AVATAR_KEY}
+
+def system_avatars() -> list[dict]:
+    return _load_system_avatar_manifest()
+
+def normalize_avatar_key(key: str | None) -> str:
+    k = (key or "").strip()
+    if k in system_avatar_keys():
+        return k
+    return _DEFAULT_SYSTEM_AVATAR_KEY
+
 def _get_county_filter_from_request():
     """Parse county filter from query params.
 
@@ -123,6 +187,7 @@ from forms import (
     DeleteCommentForm,
     FollowCountyForm,
     ProfileCarForm,
+    AvatarPickForm,
     ProfileDefaultFiltersForm,
 )
 from models import db, SpeedReport, User, Like, Comment, FollowedCounty, normalize_road, state_code_from_value
@@ -1197,9 +1262,21 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_helpers():
-        return {"format_road_bucket": format_road_bucket,
-                "static_map_url": static_map_url,
-                "county_static_map_url": county_static_map_url}
+        def user_avatar_url(user) -> str:
+            try:
+                key = normalize_avatar_key(getattr(user, "avatar_key", None))
+                return url_for("static", filename=f"img/avatars/{key}.png")
+            except Exception:
+                return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png")
+
+        return {
+            "format_road_bucket": format_road_bucket,
+            "static_map_url": static_map_url,
+            "county_static_map_url": county_static_map_url,
+            "user_avatar_url": user_avatar_url,
+            "system_avatars": system_avatars,
+            "default_avatar_key": _DEFAULT_SYSTEM_AVATAR_KEY,
+        }
 
 
     # --- Health check (Render) ---
@@ -1953,8 +2030,17 @@ GROUP BY UPPER(TRIM(stusps));
         u = User.query.filter(func.lower(User.username) == ident_lc).first_or_404()
 
         car_form = ProfileCarForm(obj=u)
+        avatar_form = AvatarPickForm()
         defaults_form = ProfileDefaultFiltersForm()
         defaults_form.set_choices()
+
+        # Selected avatar (best-effort; always fall back to default)
+        selected_avatar_key = normalize_avatar_key(getattr(u, "avatar_key", None))
+        if request.method != "POST":
+            try:
+                avatar_form.avatar_key.data = selected_avatar_key
+            except Exception:
+                pass
 
         # Pre-fill default filters form from stored JSON (best-effort).
         defaults_label = ""
@@ -2017,6 +2103,16 @@ GROUP BY UPPER(TRIM(stusps));
                     db.session.commit()
                     flash("Profile updated.", "success")
                     return redirect(url_for("profile", username=u.username))
+
+            elif form_name == "avatar":
+                if avatar_form.validate_on_submit():
+                    key = normalize_avatar_key(avatar_form.avatar_key.data)
+                    u.avatar_key = key
+                    db.session.commit()
+                    flash("Avatar saved.", "success")
+                    return redirect(url_for("profile", username=u.username))
+                else:
+                    flash("Could not save avatar.", "error")
 
             elif form_name == "defaults":
                 # Ensure choices are present before validation
@@ -2083,6 +2179,9 @@ GROUP BY UPPER(TRIM(stusps));
             reports=reports,
             ticket_count=len(reports),
             car_form=car_form,
+            avatar_form=avatar_form,
+            system_avatars=system_avatars(),
+            selected_avatar_key=selected_avatar_key,
             defaults_form=defaults_form,
         )
 
@@ -3934,6 +4033,41 @@ GROUP BY UPPER(TRIM(stusps));
                 pass
             return jsonify({"ok": False, "error": "db_error"}), 500
 
+
+
+    # --- Profile system avatars (v425) ---
+    @app.post("/api/profile/avatar")
+    def api_profile_avatar():
+        """Set the current user's system avatar key (members-only). Returns JSON."""
+        if not current_user.is_authenticated:
+            try:
+                login_url = url_for("login", next=(request.form.get("next") or request.args.get("next") or "/"))
+            except Exception:
+                login_url = url_for("login")
+            return jsonify({"ok": False, "auth": False, "login_url": login_url}), 401
+
+        form = AvatarPickForm()
+        if not form.validate_on_submit():
+            return jsonify({"ok": False, "error": "bad_csrf"}), 400
+
+        key = normalize_avatar_key(form.avatar_key.data)
+
+        try:
+            current_user.avatar_key = key
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+        return jsonify({
+            "ok": True,
+            "auth": True,
+            "avatar_key": key,
+            "avatar_url": url_for("static", filename=f"img/avatars/{key}.png"),
+        })
 
     def _admin_email_set() -> set[str]:
         raw = (os.environ.get("ADMIN_EMAILS") or os.environ.get("ADMIN_EMAIL") or "").strip()

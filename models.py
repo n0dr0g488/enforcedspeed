@@ -131,6 +131,9 @@ class User(UserMixin, db.Model):
 
     # Profile settings (v424): default feed/statistics filters stored as JSON
     default_filters_json = db.Column(db.Text, nullable=True)
+
+    # Profile avatar (v425): system avatar key (a01–a30). (User-upload photos come later.)
+    avatar_key = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # Password reset rate limiting (per account)

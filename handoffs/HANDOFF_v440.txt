@@ -1,0 +1,26 @@
+HANDOFF — EnforcedSpeed Web (v440 — strictness/statistics fix, based on v428)
+
+Base ZIP
+- Started from: EnforcedSpeed_v428_2026-02-22_avatar_photo_polish.zip
+
+What changed (single fix)
+- Fixed the Statistics/Strictness page 500 by restoring the missing helper `strictness_rows()` in app.py.
+  - Root cause: the strictness_rows logic was accidentally pasted below `profile()` after a `return render_template(...)`,
+    making it unreachable and leaving no `strictness_rows` symbol in scope. `/strictness` and `/api/strictness`
+    called it and crashed.
+  - Fix: moved that logic into a real `def strictness_rows(...):` at module scope (inside create_app), and added a small
+    base query initialization (q = SpeedReport.query + required filters).
+
+No other changes
+- No template changes.
+- No map logic changes.
+- No Render/deploy config changes.
+
+Smoke checks
+- `python -m py_compile app.py` passes
+- /strictness should load
+- /statistics redirects to /strictness
+- Home feed should be unchanged (ticket card static maps still render)
+
+Deploy reminder
+- “Going live” = commit + push; then verify https://enforcedspeed.com/healthz shows v440 and /strictness loads.

@@ -207,6 +207,11 @@
 
                   const data = await resp.json().catch(()=>null);
 
+                  if(resp.status === 413){
+                    setMsg('File too large. Try a smaller photo (under ~25 MB).');
+                    return;
+                  }
+
                   if(resp.status === 401 && data && data.login_url){
                     window.location.href = data.login_url;
                     return;

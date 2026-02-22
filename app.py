@@ -1297,6 +1297,9 @@ def create_app() -> Flask:
             except Exception:
                 cfg = (os.environ.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
             if cfg:
+                # Accept either base root or /profile_photos; normalize to base root.
+                if cfg.endswith("/profile_photos"):
+                    cfg = cfg[: -len("/profile_photos")]
                 return cfg
 
             try:
@@ -1309,7 +1312,7 @@ def create_app() -> Flask:
             if base.endswith("/pins"):
                 base = base[: -len("/pins")]
             base = base.rstrip("/")
-            return base + "/profile_photos"
+            return base
 
         def user_avatar_url(user, size: str = "sm") -> str:
             """Return a URL for the user's avatar.
@@ -4160,7 +4163,7 @@ GROUP BY UPPER(TRIM(stusps));
             return jsonify({"ok": False, "error": "no_file", "message": "Choose an image."}), 400
 
         # Tight-ish limits to keep things snappy + cheap.
-        max_bytes = int(os.environ.get("PROFILE_PHOTO_MAX_BYTES", str(6 * 1024 * 1024)))
+        max_bytes = int(os.environ.get("PROFILE_PHOTO_MAX_BYTES", str(25 * 1024 * 1024)))
         try:
             raw = file_obj.read()
         except Exception:
@@ -4299,6 +4302,8 @@ GROUP BY UPPER(TRIM(stusps));
         def _profile_base() -> str:
             cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
             if cfg:
+                if cfg.endswith("/profile_photos"):
+                    cfg = cfg[: -len("/profile_photos")]
                 return cfg
             pin = (app.config.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
             if not pin:
@@ -4308,7 +4313,7 @@ GROUP BY UPPER(TRIM(stusps));
             b = pin
             if b.endswith("/pins"):
                 b = b[: -len("/pins")]
-            return b.rstrip("/") + "/profile_photos"
+            return b.rstrip("/")
 
         pb = _profile_base()
         url_sm = f"{pb}/{base_key}_64.jpg" if pb else url_for("static", filename=f"img/avatars/{normalize_avatar_key(current_user.avatar_key)}.png")

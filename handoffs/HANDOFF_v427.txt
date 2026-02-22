@@ -1,0 +1,57 @@
+HANDOFF — EnforcedSpeed Web (v427)
+
+Purpose of v427
+- Hotfix v426 profile photo upload:
+  - Fix broken profile-photo URLs (removes the accidental /profile_photos/profile_photos double path).
+  - Make uploads more forgiving for typical phone photos (bigger request cap + clearer error message).
+
+Current live target
+- /healthz is the source of truth for what’s live (ok v### pid=...).
+- Going live = git add/commit/push (Render deploys from GitHub).
+
+What shipped (Stage 9.5B continues)
+- Optional profile photo upload (1 max) on your own profile page.
+- Flow remains synchronous: normalize -> SafeSearch scan -> upload to R2 -> save to DB.
+- Photo displays everywhere avatars appear; Remove photo reverts to built-in system avatar.
+- System avatars (v425) remain unchanged.
+
+URL construction (important)
+- users.profile_photo_key stores the full prefix key base (no suffix), e.g.:
+  profile_photos/<user_id>/<uuid>
+- R2 objects written:
+  <base>_64.jpg  (header/feed)
+  <base>_256.jpg (profile)
+- PROFILE_PHOTO_BASE_URL can be EITHER:
+  - base root: https://static.enforcedspeed.com
+  - or include /profile_photos (we normalize it)
+- If PROFILE_PHOTO_BASE_URL is not set, we derive from STATIC_PIN_BASE_URL by stripping /pins.
+
+Upload limits
+- Config.MAX_CONTENT_LENGTH default increased to 30MB (prevents 413 for normal phone photos).
+- PROFILE_PHOTO_MAX_BYTES default increased to 25MB (route-level hard cap).
+- UI shows a clear “File too large” message on 413.
+
+Required env vars (web service)
+- R2_ENDPOINT
+- R2_ACCESS_KEY_ID
+- R2_SECRET_ACCESS_KEY
+
+Optional env vars (recommended for clarity)
+- R2_PROFILE_BUCKET=enforcedspeed-static
+- R2_PROFILE_PREFIX=profile_photos/
+- PROFILE_PHOTO_BASE_URL=https://static.enforcedspeed.com
+
+Render deploy SOP (avoid “spinning deploy” confusion)
+- Health check path: /healthz
+- Start command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Never set PORT in Render env vars (Render supplies it).
+- If /healthz shows the new version → it’s live.
+
+Guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays.
+- Right-rail layout stays flush/sharp.
+- Trending/Follow tables keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time.
+- One theme per ZIP.

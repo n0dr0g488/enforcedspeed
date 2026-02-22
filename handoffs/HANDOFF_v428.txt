@@ -1,0 +1,47 @@
+HANDOFF — EnforcedSpeed Web (v428)
+
+Purpose of v428
+- Avatar/photo polish:
+  - Client-side profile photo optimization before upload (center-crop to square + downscale + JPEG).
+  - Better upload error messaging (413/too-large, SafeSearch reject, scan failures).
+  - System avatars now include a stable version query (?v=v###) so browsers can cache aggressively.
+
+Current live target
+- /healthz is the source of truth for what’s live (ok v### pid=...).
+- Going live = git add/commit/push (Render deploys from GitHub).
+
+What shipped
+- Profile photo upload (1 max) remains synchronous:
+  normalize -> SafeSearch scan -> upload to R2 -> save to DB.
+- The UI now optimizes large photos on the client before uploading (faster + fewer 413s).
+- API 413 now returns JSON for /api/* routes so the UI can show a real message.
+- System avatar URLs include ?v=<app version> for cache-busting when needed.
+
+Upload limits
+- Config.MAX_CONTENT_LENGTH default remains 30MB (env MAX_CONTENT_LENGTH overrides).
+- PROFILE_PHOTO_MAX_BYTES default remains 25MB (env PROFILE_PHOTO_MAX_BYTES overrides).
+
+Required env vars (web service)
+- R2_ENDPOINT
+- R2_ACCESS_KEY_ID
+- R2_SECRET_ACCESS_KEY
+
+Optional env vars (recommended for clarity)
+- R2_PROFILE_BUCKET=enforcedspeed-static
+- R2_PROFILE_PREFIX=profile_photos/
+- PROFILE_PHOTO_BASE_URL=https://static.enforcedspeed.com
+
+Render deploy SOP (avoid “spinning deploy” confusion)
+- Health check path: /healthz
+- Start command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Never set PORT in Render env vars (Render supplies it).
+- If /healthz shows the new version → it’s live.
+
+Guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays.
+- Right-rail layout stays flush/sharp.
+- Trending/Follow tables keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time.
+- One theme per ZIP.

@@ -44,3 +44,10 @@ v427
   - Fixed profile photo URL construction (no more /profile_photos/profile_photos double path → images render correctly).
   - Increased default upload cap (Config.MAX_CONTENT_LENGTH now 30MB; PROFILE_PHOTO_MAX_BYTES default 25MB) so typical phone photos don’t hard-fail.
   - UI now shows a clear “File too large” message on 413.
+
+
+v428
+- Avatar/photo polish:
+  - Profile photo upload now does client-side optimization (center-crop to square + downscale + JPEG) for large images before uploading.
+  - Better upload error messaging (413/too-large, SafeSearch reject, scan failures).
+  - System avatar assets now include a stable version query (?v=v###) so browsers can cache them aggressively without getting stuck on stale images.

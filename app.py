@@ -170,6 +170,7 @@ import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response
+from werkzeug.exceptions import RequestEntityTooLarge
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
 from sqlalchemy import text, func, case, tuple_, or_, and_, bindparam
 from sqlalchemy.orm import joinedload
@@ -1331,9 +1332,12 @@ def create_app() -> Flask:
 
                 raw = getattr(user, "avatar_key", None) if user else None
                 key = normalize_avatar_key(raw)
-                return url_for("static", filename=f"img/avatars/{key}.png")
+                # System avatars are immutable assets. Add a stable version query so browsers
+                # can cache aggressively, while still allowing us to bust caches by bumping
+                # app version.
+                return url_for("static", filename=f"img/avatars/{key}.png") + f"?v={_ES_VERSION}"
             except Exception:
-                return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png")
+                return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png") + f"?v={_ES_VERSION}"
 
         def user_avatar_is_photo(user) -> bool:
             try:
@@ -1349,7 +1353,23 @@ def create_app() -> Flask:
             "user_avatar_is_photo": user_avatar_is_photo,
             "system_avatars": system_avatars,
             "default_avatar_key": _DEFAULT_SYSTEM_AVATAR_KEY,
+            "asset_v": _ES_VERSION,
         }
+
+
+    # Better UX for large uploads (v428): return JSON for API calls so the client can
+    # show a real error instead of a generic "Upload failed".
+    @app.errorhandler(RequestEntityTooLarge)
+    def _handle_request_entity_too_large(e):
+        try:
+            if (request.path or "").startswith("/api/"):
+                max_len = int(app.config.get("MAX_CONTENT_LENGTH") or 0)
+                mb = round(max_len / (1024 * 1024), 1) if max_len else 0
+                msg = f"File too large. Max ~{mb} MB." if mb else "File too large."
+                return jsonify({"ok": False, "error": "too_large", "message": msg}), 413
+        except Exception:
+            pass
+        return ("File too large.", 413)
 
 
     # --- Health check (Render) ---

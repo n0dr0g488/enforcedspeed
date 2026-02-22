@@ -121,6 +121,7 @@ from forms import (
     LikeForm,
     CommentForm,
     DeleteCommentForm,
+    FollowCountyForm,
 )
 from models import db, SpeedReport, User, Like, Comment, FollowedCounty, normalize_road, state_code_from_value
 
@@ -3605,6 +3606,42 @@ GROUP BY UPPER(TRIM(stusps));
                     pass
                 region_stats = None
 
+        # --- Follow pill (county only) ---
+        # We only allow following counties (not states). The focus county is parsed via
+        # ?county_geoid / ?county / ?focus_county_geoid and stored in filter_county_geoid.
+        follow_county_geoid = (filter_county_geoid or '').strip()
+        follow_is_following = False
+        follow_login_url = ""
+        follow_form = FollowCountyForm()
+        if follow_county_geoid and re.fullmatch(r"\d{5}", follow_county_geoid):
+            try:
+                follow_form.county_geoid.data = follow_county_geoid
+            except Exception:
+                pass
+
+            if not current_user.is_authenticated:
+                try:
+                    follow_login_url = url_for("login", next=request.full_path)
+                except Exception:
+                    follow_login_url = ""
+            else:
+                try:
+                    # Ensure the table exists on older DBs without migrations.
+                    FollowedCounty.__table__.create(db.engine, checkfirst=True)
+                    row = (
+                        db.session.query(FollowedCounty.id)
+                        .filter(FollowedCounty.user_id == current_user.id)
+                        .filter(FollowedCounty.county_geoid == follow_county_geoid)
+                        .first()
+                    )
+                    follow_is_following = bool(row)
+                except Exception:
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+                    follow_is_following = False
+
         return render_template(
             "map_page.html",
             hide_anon=hide_anon,
@@ -3631,7 +3668,86 @@ GROUP BY UPPER(TRIM(stusps));
             selected_ticket=selected_ticket,
             region_title=region_title,
             region_stats=region_stats,
+            follow_county_geoid=follow_county_geoid,
+            follow_is_following=follow_is_following,
+            follow_login_url=follow_login_url,
+            follow_form=follow_form,
         )
+
+
+    # --- Follow counties (map Follow/Following pill) ---
+    @app.get("/api/follow_status")
+    def api_follow_status():
+        """Return whether the current user follows a county.
+
+        This is used for lightweight UI checks. If not authenticated, returns following=false.
+        """
+        geoid = (request.args.get("geoid") or "").strip()
+        if not re.fullmatch(r"\d{5}", geoid or ""):
+            return jsonify({"ok": False, "error": "invalid_geoid"}), 400
+
+        if not current_user.is_authenticated:
+            return jsonify({"ok": True, "auth": False, "following": False})
+
+        try:
+            FollowedCounty.__table__.create(db.engine, checkfirst=True)
+            row = (
+                db.session.query(FollowedCounty.id)
+                .filter(FollowedCounty.user_id == current_user.id)
+                .filter(FollowedCounty.county_geoid == geoid)
+                .first()
+            )
+            return jsonify({"ok": True, "auth": True, "following": bool(row)})
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+
+    @app.post("/api/toggle_follow_county")
+    def api_toggle_follow_county():
+        """Toggle following for a county (members-only). Returns JSON."""
+        if not current_user.is_authenticated:
+            # Redirect target for the UI if desired.
+            try:
+                login_url = url_for("login", next=(request.form.get("next") or request.args.get("next") or "/map"))
+            except Exception:
+                login_url = url_for("login")
+            return jsonify({"ok": False, "auth": False, "login_url": login_url}), 401
+
+        form = FollowCountyForm()
+        if not form.validate_on_submit():
+            return jsonify({"ok": False, "error": "bad_csrf"}), 400
+
+        geoid = (form.county_geoid.data or "").strip()
+        if not re.fullmatch(r"\d{5}", geoid or ""):
+            return jsonify({"ok": False, "error": "invalid_geoid"}), 400
+
+        try:
+            FollowedCounty.__table__.create(db.engine, checkfirst=True)
+
+            existing = (
+                FollowedCounty.query
+                .filter_by(user_id=current_user.id, county_geoid=geoid)
+                .first()
+            )
+            if existing:
+                db.session.delete(existing)
+                new_state = False
+            else:
+                db.session.add(FollowedCounty(user_id=current_user.id, county_geoid=geoid))
+                new_state = True
+
+            db.session.commit()
+            return jsonify({"ok": True, "auth": True, "following": new_state})
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error"}), 500
 
 
     def _admin_email_set() -> set[str]:

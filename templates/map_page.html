@@ -40,12 +40,20 @@
   .map-frame{ position: relative; flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; min-height: 0; }
   #esMap{ position: absolute; inset: 0; }
 
-  .map-title-pill{
+  .map-pill-row{
     position: absolute;
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100% - 28px);
+    pointer-events: none;
+  }
+
+  .map-title-pill{
     background: rgba(255,255,255,0.96);
     border: 1px solid rgba(0,0,0,0.10);
     border-radius: 999px;
@@ -55,10 +63,37 @@
     box-shadow: 0 6px 18px rgba(0,0,0,0.10);
     line-height: 1;
     pointer-events: none;
-    max-width: calc(100% - 28px);
+    flex: 1 1 auto;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .map-follow-pill{
+    pointer-events: auto;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    border: 1px solid rgba(0,0,0,0.12);
+    background: rgba(255,255,255,0.96);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+    cursor: pointer;
+    user-select: none;
+    text-decoration: none;
+    color: inherit;
+    flex: 0 0 auto;
+  }
+  .map-follow-pill.is-following{
+    background: rgba(17,24,39,0.92);
+    color: #fff;
+    border-color: rgba(17,24,39,0.92);
+  }
+  .map-follow-pill:disabled{
+    opacity: .55;
+    cursor: default;
   }
 
   /* Simple zoom controls (+ / -) for users without a mouse wheel */
@@ -243,7 +278,29 @@
           </div>
         {% else %}
           <div class="map-frame">
-            <div class="map-title-pill" id="esMapTitlePill">{{ region_title if region_title else 'United States' }}</div>
+            <div class="map-pill-row" aria-label="Map region header">
+              <div class="map-title-pill" id="esMapTitlePill">{{ region_title if region_title else 'United States' }}</div>
+
+              {% if follow_county_geoid %}
+                {% if current_user.is_authenticated %}
+                  <button
+                    type="button"
+                    class="map-follow-pill {% if follow_is_following %}is-following{% endif %}"
+                    id="esFollowPill"
+                    data-geoid="{{ follow_county_geoid }}"
+                    aria-label="Follow county"
+                  >{% if follow_is_following %}Following{% else %}Follow{% endif %}</button>
+
+                  <form id="esFollowForm" style="display:none;">
+                    {{ follow_form.csrf_token }}
+                    <input type="hidden" name="county_geoid" value="{{ follow_county_geoid }}">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
+                  </form>
+                {% else %}
+                  <a class="map-follow-pill" href="{{ follow_login_url or url_for('login', next=request.full_path) }}">Follow</a>
+                {% endif %}
+              {% endif %}
+            </div>
             <div class="map-zoom-controls" aria-label="Map zoom controls">
               <button type="button" class="map-zoom-btn" id="esZoomIn" aria-label="Zoom in">+</button>
               <button type="button" class="map-zoom-btn" id="esZoomOut" aria-label="Zoom out">−</button>
@@ -315,6 +372,60 @@
     let ES_MARKERS = [];
     let ES_FOCUS = { type: null, value: null };
     let ES_PINS_DEBOUNCE;
+
+    // Follow/Following pill (county focus only)
+    (function(){
+      const btn = document.getElementById('esFollowPill');
+      if(!btn) return;
+
+      const form = document.getElementById('esFollowForm');
+      function _get(name){
+        if(!form) return '';
+        const el = form.querySelector(`input[name="${name}"]`);
+        return el ? (el.value || '') : '';
+      }
+
+      btn.addEventListener('click', async function(){
+        const geoid = (btn.getAttribute('data-geoid') || '').trim();
+        if(!geoid) return;
+
+        btn.disabled = true;
+        try{
+          const csrf = _get('csrf_token');
+          const nextUrl = _get('next') || window.location.pathname + window.location.search;
+
+          const body = new URLSearchParams();
+          body.set('csrf_token', csrf);
+          body.set('county_geoid', geoid);
+          body.set('next', nextUrl);
+
+          const resp = await fetch('{{ url_for("api_toggle_follow_county") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            credentials: 'same-origin',
+            body: body.toString(),
+          });
+
+          const data = await resp.json().catch(()=>null);
+
+          if(resp.status === 401 && data && data.login_url){
+            window.location.href = data.login_url;
+            return;
+          }
+
+          if(!data || !data.ok){
+            // Best-effort: do nothing besides re-enable.
+            return;
+          }
+
+          const following = !!data.following;
+          btn.textContent = following ? 'Following' : 'Follow';
+          btn.classList.toggle('is-following', following);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
 
     // Pin style (Option 3: classic teardrop + thicker outline)
     // Pin colors (unified scheme across site):

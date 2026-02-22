@@ -6,3 +6,9 @@ v421
   - Preserves feed position on refresh (scroll + number of loaded batches stored in sessionStorage per filter query).
   - Defers ticket-card static map image requests until the card is near the viewport (IntersectionObserver + data-src), reducing initial load cost.
 
+
+v422
+- Map page: added a Follow/Following pill next to the centered region title pill when a county is the active focus.
+  - Members can follow/unfollow the focused county directly from the map.
+  - Follow state persists (updates Home “Counties you follow” list on next visit).
+  - Safe table creation on demand (checkfirst) to avoid breaking older DBs.

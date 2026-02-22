@@ -237,6 +237,12 @@ class DeleteCommentForm(FlaskForm):
     submit = SubmitField("Delete")
 
 
+class FollowCountyForm(FlaskForm):
+    """CSRF-protected form for follow/unfollow county toggles (map pill)."""
+    county_geoid = HiddenField(validators=[DataRequired()])
+    submit = SubmitField("Toggle")
+
+
 # County-first single-page submit (v229+)
 class SubmitTicketForm(FlaskForm):
     state = HiddenField("State", validators=[DataRequired()])  # STUSPS

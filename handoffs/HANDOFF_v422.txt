@@ -1,0 +1,34 @@
+HANDOFF — EnforcedSpeed Web (v422)
+
+Change in this ZIP (ONE THEME)
+- Map page: Follow/Following pill next to the centered region title pill when a COUNTY is the active focus.
+  - Authenticated users can follow/unfollow the focused county directly from /map.
+  - If not logged in, the pill links to login and returns to the same map view.
+  - Follow state persists via user_follow_counties (updates Home “Counties you follow” list on next visit).
+
+Implementation notes
+- Uses FollowedCounty model (models.py) and creates the table on demand with checkfirst=True to avoid breaking older DBs.
+- Adds a small CSRF-protected JSON endpoint used by the map pill.
+
+Files changed
+- app.py
+  - Adds /api/follow_status and /api/toggle_follow_county endpoints.
+  - map_view passes follow context (county geoid + initial following state) to template.
+- forms.py
+  - Adds FollowCountyForm (CSRF only + county_geoid).
+- templates/map_page.html
+  - Adds Follow/Following pill UI and JS handler.
+
+Verification (required)
+- python -m py_compile app.py
+- Run es-up
+- Map page:
+  - Open a county-focused map URL (e.g., /map?focus_county_geoid=51153&focus_state=VA)
+  - See the Follow pill next to the region title pill.
+  - Click Follow → becomes Following.
+  - Refresh → still Following.
+  - Home right rail “Counties you follow” shows the new county.
+- /healthz shows “ok v422 pid=…”
+
+Render note
+- If Render UI “spins,” use https://enforcedspeed.com/healthz to confirm what version is live.

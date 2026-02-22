@@ -51,3 +51,8 @@ v428
   - Profile photo upload now does client-side optimization (center-crop to square + downscale + JPEG) for large images before uploading.
   - Better upload error messaging (413/too-large, SafeSearch reject, scan failures).
   - System avatar assets now include a stable version query (?v=v###) so browsers can cache them aggressively without getting stuck on stale images.
+
+
+v429
+- Hotfix: restored Statistics page (/strictness) after v428 regression.
+  - Reintroduced strictness_rows() helper (it had been accidentally inlined into profile() and became unreachable), fixing 500 errors on /strictness and /api/strictness.

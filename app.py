@@ -2278,200 +2278,237 @@ GROUP BY UPPER(TRIM(stusps));
             defaults_form=defaults_form,
         )
 
-        # Deleted visibility (admin can request include/only; non-admin callers should pass "hide")
-        if deleted_mode == "only":
-            q = q.filter(SpeedReport.is_deleted.is_(True))
-        elif deleted_mode == "include":
-            pass
-        else:
-            q = q.filter(SpeedReport.is_deleted.is_(False))
 
-        # Hide anonymous
-        if exclude_anonymous:
-            q = q.filter(SpeedReport.user_id.isnot(None))
+def strictness_rows(
+    limit: int = 10,
+    exclude_anonymous: bool = False,
+    state_filter: str | None = None,
+    road_filter: str | None = None,
+    county_geoid: str | None = None,
+    speed_limit_list: list[str] | None = None,
+    over_list: list[str] | None = None,
+    photo_only: bool = False,
+    verify: str = "any",
+    date: str = "any",
+    pin_only: bool = False,
+    deleted_mode: str = "hide",
+) -> Dict[str, List[Dict]]:
+    """Compute county strictness rankings.
 
-        # State filter (2-letter prefix)
-        if state_filter:
-            q = q.filter(SpeedReport.state.ilike(f"{state_filter}%"))
+    Returns:
+      {"most_strict": [...], "least_strict": [...]} where each row contains:
+        state, state_name, county_geoid, county_name, median_overage, tickets
 
-        # County filter (GEOID)
-        if county_geoid:
-            q = q.filter(SpeedReport.county_geoid == county_geoid)
+    NOTE: This helper was accidentally inlined into the profile() route in v428.
+    v429 restores it as a proper helper so /strictness (Statistics) works again.
+    """
+    limit = max(1, int(limit or 10))
+    speed_limit_list = list(speed_limit_list or [])
+    over_list = list(over_list or [])
 
-        # Map pin filter (only tickets with a user-placed pin)
-        if pin_only:
-            q = q.filter(SpeedReport.location_source.in_(("user_pin", "user_pin_snapped")))
+    # Base query
+    q = SpeedReport.query
 
-        # Date filter
-        if date not in ("", "any"):
-            try:
-                days = int(date)
-            except Exception:
-                days = 0
-            if days > 0:
-                q = q.filter(SpeedReport.created_at >= (datetime.utcnow() - timedelta(days=days)))
+    # Overage expression (used for bucket filtering)
+    expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
 
-        # Optional road filter (legacy param support)
-        if road_filter:
-            try:
-                road_key = normalize_road(road_filter, (state_filter or ""))
-            except Exception:
-                road_key = ""
-            conds = [SpeedReport.road_name.ilike(f"%{road_filter}%")]
-            if road_key:
-                conds.append(SpeedReport.road_key == road_key)
-            q = q.filter(or_(*conds))
+    # Deleted visibility (admin can request include/only; non-admin callers should pass "hide")
+    if deleted_mode == "only":
+        q = q.filter(SpeedReport.is_deleted.is_(True))
+    elif deleted_mode == "include":
+        pass
+    else:
+        q = q.filter(SpeedReport.is_deleted.is_(False))
 
-        # Speed limit filter (posted_speed) — multi-select buckets
-        if speed_limit_list:
-            sl_conds = []
-            for v in speed_limit_list:
-                if v == "lte35":
-                    sl_conds.append(SpeedReport.posted_speed <= 35)
-                elif v == "40-55":
-                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 55))
-                elif v == "gte60":
-                    sl_conds.append(SpeedReport.posted_speed >= 60)
-                elif v == "25-35":
-                    sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
-                elif v == "40-50":
-                    sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
-                elif v == "55":
-                    sl_conds.append(SpeedReport.posted_speed == 55)
-                elif v == "65":
-                    sl_conds.append(SpeedReport.posted_speed == 65)
-                elif v == "70+":
-                    sl_conds.append(SpeedReport.posted_speed >= 70)
-            if sl_conds:
-                q = q.filter(or_(*sl_conds))
+    # Hide anonymous
+    if exclude_anonymous:
+        q = q.filter(SpeedReport.user_id.isnot(None))
 
-        # Overage filter (ticketed_speed - posted_speed) — multi-select buckets
-        if over_list:
-            over_conds = []
-            for v in over_list:
-                if v == "1-10":
-                    over_conds.append(and_(expr >= 1, expr <= 10))
-                elif v == "11-20":
-                    over_conds.append(and_(expr >= 11, expr <= 20))
-                elif v == "21+":
-                    over_conds.append(expr >= 21)
-                elif v == "5-9":
-                    over_conds.append(and_(expr >= 5, expr <= 9))
-                elif v == "10-14":
-                    over_conds.append(and_(expr >= 10, expr <= 14))
-                elif v == "15-19":
-                    over_conds.append(and_(expr >= 15, expr <= 19))
-                elif v == "20+":
-                    over_conds.append(expr >= 20)
-            if over_conds:
-                q = q.filter(or_(*over_conds))
+    # State filter (2-letter prefix)
+    if state_filter:
+        q = q.filter(SpeedReport.state.ilike(f"{state_filter}%"))
 
-        # Evidence: photo only
-        if photo_only:
-            q = q.filter(SpeedReport.photo_key.isnot(None))
+    # County filter (GEOID)
+    if county_geoid:
+        q = q.filter(SpeedReport.county_geoid == county_geoid)
 
-        # Evidence: verification status (implies photo exists)
-        if verify == "verified":
-            q = q.filter(
-                SpeedReport.photo_key.isnot(None),
-                or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+    # Map pin filter (only tickets with a user-placed pin)
+    if pin_only:
+        q = q.filter(SpeedReport.location_source.in_(("user_pin", "user_pin_snapped")))
+
+    # Date filter
+    if date not in ("", "any"):
+        try:
+            days = int(date)
+        except Exception:
+            days = 0
+        if days > 0:
+            q = q.filter(SpeedReport.created_at >= (datetime.utcnow() - timedelta(days=days)))
+
+    # Optional road filter (legacy param support)
+    if road_filter:
+        try:
+            road_key = normalize_road(road_filter, (state_filter or ""))
+        except Exception:
+            road_key = ""
+        conds = [SpeedReport.road_name.ilike(f"%{road_filter}%")]
+        if road_key:
+            conds.append(SpeedReport.road_key == road_key)
+        q = q.filter(or_(*conds))
+
+    # Speed limit filter (posted_speed) — multi-select buckets
+    if speed_limit_list:
+        sl_conds = []
+        for v in speed_limit_list:
+            if v == "lte35":
+                sl_conds.append(SpeedReport.posted_speed <= 35)
+            elif v == "40-55":
+                sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 55))
+            elif v == "gte60":
+                sl_conds.append(SpeedReport.posted_speed >= 60)
+            elif v == "25-35":
+                sl_conds.append(and_(SpeedReport.posted_speed >= 25, SpeedReport.posted_speed <= 35))
+            elif v == "40-50":
+                sl_conds.append(and_(SpeedReport.posted_speed >= 40, SpeedReport.posted_speed <= 50))
+            elif v == "55":
+                sl_conds.append(SpeedReport.posted_speed == 55)
+            elif v == "65":
+                sl_conds.append(SpeedReport.posted_speed == 65)
+            elif v == "70+":
+                sl_conds.append(SpeedReport.posted_speed >= 70)
+        if sl_conds:
+            q = q.filter(or_(*sl_conds))
+
+    # Overage filter (ticketed_speed - posted_speed) — multi-select buckets
+    if over_list:
+        over_conds = []
+        for v in over_list:
+            if v == "1-10":
+                over_conds.append(and_(expr >= 1, expr <= 10))
+            elif v == "11-20":
+                over_conds.append(and_(expr >= 11, expr <= 20))
+            elif v == "21+":
+                over_conds.append(expr >= 21)
+            elif v == "5-9":
+                over_conds.append(and_(expr >= 5, expr <= 9))
+            elif v == "10-14":
+                over_conds.append(and_(expr >= 10, expr <= 14))
+            elif v == "15-19":
+                over_conds.append(and_(expr >= 15, expr <= 19))
+            elif v == "20+":
+                over_conds.append(expr >= 20)
+        if over_conds:
+            q = q.filter(or_(*over_conds))
+
+    # Evidence: photo only
+    if photo_only:
+        q = q.filter(SpeedReport.photo_key.isnot(None))
+
+    # Evidence: verification status (implies photo exists)
+    if verify == "verified":
+        q = q.filter(
+            SpeedReport.photo_key.isnot(None),
+            or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+        )
+    elif verify == "not_verified":
+        q = q.filter(
+            SpeedReport.photo_key.isnot(None),
+            ~or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
+        )
+
+    rows = q.all()
+
+    groups: Dict[tuple, Dict] = {}
+    for r in rows:
+        geoid = (r.county_geoid or "").strip()
+        if not geoid:
+            continue
+        key = (normalize_state_group(r.state), geoid)
+        g = groups.get(key)
+        if g is None:
+            g = {
+                "state": key[0],
+                "county_geoid": geoid,
+                "overages": [],
+                "tickets": 0,
+            }
+            groups[key] = g
+
+        try:
+            ov = getattr(r, "overage", None)
+            if ov is None:
+                ov = int(r.ticketed_speed) - int(r.posted_speed)
+            g["overages"].append(int(ov))
+        except Exception:
+            continue
+        g["tickets"] += 1
+
+    geoids = sorted({g["county_geoid"] for g in groups.values() if g.get("county_geoid")})
+
+    # Resolve county + full state names from counties table (best-effort)
+    county_meta = {}
+    if geoids:
+        try:
+            stmt = (
+                text(
+                    """
+                    SELECT geoid,
+                           COALESCE(namelsad, name) AS county_label,
+                           COALESCE(state_name, '') AS state_name,
+                           COALESCE(stusps, '') AS stusps
+                    FROM counties
+                    WHERE geoid IN :geoids
+                    """
+                ).bindparams(bindparam("geoids", expanding=True))
             )
-        elif verify == "not_verified":
-            q = q.filter(
-                SpeedReport.photo_key.isnot(None),
-                ~or_(SpeedReport.ocr_status == "verified", SpeedReport.verification_status == "verified"),
-            )
-
-        rows = q.all()
-
-        groups: Dict[tuple, Dict] = {}
-        for r in rows:
-            geoid = (r.county_geoid or "").strip()
-            if not geoid:
-                continue
-            key = (normalize_state_group(r.state), geoid)
-            g = groups.get(key)
-            if g is None:
-                g = {
-                    "state": key[0],
-                    "county_geoid": geoid,
-                    "overages": [],
-                    "tickets": 0,
+            meta_rows = db.session.execute(stmt, {"geoids": geoids}).mappings().all()
+            for rr in meta_rows:
+                county_meta[rr.get("geoid")] = {
+                    "county_name": (rr.get("county_label") or "").strip(),
+                    "state_name": (rr.get("state_name") or "").strip(),
+                    "stusps": (rr.get("stusps") or "").strip().upper(),
                 }
-                groups[key] = g
-
+        except Exception:
             try:
-                g["overages"].append(int(r.overage))
+                db.session.rollback()
             except Exception:
-                continue
-            g["tickets"] += 1
+                pass
 
-        geoids = sorted({g["county_geoid"] for g in groups.values() if g.get("county_geoid")})
+    state_name_by_abbr = {abbr: name for abbr, name in STATE_PAIRS}
 
-        # Resolve county + full state names from counties table (best-effort)
-        county_meta = {}
-        if geoids:
-            try:
-                stmt = (
-                    text(
-                        """
-                        SELECT geoid,
-                               COALESCE(namelsad, name) AS county_label,
-                               COALESCE(state_name, '') AS state_name,
-                               COALESCE(stusps, '') AS stusps
-                        FROM counties
-                        WHERE geoid IN :geoids
-                        """
-                    ).bindparams(bindparam("geoids", expanding=True))
-                )
-                meta_rows = db.session.execute(stmt, {"geoids": geoids}).mappings().all()
-                for rr in meta_rows:
-                    county_meta[rr.get("geoid")] = {
-                        "county_name": (rr.get("county_label") or "").strip(),
-                        "state_name": (rr.get("state_name") or "").strip(),
-                        "stusps": (rr.get("stusps") or "").strip().upper(),
-                    }
-            except Exception:
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
+    results = []
+    for _, g in groups.items():
+        overages = g.get("overages") or []
+        if not overages:
+            continue
 
-        state_name_by_abbr = {abbr: name for abbr, name in STATE_PAIRS}
+        med = float(median(sorted(overages)))
 
-        results = []
-        for key, g in groups.items():
-            overages = g.get("overages") or []
-            if not overages:
-                continue
+        geoid = g.get("county_geoid")
+        meta = county_meta.get(geoid, {})
 
-            med = float(median(sorted(overages)))
+        st_code = g.get("state") or ""
+        st_name = (meta.get("state_name") or "").strip() or state_name_by_abbr.get(st_code, st_code)
+        county_name = (meta.get("county_name") or "").strip() or "Unknown County"
 
-            geoid = g.get("county_geoid")
-            meta = county_meta.get(geoid, {})
+        results.append(
+            {
+                "state": st_code,
+                "state_name": st_name,
+                "county_geoid": geoid,
+                "county_name": county_name,
+                "median_overage": med,
+                "tickets": int(g.get("tickets") or 0),
+            }
+        )
 
-            st_code = g.get("state") or ""
-            st_name = (meta.get("state_name") or "").strip() or state_name_by_abbr.get(st_code, st_code)
-            county_name = (meta.get("county_name") or "").strip() or "Unknown County"
+    results.sort(key=lambda d: (d["median_overage"], -d["tickets"], d["state"], d["county_name"]))
+    most_strict = results[:limit]
 
-            results.append(
-                {
-                    "state": st_code,
-                    "state_name": st_name,
-                    "county_geoid": geoid,
-                    "county_name": county_name,
-                    "median_overage": med,
-                    "tickets": int(g.get("tickets") or 0),
-                }
-            )
+    least_sorted = sorted(results, key=lambda d: (-d["median_overage"], -d["tickets"], d["state"], d["county_name"]))
+    least_strict = least_sorted[:limit]
 
-        results.sort(key=lambda d: (d["median_overage"], -d["tickets"], d["state"], d["county_name"]))
-        most_strict = results[:limit]
-
-        least_sorted = sorted(results, key=lambda d: (-d["median_overage"], -d["tickets"], d["state"], d["county_name"]))
-        least_strict = least_sorted[:limit]
-
-        return {"most_strict": most_strict, "least_strict": least_strict}
+    return {"most_strict": most_strict, "least_strict": least_strict}
 
     @app.get("/strictness", endpoint="strictness")
     def strictness():

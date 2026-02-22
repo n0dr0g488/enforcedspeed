@@ -1,0 +1,24 @@
+HANDOFF — EnforcedSpeed Web (v429)
+
+Purpose of v429
+- Hotfix regression: Statistics page (/statistics → /strictness) was 500’ing after v428.
+- Root cause: strictness_rows() helper was accidentally inlined into profile() (dead code after return), so /strictness called an undefined function.
+- Fix: restore strictness_rows() as a proper helper inside create_app() and remove the accidental inlined block.
+
+Current live target
+- /healthz is the source of truth for what’s live (ok v### pid=...).
+- Going live = git add/commit/push (Render deploys from GitHub).
+
+What to verify
+- Open https://enforcedspeed.com/strictness (or /statistics) → should render County Statistics (no Internal Server Error).
+- Filters still work (state/county/date/photo/pin) and Clear uses ?clear=1.
+- /api/strictness returns JSON (no 500).
+
+Guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays.
+- Right-rail layout stays flush/sharp.
+- Trending/Follow tables keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time.
+- One theme per ZIP.

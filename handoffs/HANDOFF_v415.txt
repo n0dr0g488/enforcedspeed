@@ -1,0 +1,42 @@
+HANDOFF — EnforcedSpeed Web (v415)
+
+What changed (single-scope)
+
+Goal: Fix Static Maps regression where ticket-card maps and the Submit Ticket preview show “Map error: g.co/staticmaperror” and fall back to default Google pins.
+
+Root cause
+
+Recent Static Maps code started pointing custom marker icons at app-served URLs under /static/img/pins.
+Google fetches marker icons server-side and sometimes cannot fetch those app-domain assets (Cloudflare/bot mitigation), which triggers g.co/staticmaperror and default pins.
+
+Fix in v415
+
+- Static Maps marker icons now use STATIC_PIN_BASE_URL again (Cloudflare R2 pin host) via _static_pin_base_url().
+  - Affects: /api/county_staticmap (Home ticket cards + Submit Ticket preview)
+- Reduced Static Maps context marker counts to avoid URL length issues:
+  - In-focus: max 12
+  - Out-of-focus: max 12
+
+What to verify (smoke)
+
+1) Submit a Ticket page pin preview (county_staticmap): no “g.co/staticmaperror”, custom red pin renders.
+2) Home feed ticket-card static maps:
+   - Custom red selected pin renders
+   - Gray + ghost context pins render (if ctx=1 enabled)
+   - No “g.co/staticmaperror” overlay
+3) Interactive map unaffected.
+
+Important deployment notes
+
+- Render Web Health Check Path should remain: /healthz
+- Do NOT set PORT manually in Render env vars.
+
+If Static Maps still show default pins
+
+Ensure these pin filenames exist at STATIC_PIN_BASE_URL (R2 /pins):
+- pin_inside_deepred_static.png
+- pin_outside_warmgray_static.png
+- pin_outside_ghostgray_static.png
+
+These files are included in the repo under static/img/pins/.
+Upload any missing ones to the R2 bucket enforcedspeed-static under /pins/.

@@ -25,3 +25,8 @@ v414
   - Added 32×32 *_static variants for warmgray + ghostgray and updated Static Maps builder to use them.
 - Ghost pins: increased opacity ~25% (less “ghosted”) and reduced background color bleed (eliminates the pink-ish look).
 - Note: Static Maps marker icons are now served from the app’s public /static/img/pins URLs to guarantee the new *_static assets are available.
+
+v415
+- Fix regression: county/ticket Static Maps were using app-served /static/img/pins icon URLs, which Google sometimes fails to fetch (Cloudflare/bot checks) causing g.co/staticmaperror and default Google pins.
+  - Static Maps marker icons now use STATIC_PIN_BASE_URL again (Cloudflare R2 pins) via _static_pin_base_url().
+- Reduced context marker counts on Static Maps (12 in-focus + 12 out-of-focus max) to keep URLs safely under Google Static Maps limits.

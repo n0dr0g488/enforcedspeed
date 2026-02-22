@@ -850,19 +850,20 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
             return val
         return f"{base_url}/static/img/pins"
 
-    # For Static Maps custom marker icons, we prefer app-served assets so we can guarantee
-    # consistent sizing (the *_static icons) without requiring an external pin host to be
-    # updated in lockstep. Google fetches these URLs directly.
-    pin_base_app = f"{base_url}/static/img/pins"
+
+    # Static Maps custom marker icons are fetched by Google (server-side), so the URLs must be
+    # publicly reachable without bot challenges. Prefer STATIC_PIN_BASE_URL (Cloudflare R2 pins)
+    # when configured, and fall back to app-served pins if not.
+    pin_base = _static_pin_base_url().rstrip("/")
 
     # Selected pin (deep red) uses the small static icon.
-    icon_url = f"{pin_base_app}/pin_inside_deepred_static.png"
+    icon_url = f"{pin_base}/pin_inside_deepred_static.png"
 
     # Context marker icons (for multi-pin Static Maps):
     # - In-focus: mid-gray (small static icon)
-    # - Out-of-focus: ghost gray (small static icon, slightly less transparent)
-    icon_inside_url = f"{pin_base_app}/pin_outside_warmgray_static.png"
-    icon_outside_url = f"{pin_base_app}/pin_outside_ghostgray_static.png"
+    # - Out-of-focus: ghost gray (small static icon)
+    icon_inside_url = f"{pin_base}/pin_outside_warmgray_static.png"
+    icon_outside_url = f"{pin_base}/pin_outside_ghostgray_static.png"
 
     def _qs(items: list[tuple[str, str]]) -> str:
         """Query-string builder tuned for Google Static Maps.
@@ -918,14 +919,14 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     # In-county context pins (mid-gray)
     pts_in = [p for p in (inside_points or []) if p and len(p) == 2]
     if pts_in:
-        pts_in = pts_in[:18]
+        pts_in = pts_in[:12]
         encoded_icon = urllib.parse.quote(icon_inside_url, safe="")
         items.append(('markers', f"icon:{encoded_icon}|" + "|".join(_fmt_pt(a,b) for a,b in pts_in)))
 
     # Out-of-county context pins (ghost gray)
     pts_out = [p for p in (outside_points or []) if p and len(p) == 2]
     if pts_out:
-        pts_out = pts_out[:18]
+        pts_out = pts_out[:12]
         encoded_icon = urllib.parse.quote(icon_outside_url, safe="")
         items.append(('markers', f"icon:{encoded_icon}|" + "|".join(_fmt_pt(a,b) for a,b in pts_out)))
 

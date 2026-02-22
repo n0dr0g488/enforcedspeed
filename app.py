@@ -2510,7 +2510,22 @@ GROUP BY UPPER(TRIM(stusps));
         deleted_only = bool(is_admin and deleted_mode == "only")
 
         page = request.args.get("page", 1, type=int)
-        per_page = 20
+        fragment = (request.args.get("fragment") == "1")
+        per_page = 5
+
+        # Return-to URL used by POST actions (like/comment/delete) so redirects land on the full feed (not fragment JSON).
+        def _build_home_return_to_url() -> str:
+            try:
+                from urllib.parse import urlencode
+                args = request.args.to_dict(flat=False)
+                args.pop("fragment", None)
+                args["page"] = [str(page)]
+                qs = urlencode(args, doseq=True)
+                return url_for("home") + (("?" + qs) if qs else "")
+            except Exception:
+                return url_for("home", page=page)
+
+        return_to = _build_home_return_to_url()
 
         # --- Feed filters (GET) ---
         filter_state = (request.args.get("state") or "").strip().upper()
@@ -3037,6 +3052,43 @@ GROUP BY UPPER(TRIM(stusps));
             county_ticket_counts = {}
 
         
+
+        # Infinite-scroll fragment response: return only the feed items (no rails/header chrome).
+        if fragment:
+            items_html = render_template(
+                "_feed_items.html",
+                reports=reports,
+                show_empty=False,
+                return_to=return_to,
+                hide_anon=hide_anon,
+                pct_a=pct_a,
+                pct_b=pct_b,
+                enforced_a=enforced_a,
+                enforced_b=enforced_b,
+                a_counts=a_counts,
+                user_ticket_counts=user_ticket_counts,
+                state_ticket_counts=state_ticket_counts,
+                county_ticket_counts=county_ticket_counts,
+                like_counts=like_counts,
+                user_liked=user_liked,
+                comments_by_report=comments_by_report,
+                comment_threads_by_report=comment_threads_by_report,
+                delete_comment_form=delete_comment_form,
+                like_form=like_form,
+                comment_form=comment_form,
+                is_admin=is_admin,
+                show_deleted=show_deleted,
+                deleted_mode=deleted_mode,
+                deleted_only=deleted_only,
+            )
+            return jsonify(
+                {
+                    "html": items_html,
+                    "has_next": bool(pagination.has_next),
+                    "next_page": int(pagination.next_num) if pagination.has_next else None,
+                }
+            )
+
         # Right-rail: Trending counties + followed counties (top 5). Keep this best-effort and never break home.
         trending_counties = []
         followed_counties = []
@@ -3259,6 +3311,7 @@ GROUP BY UPPER(TRIM(stusps));
             reports=reports,
             pagination=pagination,
             hide_anon=hide_anon,
+            return_to=return_to,
             pct_a=pct_a,
             pct_b=pct_b,
             enforced_a=enforced_a,

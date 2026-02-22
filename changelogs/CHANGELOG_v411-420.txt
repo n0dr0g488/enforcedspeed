@@ -51,3 +51,10 @@ v419
   - Caches the rendered minimap for 5 minutes in Redis (or /tmp fallback) to reduce DB load + Google Static Maps calls.
   - Adds X-ES-Cache: HIT/MISS header; keeps Cache-Control max-age=300.
 
+
+v420
+- Home feed: implemented Facebook-style infinite scrolling.
+  - Reduced initial load to 5 posts.
+  - Automatically loads the next 5 when you scroll near the bottom (IntersectionObserver).
+  - Keeps non-JS fallback pagination links intact.
+  - Ensures preserve-scroll (like/comment/delete) still works for newly appended posts.

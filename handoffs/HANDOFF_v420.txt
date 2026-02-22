@@ -1,0 +1,31 @@
+HANDOFF — EnforcedSpeed Web (v420)
+
+Change in this ZIP (ONE THEME)
+- Home feed infinite scroll (Facebook-style): load 5 initially, then auto-load 5 more as you scroll.
+
+Why
+- Smaller initial HTML + fewer static-map image requests up-front.
+- Better UX vs paging.
+
+Implementation notes
+- Server: home route supports fragment fetch via ?fragment=1 and returns JSON {html,next_page,has_next}.
+- Template: feed cards moved into a #feed-items container; a sentinel triggers IntersectionObserver.
+- Preserve-scroll (like/comment/delete) is re-bound for dynamically appended content.
+- Pagination links remain as no-JS fallback (hidden when JS is active).
+
+Smoke tests
+- python -m py_compile app.py
+- Home loads with 5 tickets.
+- Scrolling loads more tickets automatically (no full page refresh).
+- Like/comment/delete on ANY loaded card does not jump to top.
+- Ticket card static maps still render.
+
+Render
+- Health check path: /healthz
+- Start Command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Do NOT set PORT env var.
+
+Deploy (going live)
+- git add -A
+- git commit -m "v420: home feed infinite scroll (load 5 then append)"
+- git push

@@ -1,0 +1,302 @@
+{# Feed items partial. Used by full home page and infinite-scroll fragment loads. #}
+
+{% if reports and (reports|length) > 0 %}
+{% for r in reports %}
+  {% set state_code = (r.state.split(' - ')[0] if ' - ' in r.state else r.state) %}
+  {% set state_name = (r.state.split(' - ')[-1] if ' - ' in r.state else r.state) %}
+  {% set state_focus_url = (url_for('map_view', focus_state=state_code, ticket_id=r.id) if state_code else None) %}
+  {% set county_focus_url = (url_for('map_view', focus_state=state_code, focus_county_geoid=r.county_geoid, ticket_id=r.id) if (r.county_geoid and r.county_name) else None) %}
+  <div id="ticket-{{ r.id }}" class="card ticket-card{% if r.is_deleted %} ticket-card--deleted{% endif %}" style="margin-top:16px;">
+
+  
+
+{# --- Header: Username (X) + time, OCR pill on right --- #}
+<div class="ticket-headwrap">
+  <div class="ticket-headrow">
+    <div class="ticket-user">
+      {% if r.user %}
+        {% set user_count = user_ticket_counts.get(r.user_id, 0) %}
+        <div class="ticket-userline">
+          <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
+          <span class="ticket-usercount">({{ user_count }})</span>
+
+          {% if is_admin and r.is_deleted %}
+            <span class="pill pill-deleted" title="This ticket is soft-deleted and excluded from public views and analytics.">Deleted</span>
+          {% endif %}
+        </div>
+
+        {# Under-username metadata line (State / County / Road). #}
+        <div class="ticket-submeta">
+          {# State click should focus the interactive map without forcing a state filter. #}
+          <span class="ticket-submeta-item">
+            {% if state_focus_url %}
+              <a class="ticket-state-link" href="{{ state_focus_url }}">{{ state_name }}</a>
+              <a class="ticket-submeta-count" href="{{ state_focus_url }}">({{ state_ticket_counts.get(r.state, 0) }})</a>
+            {% else %}
+              {{ state_name }} <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span>
+            {% endif %}
+          </span>
+          <span class="ticket-submeta-sep">·</span>
+          {# County click should focus the interactive map without forcing a county filter. #}
+          <span class="ticket-submeta-item">
+            {% if county_focus_url %}
+              <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }}</a>
+              <a class="ticket-submeta-count" href="{{ county_focus_url }}">({{ county_ticket_counts.get(r.county_geoid, 0) }})</a>
+            {% else %}
+              {{ r.county_name or '—' }} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span>
+            {% endif %}
+          </span>
+          <span class="ticket-submeta-sep">·</span>
+          <span class="ticket-submeta-item">{{ format_road_bucket(r.road_name) }}</span>
+        </div>
+      {% else %}
+        <div class="ticket-userline">Anonymous</div>
+      {% endif %}
+    </div>
+
+    <div class="ticket-ocr">
+      {# Pin pill: only when the user has a refined pin. (Pin left) #}
+      {% if r.location_source in ['user_pin','user_pin_snapped'] %}
+        <span class="pill pill-photo pill-photo-ok">Pin ✓</span>
+      {% endif %}
+
+      {# Photo pill with status (Option 2): one pill when a photo exists. (Photo right) #}
+      {% set has_photo = (r.photo_key is not none) %}
+      {% if has_photo %}
+        {% set pk = (r.photo_key|string) %}
+        {% set st = (r.ocr_status or '') %}
+        {% set vs = (r.verification_status or '') %}
+        {% if pk.startswith('pending:') or st in ['pending','processing'] %}
+          <span class="pill pill-photo pill-photo-processing">Photo …</span>
+        {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
+          <span class="pill pill-photo pill-photo-fail">Photo !</span>
+        {% elif st == 'verified' or vs == 'verified' %}
+          <span class="pill pill-photo pill-photo-ok">Photo ✓</span>
+        {% else %}
+          <span class="pill pill-photo pill-photo-fail">Photo !</span>
+        {% endif %}
+      {% endif %}
+
+      {# Info icon (top-right) - click for verification details. (far right of pills row) #}
+      <button type="button" class="ticket-info" data-report-id="{{ r.id }}"
+              data-photo-key="{{ r.photo_key or '' }}"
+              data-ocr-status="{{ r.ocr_status or '' }}"
+              data-ocr-error="{{ r.ocr_error or '' }}"
+              data-verification-status="{{ r.verification_status or '' }}"
+              data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
+              data-verify-reason="{{ r.verify_reason or '' }}"
+              data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
+              data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
+              data-overage="{{ r.overage if r.overage is not none else '' }}"
+              title="Details">i</button>
+          <div class="ticket-date-right">
+            <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }} UTC</span>
+          </div>
+            </div>
+	</div>
+	</div>
+{# --- Precompute speeds for map overlay + display --- #}
+{% set disp_posted = r.posted_speed %}
+{% set disp_ticketed = r.ticketed_speed %}
+{% if disp_posted is not none and disp_ticketed is not none and disp_ticketed < disp_posted %}
+  {% set _tmp = disp_posted %}
+  {% set disp_posted = disp_ticketed %}
+  {% set disp_ticketed = _tmp %}
+{% endif %}
+{% set ticket_over = (disp_ticketed - disp_posted)|round|int %}
+{% set enforced_over = enforced_a.get(r.id, ticket_over) %}
+{% set enforced_speed_mph = (disp_posted + enforced_over)|round|int %}
+
+{# --- Static map preview (feed hero) --- #}
+{# Don't gate this on a template var (maps_api_key) because home() may not pass it.
+   The helper returns None when static maps are not configured. #}
+{% set _pin_lat = r.lat if r.location_source in ['user_pin','user_pin_snapped','route_class:interstate','route_class:numbered','route_class:local','prefer_highway','nearest'] else None %}
+{% set _pin_lng = r.lng if _pin_lat is not none else None %}
+{% set _pinmode = False %}
+{# IMPORTANT (v370): Route ticket-card static maps through our own proxy endpoint so the
+   Google Static Maps API key is never exposed to browsers (avoids referrer differences across browsers)
+   and lets us cache responses server-side. #}
+{% set _sm = url_for('api_county_staticmap', geoid=r.county_geoid, pin_lat=_pin_lat, pin_lng=_pin_lng, center_on_pin=('1' if _pinmode else '0'), w=640, h=640, ctx='1', report_id=r.id) %}
+{% if _sm %}
+
+  <div class="ticket-staticmap-frame">
+  <div class="ticket-staticmap-wrap">
+    {# Centered speed pill overlay ("84 in a 65 (+19 mph)") #}
+    <div class="ticket-speedpill{% if _pinmode %} ticket-speedpill--pinmode{% endif %}">
+      {{ disp_ticketed }} in a {{ disp_posted }}
+      <span class="ticket-speedpill-over">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
+    </div>
+    {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
+      <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">Refine pin</button>
+    {% endif %}
+    {% set map_focus_url = county_focus_url or state_focus_url %}
+    {% if map_focus_url %}
+      <a class="ticket-staticmap-link" href="{{ map_focus_url }}">
+        <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+      </a>
+    {% else %}
+      <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+    {% endif %}
+  </div>
+  </div>
+{% endif %}
+<div class="row ticket-actions" style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;">
+        <div class="row" style="display:flex;gap:14px;align-items:center;flex-wrap:nowrap;justify-content:flex-start;">
+
+          {% set lc = like_counts.get(r.id, 0) %}
+
+          {% if current_user.is_authenticated %}
+            <form method="post" action="{{ url_for('toggle_like', report_id=r.id) }}" class="js-preserve-scroll" style="margin:0;display:inline;">
+              {{ like_form.hidden_tag() }}
+              <input type="hidden" name="next" value="{{ return_to }}">
+              <button type="submit" class="action-btn">
+                {% if r.id in user_liked %}Liked{% else %}Like{% endif %}
+              </button>
+            </form>
+
+            <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
+
+            <a class="action-link" href="#" onclick="toggleComment({{ r.id }}); return false;">Comment</a>
+
+          {% else %}
+            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
+            <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
+            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
+            <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">(must log in)</span>
+          {% endif %}
+        </div>
+
+        {% set bucket_total = a_counts.get((r.state, r.road_key), 0) %}
+        <div class="ticket-total" style="margin-left:auto;text-align:right;">
+</div>
+        {# Report link later (v3) #}
+      
+</div>
+{% if r.caption %}
+        <div class="ticket-caption ticket-caption--clamp">{{ r.caption }}</div>
+      {% endif %}
+
+{# date moved to header-right under pills #}
+
+{% if r.caption and not _sm %}
+        <div class="ticket-caption" style="margin-top:10px; font-size:14px; line-height:1.35; color:#111827;">{{ r.caption }}</div>
+      {% endif %}
+{% set thread = comment_threads_by_report.get(r.id, {"top": [], "replies": {}}) %}
+      {% set top_comments = thread["top"] %}
+      {% set replies_map = thread["replies"] %}
+      {% set total_comments = comments_by_report.get(r.id, [])|length %}
+
+      {# Comments are fully collapsed by default (no comments shown until user expands). #}
+      {% if top_comments %}
+        <div style="margin-top:12px;">
+          {% for c in top_comments %}
+            <div id="comment-{{ c.id }}" class="subtle" style="margin-top:6px; display:none;">
+              <strong style="color:#111827;">
+                <a href="{{ url_for('profile', username=c.user.username) }}" style="color:inherit;text-decoration:none;">{{ c.user.username }}</a>
+              </strong>
+              <span class="subtle">
+                · <span class="js-localtime" data-utc="{{ c.created_at.isoformat() }}Z">{{ c.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span>
+              </span>
+              <div style="margin-top:2px;">{{ c.body }}</div>
+
+              <div class="subtle" style="margin-top:4px;">
+                {% if current_user.is_authenticated %}
+                  <a class="action-link" href="#" onclick="openReplyWithMention({{ c.id }}, {{ c.id }}, '{{ c.user.username|e }}'); return false;">Reply</a>
+                  {% if current_user.id == c.user_id %}
+                    <form method="post" action="{{ url_for('delete_comment', comment_id=c.id) }}" class="js-preserve-scroll" style="display:inline; margin-left:10px;">
+                      {{ delete_comment_form.hidden_tag() }}
+                      <button type="submit" style="background:none;border:none;padding:0;margin:0;color:inherit;cursor:pointer;">Delete</button>
+                      <input type="hidden" name="next" value="{{ return_to }}">
+                    </form>
+                  {% endif %}
+                {% endif %}
+              </div>
+
+              {# Nested replies renderer (supports replying to replies). #}
+              {# Nested replies renderer with capped visual indentation and feed-collapse (fully collapsed by default). #}
+              {% macro render_replies(parent_id, depth, root_id, seen) -%}
+                {# Safety guard: prevent cycles/runaway nesting from hanging the page. #}
+                {% if parent_id in seen or depth > 20 %}
+                {% else %}
+                {% set kids = replies_map.get(parent_id, []) %}
+                {% if kids %}
+                  <div style="margin-top:6px;">
+                    {% for rc in kids %}
+                      {% set d = depth if depth < 2 else 2 %}
+                      <div id="comment-{{ rc.id }}" class="subtle" style="margin-top:6px; margin-left:{{ 18 * d }}px; display:none;">
+                        <strong style="color:#111827;">
+                          <a href="{{ url_for('profile', username=rc.user.username) }}" style="color:inherit;text-decoration:none;">{{ rc.user.username }}</a>
+                        </strong>
+                        <span class="subtle"> · <span class="js-localtime" data-utc="{{ rc.created_at.isoformat() }}Z">{{ rc.created_at.strftime("%b %d, %Y %I:%M %p") }} UTC</span></span>
+                        <div style="margin-top:2px;">{{ rc.body }}</div>
+                        {% if current_user.is_authenticated %}
+                          <div class="subtle" style="margin-top:4px;">
+                            <a class="action-link" href="#" onclick="openReplyWithMention({{ root_id }}, {{ rc.id }}, '{{ rc.user.username|e }}'); return false;">Reply</a>
+                            {% if current_user.id == rc.user_id %}
+                              <form method="post" action="{{ url_for('delete_comment', comment_id=rc.id) }}" class="js-preserve-scroll" style="display:inline; margin-left:10px;">
+                                {{ delete_comment_form.hidden_tag() }}
+                                  <input type="hidden" name="next" value="{{ return_to }}">
+                      <button type="submit" style="background:none;border:none;padding:0;margin:0;color:inherit;cursor:pointer;">Delete</button>
+                              </form>
+                            {% endif %}
+                          </div>
+                        {% endif %}
+                      </div>
+                      {{ render_replies(rc.id, depth+1, root_id, seen + [parent_id]) }}
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endif %}
+              {%- endmacro %}
+
+              {{ render_replies(c.id, 1, c.id, []) }}
+              {% if current_user.is_authenticated %}
+                <div id="replybox-{{ c.id }}" style="display:none; margin-top:10px; margin-left:18px;">
+                  <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll">
+                    {# Render CSRF only. We'll provide parent_id manually to avoid duplicate fields. #}
+                    {{ comment_form.csrf_token }}
+                    <input type="hidden" name="next" value="{{ return_to }}">
+                    <input type="hidden" name="parent_id" value="{{ c.id }}">
+                    <textarea class="js-comment-body" name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a reply…"></textarea>
+                    <div style="margin-top:0;">
+                      <button type="submit">Reply</button>
+                      <span class="subtle" style="margin-left:10px;">280 characters max.</span>
+                    </div>
+                  </form>
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="subtle" style="margin-top:6px;">
+            <a class="action-link" href="javascript:void(0)" id="toggle-comments-{{ r.id }}" onclick="return toggleComments({{ r.id }}, {{ total_comments }});" data-expanded="0" data-label="View all {{ total_comments }} comment{% if total_comments != 1 %}s{% endif %}">View all {{ total_comments }} comment{% if total_comments != 1 %}s{% endif %}</a>
+          </div>
+
+        </div>
+      {% endif %}
+
+      {% if current_user.is_authenticated %}
+        <div id="commentbox-{{ r.id }}" style="display:none; margin-top:12px;">
+          <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll">
+            {# Render CSRF only. We'll provide parent_id manually to avoid duplicate fields. #}
+            {{ comment_form.csrf_token }}
+            <input type="hidden" name="next" value="{{ return_to }}">
+            <input type="hidden" name="parent_id" value="">
+            <textarea class="js-comment-body" name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a comment…"></textarea>
+            <div style="margin-top:0;">
+              <button type="submit">Post</button>
+              <span class="subtle" style="margin-left:10px;">280 characters max.</span>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+
+    </div>
+{% endfor %}
+{% else %}
+  {% if show_empty %}
+    <div class="card ticket-card" style="margin-top:16px;">
+      <p>No posts yet. Be the first to <a href="{{ url_for('submit') }}">submit a ticket</a>.</p>
+    </div>
+  {% endif %}
+{% endif %}

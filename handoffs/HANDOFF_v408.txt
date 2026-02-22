@@ -1,0 +1,44 @@
+HANDOFF — EnforcedSpeed Web (v408)
+
+Goal of v408
+Refine the Home feed Welcome tile CTA presentation:
+- Move the CTA to the RIGHT of the "Welcome to EnforcedSpeed" title on the same line, separated by an em dash.
+- Add a small right-arrow icon next to the CTA text.
+- Tighten the body line-height/spacing so the tile stays compact.
+
+What changed
+- templates/home_feed.html
+  - Replaced the stacked title + CTA with a single inline title line: "Welcome… — Click this tile…".
+  - Added the arrow icon to the right of the CTA text.
+
+- templates/_mvp_styles.html
+  - Added inline titleline/arrow styles.
+  - Tightened welcome-body font-size/line-height.
+
+- static/img/cta_arrow_right_blue.png
+  - New small right-arrow icon (transparent PNG).
+
+Files changed
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- static/img/cta_arrow_right_blue.png
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v408.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) Home feed:
+   - Welcome tile title reads: "Welcome to EnforcedSpeed. — Click this tile…" with the arrow icon.
+   - Tile remains clickable:
+     - Logged out: lands on Create Account, then after registration goes to /submit.
+     - Logged in: goes straight to /submit.
+   - Like/comment still does NOT jump to top (v405).
+4) Verify NO regressions:
+   - Ticket card static maps still render
+   - Right-rail minimap renders
+   - Trending/follow tables show names (not GEOIDs)
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

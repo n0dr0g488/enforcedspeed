@@ -233,8 +233,14 @@
 
       <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
         <div class="home-intro">
-          <div class="home-intro-title">Welcome to EnforcedSpeed.</div>
-          <div class="home-intro-cta">Click this tile to create an account and post your ticket.</div>
+          <div class="home-intro-titleline">
+            <span class="home-intro-title">Welcome to EnforcedSpeed.</span>
+            <span class="home-intro-dash">—</span>
+            <span class="home-intro-cta-wrap">
+              <span class="home-intro-cta">Click this tile to create an account and post your ticket.</span>
+              <img class="home-intro-arrow" src="{{ url_for('static', filename='img/cta_arrow_right_blue.png') }}" alt="">
+            </span>
+          </div>
           <div class="home-intro-body">
             EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.
           </div>

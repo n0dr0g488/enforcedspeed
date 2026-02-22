@@ -31,3 +31,8 @@ v407 — 2026-02-20 — Merge Welcome + CTA into one tile
 - Home feed: removed the separate thin "Post your ticket" card.
 - Home feed: the Welcome card is now clickable; routes to Submit if logged in, otherwise to Create Account and then on to Submit via next=/submit.
 - Home feed: added a short CTA line under the title and tightened the welcome card spacing/line-height.
+
+v408 — 2026-02-20 — Welcome tile inline CTA + arrow icon
+- Home feed: moved the CTA text to the right of "Welcome to EnforcedSpeed" on the same line, separated by an em dash.
+- Home feed: added a small right-arrow icon next to the CTA text.
+- Home feed: tightened the welcome body text spacing/line-height to keep the tile compact.

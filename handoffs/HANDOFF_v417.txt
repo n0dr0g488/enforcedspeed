@@ -1,0 +1,30 @@
+HANDOFF — EnforcedSpeed Web (v417)
+
+What changed (single-scope)
+- Fix v416 deploy failure on Render: app.py had a SyntaxError ("return outside function") caused by an unindented schema-bootstrap gate + return app block at the end of create_app().
+- v417 re-indents that block correctly inside create_app() so Gunicorn can import app.py.
+
+Why it matters
+- Render deploys were failing immediately at import time due to SyntaxError.
+
+Guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Trending/Follow tables must keep county/state names (never raw GEOIDs).
+
+Render stability checklist
+- Health Check Path: /healthz
+- Start Command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- DO NOT set PORT manually in Render env vars (Render supplies it).
+
+Required smoke tests (before any push)
+- python -m py_compile app.py
+- Run es-up locally
+- Verify Home feed loads + ticket static maps render
+- Verify Map page loads + pins render
+
+Deploy ("going live")
+- git add -A
+- git commit -m "v417: fix create_app indentation (Render import SyntaxError)"
+- git push

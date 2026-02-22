@@ -36,3 +36,8 @@ v416
   - Do not run ensure_counties_schema() at boot when FLASK_ENV=production (prevents gunicorn bind delays / spinning deploy)
   - Stop overriding environment variables from .env (load_dotenv without override)
 
+
+
+v417
+- Fix v416 deploy regression: corrected indentation at end of create_app() (schema bootstrap gate + return app) that caused SyntaxError: 'return' outside function on Render.
+- Added/kept guardrail: run python -m py_compile app.py before pushing to GitHub to catch syntax errors pre-deploy.

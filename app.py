@@ -6211,17 +6211,18 @@ GROUP BY UPPER(TRIM(stusps));
         return {"status": "ok"}
 
     # Schema bootstrap for dev/local databases (additive, no destructive changes).
-# IMPORTANT (Render deploy stability): do NOT run schema bootstrap at process start in production.
-# It can block gunicorn from binding to $PORT (DB wake/locks), causing “spinning deploy / no open ports detected”.
-if os.getenv("FLASK_ENV", "production").lower() != "production":
-    with app.app_context():
-        try:
-            ensure_counties_schema()
-            # ensure_states_schema()  # Disabled at boot (can be expensive); built lazily when needed.
-        except Exception as e:
-            # Keep app running even if counties are unavailable; submit page will degrade gracefully.
-            print(f"[COUNTY INIT ERROR] failed to ensure counties schema: {e}")
-return app
+    # IMPORTANT (Render deploy stability): do NOT run schema bootstrap at process start in production.
+    # It can block gunicorn from binding to $PORT (DB wake/locks), causing “spinning deploy / no open ports detected”.
+    if os.getenv("FLASK_ENV", "production").lower() != "production":
+        with app.app_context():
+            try:
+                ensure_counties_schema()
+                # ensure_states_schema()  # Disabled at boot (can be expensive); built lazily when needed.
+            except Exception as e:
+                # Keep app running even if counties are unavailable; submit page will degrade gracefully.
+                print(f"[COUNTY INIT ERROR] failed to ensure counties schema: {e}")
+
+    return app
 
 app = create_app()
 

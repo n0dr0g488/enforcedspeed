@@ -1,0 +1,24 @@
+HANDOFF — EnforcedSpeed Web (v416)
+
+Primary change
+- Render deploy stability hardening:
+  - In production (FLASK_ENV=production), app no longer runs ensure_counties_schema() at process startup.
+    This prevents DB wake/locks from delaying gunicorn binding to $PORT (causes “spinning deploy / no open ports detected”).
+  - load_dotenv no longer overrides existing env vars (prevents accidental override of Render-provided vars like PORT).
+
+Render must-haves (DO NOT DRIFT)
+- Start Command (Render UI): gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path: /healthz
+- Do NOT set PORT manually anywhere (service env vars AND any Environment Group).
+
+Local workflow
+- Use es-up (app + worker).
+- If local hangs: confirm Docker Desktop + Postgres container (localhost:5433) are up.
+
+Smoke tests
+- python -m py_compile app.py
+- Home feed loads; ticket static maps render; minimap renders; Trending/Follow show names
+- Map page loads; title pill works; zoom buttons work
+
+Packaging
+- ZIP has unique top-level folder name and VERSION.txt updated to v416.

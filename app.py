@@ -53,7 +53,7 @@ def _get_county_filter_from_request():
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(override=True)
+    load_dotenv()
 except Exception:
     pass
 
@@ -6211,6 +6211,9 @@ GROUP BY UPPER(TRIM(stusps));
         return {"status": "ok"}
 
     # Schema bootstrap for dev/local databases (additive, no destructive changes).
+# IMPORTANT (Render deploy stability): do NOT run schema bootstrap at process start in production.
+# It can block gunicorn from binding to $PORT (DB wake/locks), causing “spinning deploy / no open ports detected”.
+if os.getenv("FLASK_ENV", "production").lower() != "production":
     with app.app_context():
         try:
             ensure_counties_schema()
@@ -6218,9 +6221,7 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception as e:
             # Keep app running even if counties are unavailable; submit page will degrade gracefully.
             print(f"[COUNTY INIT ERROR] failed to ensure counties schema: {e}")
-
-
-    return app
+return app
 
 app = create_app()
 

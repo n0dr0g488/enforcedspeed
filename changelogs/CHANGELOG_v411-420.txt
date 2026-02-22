@@ -30,3 +30,9 @@ v415
 - Fix regression: county/ticket Static Maps were using app-served /static/img/pins icon URLs, which Google sometimes fails to fetch (Cloudflare/bot checks) causing g.co/staticmaperror and default Google pins.
   - Static Maps marker icons now use STATIC_PIN_BASE_URL again (Cloudflare R2 pins) via _static_pin_base_url().
 - Reduced context marker counts on Static Maps (12 in-focus + 12 out-of-focus max) to keep URLs safely under Google Static Maps limits.
+
+v416
+- Render deploy stability hardening:
+  - Do not run ensure_counties_schema() at boot when FLASK_ENV=production (prevents gunicorn bind delays / spinning deploy)
+  - Stop overriding environment variables from .env (load_dotenv without override)
+

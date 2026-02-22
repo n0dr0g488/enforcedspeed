@@ -35,7 +35,31 @@
 
   /* Map card fills available height; the shell padding provides the outer buffer. */
   .map-card{ flex: 1 1 auto; display: flex; flex-direction: column; padding: 12px; margin: 0; box-sizing: border-box; min-height: 0; }
-  #esMap{ flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; }
+
+  /* Map frame: rounded map + a centered title pill overlay (matches the outlined scope). */
+  .map-frame{ position: relative; flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; min-height: 0; }
+  #esMap{ position: absolute; inset: 0; }
+
+  .map-title-pill{
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid rgba(0,0,0,0.10);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+    line-height: 1;
+    pointer-events: none;
+    max-width: calc(100% - 28px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   /* Right panel cards */
   .map-right{ height: 100%; overflow: auto; padding-left: 0; min-height: 0; }
@@ -188,7 +212,10 @@
             Google Maps key not configured. Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map.
           </div>
         {% else %}
-          <div id="esMap"></div>
+          <div class="map-frame">
+            <div class="map-title-pill" id="esMapTitlePill">{{ region_title if region_title else 'United States' }}</div>
+            <div id="esMap"></div>
+          </div>
         {% endif %}
       </div>
     </main>

@@ -1,0 +1,35 @@
+HANDOFF — EnforcedSpeed Web (v409)
+
+Goal of v409
+Stage 4 (Map UX): Add a centered title pill on top of the interactive map that matches the outlined scope.
+- If a county is outlined: show that county label.
+- If a state is outlined: show the state name (e.g., Virginia (VA)).
+- Otherwise: default to "United States".
+
+What changed
+- templates/map_page.html
+  - Added a map-frame wrapper around the map with a centered "map-title-pill" overlay.
+  - Pill text is driven by the existing server-side region_title (same value used in the right stats card).
+  - Map container now fills the rounded map-frame via absolute positioning.
+
+Files changed
+- templates/map_page.html
+- VERSION.txt
+- changelogs/CHANGELOG_v401-410.txt
+- handoffs/HANDOFF_v409.txt
+
+Smoke tests (required)
+1) python -m py_compile app.py
+2) Run es-up
+3) /map page:
+   - Pill appears centered at the top of the map.
+   - From Home: click a State → /map shows pill "<State Name> (<ST>)" and correct outline.
+   - From Home: click a County → /map shows pill "<County>, <ST>" and correct outline.
+   - Map remains viewport-locked and the map card bottom buffer is still visible.
+4) Verify NO regressions:
+   - Home feed ticket static maps still render
+   - Right-rail minimap renders
+   - Trending/follow tables show names (not GEOIDs)
+
+Render / Going live
+Going live = commit + push to GitHub (Render deploys from Git).

@@ -1,0 +1,19 @@
+HANDOFF — EnforcedSpeed Web (v432 — Render boot diagnostics)
+
+Problem
+- Render deploy fails to boot with Gunicorn error: "Failed to find application object: 'app'".
+- This often hides the real underlying import error.
+
+What changed in v432
+- Keeps the Render boot entrypoint module name: enforcedspeed_wsgi.py
+- Adds a try/except with traceback.print_exc() so Render logs show the REAL import error (e.g., missing dependency)
+- VERSION bumped to v432
+
+Render settings (must match)
+- Root Directory: blank (repo root)
+- Start Command:
+  gunicorn --chdir /opt/render/project/src enforcedspeed_wsgi:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+
+Next action
+- Deploy latest commit.
+- If it fails, open the failed deploy logs and copy the FIRST traceback that prints (it will now show the real exception).

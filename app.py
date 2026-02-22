@@ -123,6 +123,7 @@ from forms import (
     DeleteCommentForm,
     FollowCountyForm,
     ProfileCarForm,
+    ProfileDefaultFiltersForm,
 )
 from models import db, SpeedReport, User, Like, Comment, FollowedCounty, normalize_road, state_code_from_value
 
@@ -1952,24 +1953,122 @@ GROUP BY UPPER(TRIM(stusps));
         u = User.query.filter(func.lower(User.username) == ident_lc).first_or_404()
 
         car_form = ProfileCarForm(obj=u)
+        defaults_form = ProfileDefaultFiltersForm()
+        defaults_form.set_choices()
+
+        # Pre-fill default filters form from stored JSON (best-effort).
+        defaults_label = ""
+        try:
+            raw = (u.default_filters_json or "").strip()
+            df = json.loads(raw) if raw else {}
+        except Exception:
+            df = {}
+
+        try:
+            defaults_form.default_state.data = (df.get("state") or "")
+            defaults_form.default_county_geoid.data = (df.get("county_geoid") or "")
+            defaults_form.default_date.data = (df.get("date") or "any")
+            defaults_form.default_verify.data = (df.get("verify") or "any")
+            defaults_form.default_pin.data = bool(df.get("pin"))
+            defaults_form.default_speed_limit.data = (df.get("speed_limit") or "any")
+            defaults_form.default_overage.data = (df.get("overage") or "all")
+            defaults_form.default_sort.data = (df.get("sort") or "new")
+        except Exception:
+            pass
+
+        # County label lookup (for display only)
+        try:
+            g = (defaults_form.default_county_geoid.data or "").strip()
+            if g and re.fullmatch(r"\d{5}", g):
+                row = db.session.execute(
+                    text('SELECT namelsad, name, stusps FROM counties WHERE geoid = :g LIMIT 1'),
+                    {'g': g},
+                ).mappings().first()
+                if row:
+                    nm = row.get('namelsad') or row.get('name') or ''
+                    st = row.get('stusps') or ''
+                    defaults_label = f"{nm}, {st}".strip(', ')
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            defaults_label = ""
+        if defaults_label:
+            defaults_form.default_county_label.data = defaults_label
 
         # Only the owner can update profile fields.
         if request.method == "POST":
             if (not current_user.is_authenticated) or (current_user.id != u.id):
                 abort(403)
 
-            if car_form.validate_on_submit():
-                def _clean(s):
-                    s = (s or "").strip()
-                    return s if s else None
+            form_name = (request.form.get("form_name") or "").strip().lower()
 
-                u.car_make = _clean(car_form.car_make.data)
-                u.car_model = _clean(car_form.car_model.data)
-                u.car_year = car_form.car_year.data or None
+            if form_name == "car":
+                if car_form.validate_on_submit():
+                    def _clean(s):
+                        s = (s or "").strip()
+                        return s if s else None
 
-                db.session.commit()
-                flash("Profile updated.", "success")
-                return redirect(url_for("profile", username=u.username))
+                    u.car_make = _clean(car_form.car_make.data)
+                    u.car_model = _clean(car_form.car_model.data)
+                    u.car_year = car_form.car_year.data or None
+
+                    db.session.commit()
+                    flash("Profile updated.", "success")
+                    return redirect(url_for("profile", username=u.username))
+
+            elif form_name == "defaults":
+                # Ensure choices are present before validation
+                defaults_form.set_choices()
+
+                if 'clear_defaults' in request.form:
+                    u.default_filters_json = None
+                    db.session.commit()
+                    flash("Default filters cleared.", "success")
+                    return redirect(url_for("profile", username=u.username))
+
+                if defaults_form.validate_on_submit():
+                    st = (defaults_form.default_state.data or "").strip().upper()
+                    cg = (defaults_form.default_county_geoid.data or "").strip()
+                    if cg and not re.fullmatch(r"\d{5}", cg):
+                        cg = ""
+
+                    date_v = (defaults_form.default_date.data or "any").strip()
+                    verify_v = (defaults_form.default_verify.data or "any").strip()
+                    pin_v = bool(defaults_form.default_pin.data)
+                    sl_v = (defaults_form.default_speed_limit.data or "any").strip()
+                    ov_v = (defaults_form.default_overage.data or "all").strip()
+                    sort_v = (defaults_form.default_sort.data or "new").strip()
+
+                    # Build compact JSON (only store meaningful values)
+                    payload = {
+                        "state": st or "",
+                        "county_geoid": cg or "",
+                        "date": date_v or "any",
+                        "verify": verify_v or "any",
+                        "pin": 1 if pin_v else 0,
+                        "speed_limit": sl_v or "any",
+                        "overage": ov_v or "all",
+                        "sort": sort_v or "new",
+                    }
+
+                    # If everything is default/empty, store NULL.
+                    is_empty = (
+                        not payload.get('state')
+                        and not payload.get('county_geoid')
+                        and (payload.get('date') in ('', 'any'))
+                        and (payload.get('verify') in ('', 'any'))
+                        and not payload.get('pin')
+                        and (payload.get('speed_limit') in ('', 'any'))
+                        and (payload.get('overage') in ('', 'all', 'any'))
+                        and (payload.get('sort') in ('', 'new'))
+                    )
+
+                    u.default_filters_json = None if is_empty else json.dumps(payload, separators=(",", ":"))
+                    db.session.commit()
+                    flash("Default filters saved.", "success")
+                    return redirect(url_for("profile", username=u.username))
 
         reports = (
             SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).filter(SpeedReport.user_id == u.id)
@@ -1984,48 +2083,7 @@ GROUP BY UPPER(TRIM(stusps));
             reports=reports,
             ticket_count=len(reports),
             car_form=car_form,
-        )
-
-    def strictness_rows(
-        limit: int,
-        exclude_anonymous: bool,
-        state_filter: str | None = None,
-        road_filter: str | None = None,
-        county_geoid: str | None = None,
-        speed_limit_list: List[str] | None = None,
-        over_list: List[str] | None = None,
-        photo_only: bool = False,
-        verify: str = "any",
-        date: str = "any",
-                pin_only: bool = False,
-        deleted_mode: str = "hide",
-    ) -> Dict[str, List[Dict]]:
-        """Return county-based statistics (Lower/Higher median overage).
-
-        Metric: MEDIAN overage (ticketed - posted), considering only tickets where ticketed_speed > posted_speed.
-        Lower median overage = more strict.
-
-        Supports the shared filter rail inputs so the Statistics page behaves like other pages.
-        """
-
-        speed_limit_list = speed_limit_list or []
-        over_list = over_list or []
-
-        expr = (SpeedReport.ticketed_speed - SpeedReport.posted_speed)
-
-        q = (
-            db.session.query(
-                SpeedReport.state.label("state"),
-                SpeedReport.county_geoid.label("county_geoid"),
-                expr.label("overage"),
-                SpeedReport.created_at.label("created_at"),
-                SpeedReport.photo_key.label("photo_key"),
-                SpeedReport.ocr_status.label("ocr_status"),
-                SpeedReport.verification_status.label("verification_status"),
-                SpeedReport.user_id.label("user_id"),
-            )
-            .filter(SpeedReport.ticketed_speed > SpeedReport.posted_speed)
-            .filter(SpeedReport.county_geoid.isnot(None))
+            defaults_form=defaults_form,
         )
 
         # Deleted visibility (admin can request include/only; non-admin callers should pass "hide")
@@ -2232,6 +2290,55 @@ GROUP BY UPPER(TRIM(stusps));
             flash("You must be logged in to hide anonymous posts.", "info")
 
         hide_anon = bool(current_user.is_authenticated and hide_anon_requested)
+
+        # --- Apply user default filters (v424) ---
+        # If the user saved defaults and they load Statistics with no filters, redirect to the default query.
+        # Use ?clear=1 to bypass defaults and view everything.
+        try:
+            if current_user.is_authenticated and (request.args.get('clear') != '1'):
+                _keys = {
+                    'state','county_geoid','county','road','speed_limit','overage','over','verify','pin','date','sort',
+                    'photo_only','verified_photo','hide_anon','deleted'
+                }
+                if not any(k in request.args for k in _keys):
+                    raw = (getattr(current_user, 'default_filters_json', None) or '').strip()
+                    if raw:
+                        df = json.loads(raw)
+                        params = {}
+                        st = (df.get('state') or '').strip().upper()
+                        if st and re.fullmatch(r'[A-Z]{2}', st):
+                            params['state'] = st
+                        cg = (df.get('county_geoid') or '').strip()
+                        if cg and re.fullmatch(r'\d{5}', cg):
+                            params['county_geoid'] = cg
+
+                        date_v = (df.get('date') or 'any').strip()
+                        if date_v in ('7','30','90','365'):
+                            params['date'] = date_v
+
+                        verify_v = (df.get('verify') or 'any').strip()
+                        if verify_v in ('verified','not_verified'):
+                            params['verify'] = verify_v
+
+                        if str(df.get('pin') or '0') in ('1','true','True'):
+                            params['pin'] = '1'
+
+                        sl_v = (df.get('speed_limit') or 'any').strip()
+                        if sl_v in ('lte35','40-55','gte60'):
+                            params['speed_limit'] = sl_v
+
+                        ov_v = (df.get('overage') or 'all').strip()
+                        if ov_v in ('1-10','11-20','21+'):
+                            params['overage'] = ov_v
+
+                        sort_v = (df.get('sort') or 'new').strip()
+                        if sort_v in ('new','old','most_over','least_over'):
+                            params['sort'] = sort_v
+
+                        if params:
+                            return redirect(url_for('strictness', **params))
+        except Exception:
+            pass
 
         is_admin = is_admin_user(current_user)
         deleted_mode = (request.args.get("deleted") or "hide").strip().lower()
@@ -2535,6 +2642,62 @@ GROUP BY UPPER(TRIM(stusps));
         page = request.args.get("page", 1, type=int)
         fragment = (request.args.get("fragment") == "1")
         per_page = 5
+        # --- Apply user default filters (v424) ---
+        # If the user saved defaults and they load Home with no filters, redirect to the default query.
+        # Use ?clear=1 to bypass defaults and view everything.
+        try:
+            if (
+                current_user.is_authenticated
+                and (request.args.get('clear') != '1')
+                and (not fragment)
+                and page == 1
+            ):
+                # Only apply when no meaningful filter args are present.
+                _keys = {
+                    'state','county_geoid','county','road','speed_limit','overage','over','verify','pin','date','sort',
+                    'photo_only','verified_photo','hide_anon','deleted'
+                }
+                if not any(k in request.args for k in _keys):
+                    raw = (getattr(current_user, 'default_filters_json', None) or '').strip()
+                    if raw:
+                        df = json.loads(raw)
+                        params = {}
+                        st = (df.get('state') or '').strip().upper()
+                        if st and re.fullmatch(r'[A-Z]{2}', st):
+                            params['state'] = st
+                        cg = (df.get('county_geoid') or '').strip()
+                        if cg and re.fullmatch(r'\d{5}', cg):
+                            params['county_geoid'] = cg
+
+                        date_v = (df.get('date') or 'any').strip()
+                        if date_v in ('7','30','90','365'):
+                            params['date'] = date_v
+
+                        verify_v = (df.get('verify') or 'any').strip()
+                        if verify_v in ('verified','not_verified'):
+                            params['verify'] = verify_v
+
+                        if str(df.get('pin') or '0') in ('1','true','True'):
+                            params['pin'] = '1'
+
+                        sl_v = (df.get('speed_limit') or 'any').strip()
+                        if sl_v in ('lte35','40-55','gte60','25-35','40-50','55','65','70+'):
+                            params['speed_limit'] = sl_v
+
+                        ov_v = (df.get('overage') or 'all').strip()
+                        if ov_v in ('1-10','11-20','21+','5-9','10-14','15-19','20+'):
+                            params['overage'] = ov_v
+
+                        sort_v = (df.get('sort') or 'new').strip()
+                        if sort_v in ('new','old','most_over','least_over'):
+                            params['sort'] = sort_v
+
+                        if params:
+                            return redirect(url_for('home', **params))
+        except Exception:
+            # Never block Home if defaults parsing fails.
+            pass
+
 
         # Return-to URL used by POST actions (like/comment/delete) so redirects land on the full feed (not fragment JSON).
         def _build_home_return_to_url() -> str:

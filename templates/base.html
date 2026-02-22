@@ -215,7 +215,12 @@
       if(hidden) hidden.value = item.geoid || '';
       clearSuggestions();
       const form = input.closest('form');
-      if(form) form.submit();
+      if(form){
+        const auto = (form.getAttribute('data-county-autosubmit') || '').trim();
+        if(auto !== '0'){
+          form.submit();
+        }
+      }
     }
 
     let lastController = null;

@@ -18,3 +18,10 @@ v423
 - Profile: added optional vehicle fields (car brand, model, year).
   - Visible on the profile header as a pill when set.
   - Owners can edit these fields directly on their profile page.
+
+
+v424
+- Profile: added saved Default Filters (state/county/date/photo/pin/speed/overage/sort).
+  - Applied automatically when opening Home or Statistics with no filters.
+  - Clear button now uses ?clear=1 to bypass defaults and show everything.
+

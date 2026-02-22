@@ -128,6 +128,9 @@ class User(UserMixin, db.Model):
     car_make = db.Column(db.String(50), nullable=True)
     car_model = db.Column(db.String(60), nullable=True)
     car_year = db.Column(db.Integer, nullable=True)
+
+    # Profile settings (v424): default feed/statistics filters stored as JSON
+    default_filters_json = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # Password reset rate limiting (per account)

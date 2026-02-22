@@ -55,6 +55,7 @@
 
             <form method="post" action="{{ url_for('profile', username=profile_user.username) }}">
               {{ car_form.hidden_tag() }}
+              <input type="hidden" name="form_name" value="car">
 
               <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
                 <div style="flex:1; min-width:160px;">
@@ -80,6 +81,82 @@
 
             <div class="subtle" style="margin-top:8px;">
               This is optional and can be expanded later (photos, visibility controls, etc.).
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if current_user.is_authenticated and current_user.id == profile_user.id %}
+        <div class="list" style="margin-top:14px;">
+          <h3 style="margin: 14px 0 10px;">Default filters (optional)</h3>
+
+          <div class="item">
+            <form method="post" action="{{ url_for('profile', username=profile_user.username) }}" data-county-autosubmit="0">
+              {{ defaults_form.hidden_tag() }}
+              <input type="hidden" name="form_name" value="defaults">
+
+              <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="width:140px; min-width:140px;">
+                  <label for="filter-state">State</label>
+                  {{ defaults_form.default_state(id='filter-state', class_='filterbar-select') }}
+                </div>
+
+                <div style="flex:1; min-width:220px;">
+                  <label for="filter-county">County</label>
+                  <div class="filter-autocomplete-wrap">
+                    {{ defaults_form.default_county_label(id='filter-county', autocomplete='off') }}
+                    {{ defaults_form.default_county_geoid(id='filter-county-geoid') }}
+                    <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
+                  </div>
+                </div>
+
+                <div style="width:160px; min-width:160px;">
+                  <label for="default_date">Date</label>
+                  {{ defaults_form.default_date(id='default_date', class_='filterbar-select') }}
+                </div>
+
+                <div style="width:170px; min-width:170px;">
+                  <label for="default_verify">Photo</label>
+                  {{ defaults_form.default_verify(id='default_verify', class_='filterbar-select') }}
+                </div>
+
+                <div style="width:150px; min-width:150px;">
+                  <label for="default_speed_limit">Posted</label>
+                  {{ defaults_form.default_speed_limit(id='default_speed_limit', class_='filterbar-select') }}
+                </div>
+
+                <div style="width:160px; min-width:160px;">
+                  <label for="default_overage">Overage</label>
+                  {{ defaults_form.default_overage(id='default_overage', class_='filterbar-select') }}
+                </div>
+
+                <div style="width:170px; min-width:170px;">
+                  <label for="default_sort">Sort</label>
+                  {{ defaults_form.default_sort(id='default_sort', class_='filterbar-select') }}
+                </div>
+
+                <div style="width:140px; min-width:140px;">
+                  <div class="filterbar-rowline" style="margin-top:0; justify-content:space-between;">
+                    <label for="default_pin" style="margin:0;">Map pin ✓</label>
+                    <label class="switch">
+                      {{ defaults_form.default_pin(id='default_pin') }}
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div style="width:140px; min-width:140px;">
+                  <button type="submit" name="save_defaults" value="1" class="es-btn" style="height:44px; width:100%; font-weight:500;">Save</button>
+                </div>
+
+                <div style="width:160px; min-width:160px;">
+                  <button type="submit" name="clear_defaults" value="1" class="es-btn" style="height:44px; width:100%; font-weight:500; background:#fff; border:1px solid #e5e7eb;">Clear defaults</button>
+                </div>
+              </div>
+            </form>
+
+            <div class="subtle" style="margin-top:10px;">
+              Your defaults apply when you open Home or Statistics with no filters. Use the left-rail Clear button to view everything.
             </div>
           </div>
         </div>

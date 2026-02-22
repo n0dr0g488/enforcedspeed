@@ -1,0 +1,50 @@
+HANDOFF — EnforcedSpeed Web (v424)
+
+Change in this ZIP (ONE THEME)
+- Profile: added “Default Filters” settings (saved defaults for Home + Statistics filter rails).
+  - User can save default: state, county, date, photo, pin-only, posted-speed bucket, overage bucket, sort.
+  - Defaults apply automatically when opening Home/Statistics with no filters.
+  - Clear button now uses ?clear=1 to bypass defaults and show everything.
+
+Implementation notes
+- Adds nullable User.default_filters_json (compact JSON string).
+- Uses existing ensure_schema additive behavior to add missing column.
+- Home + /strictness apply defaults only when:
+  - authenticated
+  - page=1 (Home)
+  - not fragment mode
+  - no filter args present
+  - clear!=1
+
+Files changed
+- models.py
+  - Adds User.default_filters_json
+- forms.py
+  - Adds ProfileDefaultFiltersForm
+- app.py
+  - Profile route (/u/<username>) supports saving/clearing defaults (owner-only).
+  - Home + strictness auto-apply defaults when no filters.
+- templates/profile.html
+  - Adds Default filters section on owner profile.
+- templates/base.html
+  - County autocomplete: respects form attribute data-county-autosubmit="0" (prevents auto-save on profile).
+- templates/home_feed.html
+  - Clear link now points to /?clear=1
+- templates/strictness.html
+  - Clear link now points to /strictness?clear=1
+
+Verification (required)
+- python -m py_compile app.py
+- Run es-up
+- As logged-in user, go to /u/<yourusername>
+  - Set a default state/county/date/etc → Save defaults → refresh → persists.
+  - Click “Clear defaults” → removes.
+- Open Home with no query params
+  - Redirects to your saved defaults.
+  - Click Clear → shows all (no defaults applied).
+- Open /strictness with no query params
+  - Redirects to your saved defaults.
+- /healthz shows “ok v424 pid=…”
+
+Render note
+- If Render UI “spins,” /healthz is the source of truth.

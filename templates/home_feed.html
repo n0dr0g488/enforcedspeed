@@ -126,7 +126,7 @@
               </div>
 
 <div class="filterbox-footer">
-                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('home') }}">Clear</a>
+                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('home', clear=1) }}">Clear</a>
               </div>
 
             </div>

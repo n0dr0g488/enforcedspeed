@@ -3,7 +3,7 @@ import re
 import datetime
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
-from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField, HiddenField, SelectField
+from wtforms import StringField, IntegerField, TextAreaField, SubmitField, PasswordField, HiddenField, SelectField, BooleanField
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError, Email, EqualTo, Regexp
 
 US_STATE_CODES = {
@@ -291,3 +291,68 @@ class SubmitTicketForm(FlaskForm):
     photo = FileField("Photo")
 
     submit = SubmitField("Submit Ticket")
+
+
+class ProfileDefaultFiltersForm(FlaskForm):
+    """Default Home/Statistics filters stored on the user profile (v424)."""
+
+    form_name = HiddenField(default="defaults")
+
+    default_state = SelectField("Default state", choices=[], validators=[Optional()])
+    default_county_label = StringField(
+        "Default county (optional)",
+        validators=[Optional(), Length(max=80)],
+        render_kw={"placeholder": "Start typing (requires a state)"},
+    )
+    default_county_geoid = HiddenField()
+
+    default_date = SelectField("Default date", choices=[], validators=[Optional()])
+    default_verify = SelectField("Default photo", choices=[], validators=[Optional()])
+    default_pin = BooleanField("Map pin only", default=False)
+
+    default_speed_limit = SelectField("Posted speed limit", choices=[], validators=[Optional()])
+    default_overage = SelectField("Overage", choices=[], validators=[Optional()])
+    default_sort = SelectField("Sort by", choices=[], validators=[Optional()])
+
+    save_defaults = SubmitField("Save defaults")
+    clear_defaults = SubmitField("Clear defaults")
+
+    def set_choices(self):
+        # State choices: All + all US state codes
+        st = sorted(list(US_STATE_CODES))
+        self.default_state.choices = [("", "All states")] + [(c, c) for c in st]
+
+        self.default_date.choices = [
+            ("any", "Any"),
+            ("7", "Last 7 days"),
+            ("30", "Last 30 days"),
+            ("90", "Last 90 days"),
+            ("365", "Last year"),
+        ]
+
+        self.default_verify.choices = [
+            ("any", "Any"),
+            ("verified", "Auto-Extracted"),
+            ("not_verified", "Not auto-extracted"),
+        ]
+
+        self.default_speed_limit.choices = [
+            ("any", "Any"),
+            ("lte35", "≤ 35 mph"),
+            ("40-55", "40–55 mph"),
+            ("gte60", "≥ 60 mph"),
+        ]
+
+        self.default_overage.choices = [
+            ("all", "Any"),
+            ("1-10", "1–10 mph over"),
+            ("11-20", "11–20 mph over"),
+            ("21+", "≥ 21 mph over"),
+        ]
+
+        self.default_sort.choices = [
+            ("new", "Newest"),
+            ("old", "Oldest"),
+            ("most_over", "Highest overage"),
+            ("least_over", "Lowest overage"),
+        ]

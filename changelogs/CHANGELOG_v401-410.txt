@@ -40,3 +40,7 @@ v408 — 2026-02-20 — Welcome tile inline CTA + arrow icon
 v409 — 2026-02-21 — Map page title pill (matches outlined scope)
 - Map page: added a centered title pill overlay at the top of the interactive map.
 - The pill text matches the outlined selection (county/state) using the same server-side region title (defaults to "United States").
+
+v410 — 2026-02-21 — Map page zoom buttons (+/−)
+- Map page: added simple +/− zoom controls inside the map card so users without a mouse wheel can zoom reliably.
+- Buttons clamp zoom to a safe range and disable at min/max.

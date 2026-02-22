@@ -1,0 +1,36 @@
+HANDOFF — EnforcedSpeed Web (v410)
+
+Current status
+- v410 adds Map page zoom buttons (+/−) inside the interactive map card.
+- This is Stage 5 from the staged roadmap (Map UX: zoom controls for users without a mouse wheel).
+
+What changed (scoped)
+- templates/map_page.html
+  - Added overlay zoom controls (bottom-right) inside .map-frame.
+  - Wired buttons to ES_MAP.setZoom(±1) with safe clamp + disabled state.
+
+Non‑negotiable guardrails (NO REGRESSIONS)
+- Home feed ticket card static maps must render.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style (no wrapper duplication).
+- Trending/Follow tables must keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time (state/county boundaries must remain cached/precomputed).
+
+Render / Going live
+- Going live = commit + push to GitHub (Render deploys from Git).
+- Web service Start Command must remain:
+  gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path: /healthz
+
+Smoke tests (required)
+- python -m py_compile app.py
+- Run es-up
+- Verify:
+  - Home feed loads fast; ticket static maps appear
+  - Right-rail minimap loads
+  - Trending/Follow tables show names
+  - Map page loads; title pill present; zoom buttons work (+/−)
+
+Next stage suggestion
+- Stage 6: unify pin colors across static ticket maps + minimap + interactive map (Selected red, in-county mid-gray, out-of-county ghosted). Keep it one-change and verify contrast.

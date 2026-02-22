@@ -132,10 +132,10 @@
     {% set map_focus_url = county_focus_url or state_focus_url %}
     {% if map_focus_url %}
       <a class="ticket-staticmap-link" href="{{ map_focus_url }}">
-        <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+        <img class="ticket-staticmap" loading="lazy" width="640" height="640" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="{{ _sm }}" alt="Map preview">
       </a>
     {% else %}
-      <img class="ticket-staticmap" loading="lazy" src="{{ _sm }}" alt="Map preview">
+      <img class="ticket-staticmap" loading="lazy" width="640" height="640" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="{{ _sm }}" alt="Map preview">
     {% endif %}
   </div>
   </div>

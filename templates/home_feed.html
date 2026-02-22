@@ -267,9 +267,9 @@
            data-has-next="{{ '1' if pagination.has_next else '0' }}"
            style="height:1px;"></div>
 
-      <div id="feed-loading" class="subtle" style="display:none; margin-top:14px; text-align:center;">Loading…</div>
+      <div id="feed-loading" class="subtle feed-loading" style="display:none; margin-top:14px; text-align:center;"><span class="es-spinner" aria-hidden="true"></span><span>Loading…</span></div>
       <button id="feed-loadmore" type="button" style="display:none; width:100%; margin-top:14px;">Load more</button>
-      <div id="feed-end" class="subtle" style="display:none; margin-top:14px; text-align:center;">You’re all caught up.</div>
+      <div id="feed-end" class="subtle feed-endcap" style="display:none; margin-top:14px; text-align:center;">No more posts.</div>
 
   {% if pagination.pages > 1 %}
 
@@ -621,6 +621,47 @@ document.addEventListener('DOMContentLoaded', function(){
       return base + (base.indexOf('?') >= 0 ? '&' : '?') + extra;
     }
 
+
+// Lazy-load ticket static map images so initial home load is lighter.
+(function(){
+  var blank = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+  function initLazy(rootEl){
+    rootEl = rootEl || document;
+    var imgs = rootEl.querySelectorAll('img.ticket-staticmap[data-src]');
+    if(!imgs || !imgs.length) return;
+    if(!('IntersectionObserver' in window)){
+      for(var i=0;i<imgs.length;i++){
+        if(!imgs[i].getAttribute('src') || imgs[i].getAttribute('src')===blank){
+          imgs[i].setAttribute('src', imgs[i].getAttribute('data-src'));
+        }
+      }
+      return;
+    }
+    var io = window.__esMapLazyIO;
+    if(!io){
+      io = new IntersectionObserver(function(entries){
+        for(var j=0;j<entries.length;j++){
+          var e = entries[j];
+          if(!e.isIntersecting) continue;
+          var im = e.target;
+          var ds = im.getAttribute('data-src');
+          if(ds){
+            im.setAttribute('src', ds);
+            im.removeAttribute('data-src');
+          }
+          try{ io.unobserve(im); }catch(_e){}
+        }
+      }, { root:null, rootMargin:'800px 0px', threshold:0.01 });
+      window.__esMapLazyIO = io;
+    }
+    for(var k=0;k<imgs.length;k++){
+      try{ io.observe(imgs[k]); }catch(e){}
+    }
+  }
+  window.esLazyLoadStaticMaps = initLazy;
+  document.addEventListener('DOMContentLoaded', function(){ initLazy(document); });
+})();
+
     async function fetchNext(nextPage, baseUrl){
       var url = qsJoin(baseUrl, 'page=' + encodeURIComponent(nextPage) + '&fragment=1');
       var resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -640,6 +681,24 @@ document.addEventListener('DOMContentLoaded', function(){
       var nextPage = parseInt(sentinel.getAttribute('data-next-page') || '', 10);
       var hasNext = (sentinel.getAttribute('data-has-next') === '1') && !isNaN(nextPage);
       var loading = false;
+
+// Persist feed position so refresh returns to the same spot (session/tab only).
+var stateKey = 'es_feed_state:' + baseUrl;
+var loadedPages = 1; // initial page already rendered server-side
+function saveState(){
+  try{
+    var st = { y: window.scrollY || 0, pages: loadedPages, ts: Date.now() };
+    sessionStorage.setItem(stateKey, JSON.stringify(st));
+  }catch(e){}
+}
+// Throttle scroll saves.
+var saveT = null;
+window.addEventListener('scroll', function(){
+  if(saveT) return;
+  saveT = window.setTimeout(function(){ saveT=null; saveState(); }, 250);
+}, { passive:true });
+window.addEventListener('beforeunload', saveState);
+
 
       function setLoading(v){
         loading = v;
@@ -663,8 +722,11 @@ document.addEventListener('DOMContentLoaded', function(){
             var tmp = document.createElement('div');
             tmp.innerHTML = html;
             while(tmp.firstChild){ container.appendChild(tmp.firstChild); }
+            loadedPages += 1;
+            saveState();
             try{ if(window.esBindPreserveScroll){ window.esBindPreserveScroll(container); } }catch(e){}
             try{ if(window.convertLocalTimes){ window.convertLocalTimes(); } }catch(e){}
+            try{ if(window.esLazyLoadStaticMaps){ window.esLazyLoadStaticMaps(container); } }catch(e){}
           }
 
           if(data && data.has_next && data.next_page){
@@ -682,18 +744,59 @@ document.addEventListener('DOMContentLoaded', function(){
       }
 
       if(!hasNext){ setDone(); return; }
-
-      // IntersectionObserver for auto-load; fallback to button for older browsers.
-      if('IntersectionObserver' in window){
-        var obs = new IntersectionObserver(function(entries){
-          for(var i=0;i<entries.length;i++){
-            if(entries[i].isIntersecting){ loadMore(); break; }
-          }
-        }, { root: null, rootMargin: '600px 0px', threshold: 0 });
-        try{ obs.observe(sentinel); }catch(e){}
-      }else{
-        if(btn){ btn.style.display = 'block'; btn.addEventListener('click', loadMore); }
+function startAutoLoad(){
+  // IntersectionObserver for auto-load; fallback to button for older browsers.
+  if(!hasNext) return;
+  if('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      for(var i=0;i<entries.length;i++){
+        if(entries[i].isIntersecting){ loadMore(); break; }
       }
+    }, { root: null, rootMargin: '600px 0px', threshold: 0 });
+    try{ obs.observe(sentinel); }catch(e){}
+  }else{
+    if(btn){ btn.style.display = 'block'; btn.addEventListener('click', loadMore); }
+  }
+}
+
+// Restore saved scroll + loaded pages (if any) for this query.
+(function restoreState(){
+  var raw = null;
+  try{ raw = sessionStorage.getItem(stateKey); }catch(e){}
+  if(!raw){ startAutoLoad(); return; }
+  var st = null;
+  try{ st = JSON.parse(raw); }catch(e){ startAutoLoad(); return; }
+  if(!st || !st.ts){ startAutoLoad(); return; }
+  // Ignore very old state (2 hours) to avoid surprise jumps.
+  if(Date.now() - st.ts > 2*60*60*1000){ startAutoLoad(); return; }
+
+  var targetPages = parseInt(st.pages || 1, 10);
+  if(isNaN(targetPages) || targetPages < 1) targetPages = 1;
+  var targetY = parseInt(st.y || 0, 10);
+  if(isNaN(targetY)) targetY = 0;
+
+  if(targetPages === 1 && targetY === 0){ startAutoLoad(); return; }
+
+  // Load additional pages sequentially until we reach prior depth or run out,
+  // then scroll back to the saved position. Only after that do we enable auto-load.
+  (async function(){
+    while(hasNext && loadedPages < targetPages){
+      await loadMore();
+    }
+    try{
+      window.requestAnimationFrame(function(){
+        window.scrollTo(0, targetY);
+        saveState();
+        startAutoLoad();
+      });
+    }catch(e){
+      window.scrollTo(0, targetY);
+      saveState();
+      startAutoLoad();
+    }
+  })();
+})();
+
     });
   })();
 </script>

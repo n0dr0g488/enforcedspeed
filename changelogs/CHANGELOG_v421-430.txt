@@ -1,0 +1,8 @@
+CHANGELOG v421–v430
+
+v421
+- Home feed infinite scroll polish:
+  - Added a subtle loading row with a spinner and a clear end cap (“No more posts.”).
+  - Preserves feed position on refresh (scroll + number of loaded batches stored in sessionStorage per filter query).
+  - Defers ticket-card static map image requests until the card is near the viewport (IntersectionObserver + data-src), reducing initial load cost.
+

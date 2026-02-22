@@ -1,0 +1,33 @@
+HANDOFF — EnforcedSpeed Web (v421)
+
+Change in this ZIP (ONE THEME)
+- Home feed infinite-scroll polish + performance:
+  1) Loading row includes spinner + “No more posts” end cap.
+  2) Refresh restores your feed position (scroll + number of loaded batches).
+  3) Ticket-card static maps lazy-load (don’t request /api/county_staticmap until near viewport).
+
+Why
+- Faster initial home load (fewer static map requests up front) while keeping the Facebook-style infinite feed UX.
+
+Files changed
+- templates/base.html
+  - Adds documentElement “js” class for progressive enhancement (used to hide fallback pagination when JS is enabled).
+- templates/home_feed.html
+  - Spinner/end cap styling + improved infinite-scroll JS (restore state + invoke lazy loader on appended content).
+- templates/_feed_items.html
+  - Ticket static map <img> uses placeholder src + data-src to enable IntersectionObserver lazy-loading.
+
+Verification (required)
+- python -m py_compile app.py
+- Run es-up
+- Home:
+  - Initially loads 5 posts
+  - Scroll down → loads additional batches
+  - Loading spinner row shows while fetching
+  - When no more posts: shows “No more posts.”
+  - Refresh mid-feed → returns to roughly the same scroll position and same loaded depth
+  - Ticket static maps still appear normally as you scroll (no regressions)
+- /healthz shows “ok v421 pid=…”
+
+Render note (deploy sanity)
+- If Render UI “spins,” check https://enforcedspeed.com/healthz for the live version string; that’s the source of truth.

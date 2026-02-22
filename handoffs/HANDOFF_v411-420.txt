@@ -26,3 +26,7 @@ Packaging
 Deploy observability (v418)
 - /healthz returns "ok v### pid=..." so you can prove which build is responding during deploys.
 - render.yaml includes healthCheckPath: /healthz to prevent drift.
+
+v419
+- Added server-side caching for /api/home_minimap_staticmap (5 min TTL; X-ES-Cache header).
+

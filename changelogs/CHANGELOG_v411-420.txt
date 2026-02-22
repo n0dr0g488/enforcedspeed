@@ -45,3 +45,9 @@ v417
 v418
 - Deploy observability: /healthz now returns "ok v### pid=..." so you can confirm the NEW build is responding during deploy.
 - Blueprint safety: render.yaml now includes healthCheckPath: /healthz so it can’t drift.
+
+v419
+- Performance: added server-side caching for the Home right-rail minimap image (/api/home_minimap_staticmap).
+  - Caches the rendered minimap for 5 minutes in Redis (or /tmp fallback) to reduce DB load + Google Static Maps calls.
+  - Adds X-ES-Cache: HIT/MISS header; keeps Cache-Control max-age=300.
+

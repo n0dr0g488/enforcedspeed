@@ -5651,6 +5651,81 @@ GROUP BY UPPER(TRIM(stusps));
         if not google_key:
             return ("Missing GOOGLE_MAPS_SERVER_KEY", 503)
 
+        # --- v419: server-side caching (minimap) ---
+        # The home minimap is the same for all users and can be expensive (DB scan + Google Static Maps).
+        # Cache the final rendered image for a short window to reduce load and API spend.
+        cache_ttl_sec = 300  # 5 minutes (matches Cache-Control below)
+        cache_key = None
+        if not debug:
+            try:
+                v = (request.args.get("v") or "").strip()
+                cache_key = "es:home_minimap:" + (v if v else "v1")
+            except Exception:
+                cache_key = "es:home_minimap:v1"
+
+        def _cache_get(k: str):
+            """Return (content_type, bytes) or (None, None)."""
+            if not k:
+                return (None, None)
+            rurl = (os.environ.get("REDIS_URL") or "").strip()
+            if rurl:
+                try:
+                    import redis
+                    r = redis.Redis.from_url(rurl, socket_timeout=2, socket_connect_timeout=2)
+                    blob = r.get(k)
+                    if blob:
+                        i = blob.find(b"\n")
+                        if i > 0:
+                            ct = blob[:i].decode("utf-8", errors="ignore") or "image/png"
+                            return (ct, blob[i + 1 :])
+                except Exception:
+                    pass
+            try:
+                cache_dir = "/tmp/es_home_minimap_cache"
+                os.makedirs(cache_dir, exist_ok=True)
+                p = os.path.join(cache_dir, k.replace(":", "_") + ".bin")
+                if os.path.exists(p):
+                    with open(p, "rb") as f:
+                        blob = f.read()
+                    i = blob.find(b"\n")
+                    if i > 0:
+                        ct = blob[:i].decode("utf-8", errors="ignore") or "image/png"
+                        return (ct, blob[i + 1 :])
+            except Exception:
+                pass
+            return (None, None)
+
+        def _cache_set(k: str, content_type: str, data: bytes):
+            if not k:
+                return
+            blob = (content_type or "image/png").encode("utf-8") + b"\n" + (data or b"")
+            rurl = (os.environ.get("REDIS_URL") or "").strip()
+            if rurl:
+                try:
+                    import redis
+                    r = redis.Redis.from_url(rurl, socket_timeout=2, socket_connect_timeout=2)
+                    r.setex(k, cache_ttl_sec, blob)
+                    return
+                except Exception:
+                    pass
+            try:
+                cache_dir = "/tmp/es_home_minimap_cache"
+                os.makedirs(cache_dir, exist_ok=True)
+                p = os.path.join(cache_dir, k.replace(":", "_") + ".bin")
+                with open(p, "wb") as f:
+                    f.write(blob)
+            except Exception:
+                pass
+
+        if cache_key:
+            ct_cached, data_cached = _cache_get(cache_key)
+            if data_cached:
+                out = Response(data_cached, mimetype=(ct_cached or "image/png"))
+                out.headers["Cache-Control"] = "public, max-age=300"
+                out.headers["X-ES-Cache"] = "HIT"
+                return out
+
+
         # Fixed CONUS bounds (approx). Use 'visible=' so Google chooses an appropriate zoom.
         # Padded slightly so WA/OR (and Maine) don't feel clipped.
         visible_sw = "23.0,-127.5"
@@ -5857,8 +5932,14 @@ GROUP BY UPPER(TRIM(stusps));
             if resp.status_code != 200:
                 return (f"Upstream error {resp.status_code}", 502)
 
-            out = Response(resp.content, mimetype=(resp.headers.get("Content-Type") or "image/png"))
+            content_type = (resp.headers.get("Content-Type") or "image/png")
+            data = (resp.content or b"")
+            if cache_key:
+                _cache_set(cache_key, content_type, data)
+
+            out = Response(data, mimetype=content_type)
             out.headers["Cache-Control"] = "public, max-age=300"
+            out.headers["X-ES-Cache"] = "MISS" if cache_key else "BYPASS"
             return out
 
         except Exception as e:

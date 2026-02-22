@@ -1,0 +1,25 @@
+HANDOFF — EnforcedSpeed Web (v419)
+
+What changed
+- Added server-side caching for the Home right-rail minimap image endpoint:
+  /api/home_minimap_staticmap
+
+Why
+- That endpoint was doing a DB scan + a Google Static Maps request on every hit.
+- Now it caches the final PNG for 5 minutes (Redis if available, else /tmp), reducing load and Google spend.
+
+Behavior
+- Response headers:
+  - Cache-Control: public, max-age=300
+  - X-ES-Cache: HIT / MISS / BYPASS
+- Optional cache-bust: add ?v=2 (or any string) to use a separate cache key.
+
+Non-negotiable guardrails
+- No changes to ticket card static map centering logic.
+- No changes to custom pin sizing logic.
+- No per-request geometry unions.
+
+Smoke test
+- python -m py_compile app.py
+- Load Home and confirm minimap renders.
+- Reload Home twice and confirm the second hit shows X-ES-Cache: HIT (via browser devtools Network headers).

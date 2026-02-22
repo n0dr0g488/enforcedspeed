@@ -122,6 +122,7 @@ from forms import (
     CommentForm,
     DeleteCommentForm,
     FollowCountyForm,
+    ProfileCarForm,
 )
 from models import db, SpeedReport, User, Like, Comment, FollowedCounty, normalize_road, state_code_from_value
 
@@ -1945,10 +1946,30 @@ GROUP BY UPPER(TRIM(stusps));
 
         return render_template('reset_password.html', form=form, token=token)
 
-    @app.get("/u/<username>")
+    @app.route("/u/<username>", methods=["GET", "POST"])
     def profile(username: str):
         ident_lc = username.strip().lower()
         u = User.query.filter(func.lower(User.username) == ident_lc).first_or_404()
+
+        car_form = ProfileCarForm(obj=u)
+
+        # Only the owner can update profile fields.
+        if request.method == "POST":
+            if (not current_user.is_authenticated) or (current_user.id != u.id):
+                abort(403)
+
+            if car_form.validate_on_submit():
+                def _clean(s):
+                    s = (s or "").strip()
+                    return s if s else None
+
+                u.car_make = _clean(car_form.car_make.data)
+                u.car_model = _clean(car_form.car_model.data)
+                u.car_year = car_form.car_year.data or None
+
+                db.session.commit()
+                flash("Profile updated.", "success")
+                return redirect(url_for("profile", username=u.username))
 
         reports = (
             SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).filter(SpeedReport.user_id == u.id)
@@ -1962,6 +1983,7 @@ GROUP BY UPPER(TRIM(stusps));
             profile_user=u,
             reports=reports,
             ticket_count=len(reports),
+            car_form=car_form,
         )
 
     def strictness_rows(

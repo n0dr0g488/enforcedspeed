@@ -23,7 +23,67 @@
 
       <div style="margin-top:12px;">
         <span class="pill">Tickets posted: {{ ticket_count }}</span>
+
+        {% if profile_user.car_make or profile_user.car_model or profile_user.car_year %}
+          <span class="pill">
+            Car:
+            {% if profile_user.car_year %}{{ profile_user.car_year }}{% endif %}
+            {% if profile_user.car_make %} {{ profile_user.car_make }}{% endif %}
+            {% if profile_user.car_model %} {{ profile_user.car_model }}{% endif %}
+          </span>
+        {% endif %}
       </div>
+
+
+      {% if current_user.is_authenticated and current_user.id == profile_user.id %}
+        <div class="list" style="margin-top:14px;">
+          <h3 style="margin: 14px 0 10px;">Vehicle (optional)</h3>
+
+          <div class="item">
+            {% if car_form.errors %}
+              <div class="errors" style="margin-bottom:10px;">
+                <strong>Fix these:</strong>
+                <ul>
+                  {% for field, errs in car_form.errors.items() %}
+                    {% for err in errs %}
+                      <li>{{ err }}</li>
+                    {% endfor %}
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+
+            <form method="post" action="{{ url_for('profile', username=profile_user.username) }}">
+              {{ car_form.hidden_tag() }}
+
+              <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:1; min-width:160px;">
+                  <label for="car_make">{{ car_form.car_make.label.text }}</label>
+                  {{ car_form.car_make(id="car_make", autocomplete="off") }}
+                </div>
+
+                <div style="flex:1; min-width:160px;">
+                  <label for="car_model">{{ car_form.car_model.label.text }}</label>
+                  {{ car_form.car_model(id="car_model", autocomplete="off") }}
+                </div>
+
+                <div style="width:120px; min-width:120px;">
+                  <label for="car_year">{{ car_form.car_year.label.text }}</label>
+                  {{ car_form.car_year(id="car_year", inputmode="numeric") }}
+                </div>
+
+                <div style="width:140px; min-width:140px;">
+                  <button type="submit" class="es-btn" style="height:44px; width:100%; font-weight:500;">Save</button>
+                </div>
+              </div>
+            </form>
+
+            <div class="subtle" style="margin-top:8px;">
+              This is optional and can be expanded later (photos, visibility controls, etc.).
+            </div>
+          </div>
+        </div>
+      {% endif %}
 
       <div class="list">
         <h3 style="margin: 14px 0 10px;">Tickets</h3>

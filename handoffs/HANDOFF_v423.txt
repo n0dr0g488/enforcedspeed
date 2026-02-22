@@ -1,0 +1,35 @@
+HANDOFF — EnforcedSpeed Web (v423)
+
+Change in this ZIP (ONE THEME)
+- Profile: added optional vehicle fields (car brand, model, year).
+  - Visible as a “Car:” pill on profiles when set.
+  - Owners can edit these fields directly on their profile page.
+
+Implementation notes
+- Adds nullable columns to User (car_make, car_model, car_year).
+- Uses existing ensure_schema additive behavior to add missing columns (no destructive migrations).
+- Profile route now supports GET + POST (POST is owner-only; others get 403).
+
+Files changed
+- models.py
+  - Adds User.car_make / car_model / car_year.
+- forms.py
+  - Adds ProfileCarForm.
+- app.py
+  - Profile route (/u/<username>) now accepts POST to update vehicle fields.
+- templates/profile.html
+  - Shows car pill when set.
+  - Shows editable vehicle form for the profile owner.
+
+Verification (required)
+- python -m py_compile app.py
+- Run es-up
+- Visit your profile (/u/<yourusername>)
+  - Enter car brand/model/year → Save → refresh → values persist.
+  - “Car:” pill shows in header.
+- Visit another user’s profile
+  - No edit form shown.
+- /healthz shows “ok v423 pid=…”
+
+Render note
+- If Render UI “spins,” use https://enforcedspeed.com/healthz to confirm what version is live.

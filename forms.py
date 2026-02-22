@@ -198,6 +198,30 @@ class LoginForm(FlaskForm):
     submit = SubmitField("Log In")
 
 
+class ProfileCarForm(FlaskForm):
+    """Optional vehicle info shown on the profile page (v423)."""
+
+    car_make = StringField(
+        "Car brand (optional)",
+        validators=[Optional(), Length(max=50, message="Keep it under 50 characters.")],
+        render_kw={"placeholder": "e.g., Toyota"},
+    )
+
+    car_model = StringField(
+        "Car model (optional)",
+        validators=[Optional(), Length(max=60, message="Keep it under 60 characters.")],
+        render_kw={"placeholder": "e.g., Tacoma"},
+    )
+
+    car_year = IntegerField(
+        "Year (optional)",
+        validators=[Optional(), NumberRange(min=1900, max=2035, message="Enter a valid year.")],
+        render_kw={"placeholder": "e.g., 2019"},
+    )
+
+    submit = SubmitField("Save")
+
+
 class ChangePasswordForm(FlaskForm):
     current_password = PasswordField("Current Password", validators=[DataRequired()])
     new_password = PasswordField("New Password", validators=[DataRequired(), Length(min=8, max=128)])

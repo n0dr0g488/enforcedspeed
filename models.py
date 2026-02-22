@@ -123,6 +123,11 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     phone = db.Column(db.String(25), nullable=True, index=True)
     birthdate = db.Column(db.Date, nullable=True)
+
+    # Profile (v423): optional vehicle info
+    car_make = db.Column(db.String(50), nullable=True)
+    car_model = db.Column(db.String(60), nullable=True)
+    car_year = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # Password reset rate limiting (per account)

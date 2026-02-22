@@ -134,6 +134,10 @@ class User(UserMixin, db.Model):
 
     # Profile avatar (v425): system avatar key (a01–a30). (User-upload photos come later.)
     avatar_key = db.Column(db.String(50), nullable=True)
+
+    # Profile photo (v426): optional uploaded avatar photo stored in R2.
+    # Stores a base key WITHOUT the size suffix, e.g. "profile_photos/<uid>/<uuid>".
+    profile_photo_key = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # Password reset rate limiting (per account)

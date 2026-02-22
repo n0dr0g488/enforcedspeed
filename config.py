@@ -78,3 +78,12 @@ class Config:
     # (e.g. Cloudflare R2 custom domain) so Google can fetch icons reliably.
     # Example: https://static.enforcedspeed.com/pins
     STATIC_PIN_BASE_URL = os.environ.get("STATIC_PIN_BASE_URL", "").strip().rstrip("/")
+
+    # Public base URL for user profile photos served from Cloudflare R2 (public bucket / custom domain).
+    # Example: https://static.enforcedspeed.com/profile_photos
+    PROFILE_PHOTO_BASE_URL = os.environ.get("PROFILE_PHOTO_BASE_URL", "").strip().rstrip("/")
+
+    # Optional: if you want profile photos in a separate bucket/prefix.
+    # Defaults are chosen to work with the existing public `enforcedspeed-static` bucket.
+    R2_PROFILE_BUCKET = os.environ.get("R2_PROFILE_BUCKET", "").strip()
+    R2_PROFILE_PREFIX = os.environ.get("R2_PROFILE_PREFIX", "profile_photos/").strip()

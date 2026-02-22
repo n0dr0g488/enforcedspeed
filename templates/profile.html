@@ -5,7 +5,7 @@
     <div class="card">
 <div class="row">
         <div style="display:flex; align-items:center; gap:12px;">
-          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user) }}" alt="" style="width:48px;height:48px;border-radius:999px;object-fit:cover;background:#e5e7eb;flex:0 0 auto;">
+          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:48px;height:48px;border-radius:999px;object-fit:cover;background:#e5e7eb;flex:0 0 auto;">
           <div>
             <h1 style="margin:0;">@{{ profile_user.username }}</h1>
           <div class="subtle" style="margin-top:6px;">
@@ -51,10 +51,29 @@
             </form>
 
             <div class="subtle" style="margin-bottom:10px;">
-              Pick a built-in avatar. (Profile photo uploads come later.)
+              Upload a profile photo (optional) or pick a built-in avatar.
             </div>
 
-            <div id="esAvatarGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap:10px; max-width:520px;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+              <input id="esPhotoInput" type="file" accept="image/*" style="max-width:280px;">
+              <button id="esPhotoUploadBtn" type="button" class="es-btn" style="height:38px; padding:0 12px; font-weight:500;">Upload photo</button>
+              {% if user_avatar_is_photo(profile_user) %}
+                <button id="esPhotoRemoveBtn" type="button" class="es-btn" style="height:38px; padding:0 12px; font-weight:500; background:#fff; border:1px solid #d1d5db; color:#111827;">Remove photo</button>
+              {% endif %}
+              <span id="esPhotoMsg" class="subtle"></span>
+            </div>
+
+            <div class="subtle" style="margin:6px 0 10px;">
+              Photos are scanned for adult/racy content via Google Vision SafeSearch.
+            </div>
+
+            {% if user_avatar_is_photo(profile_user) %}
+              <div class="subtle" style="margin:6px 0 10px;">
+                You’re using an uploaded photo. Remove it to switch back to a built-in avatar.
+              </div>
+            {% endif %}
+
+            <div id="esAvatarGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap:10px; max-width:520px;{% if user_avatar_is_photo(profile_user) %} opacity:.55; pointer-events:none;{% endif %}">
               {% for a in system_avatars %}
                 {% set k = a.key %}
                 {% set f = a.file %}
@@ -146,6 +165,104 @@
                 // best-effort
               }
             });
+
+            // --- Profile photo upload/remove (v426) ---
+            const photoInput = document.getElementById('esPhotoInput');
+            const photoBtn = document.getElementById('esPhotoUploadBtn');
+            const photoMsg = document.getElementById('esPhotoMsg');
+            const removeBtn = document.getElementById('esPhotoRemoveBtn');
+
+            function setMsg(t){ if(photoMsg) photoMsg.textContent = t || ''; }
+
+            async function updateImgs(urlSm, urlLg){
+              const headImg = document.querySelector('.header-nav .nav-user .avatar img');
+              if(headImg && urlSm){ headImg.src = urlSm + '?v=' + Date.now(); }
+              const profImg = document.getElementById('profileAvatarImg');
+              if(profImg && (urlLg || urlSm)){
+                profImg.src = (urlLg || urlSm) + '?v=' + Date.now();
+              }
+            }
+
+            if(photoBtn){
+              photoBtn.addEventListener('click', async function(){
+                if(!photoInput || !photoInput.files || photoInput.files.length < 1){
+                  setMsg('Choose an image first.');
+                  return;
+                }
+
+                setMsg('Uploading…');
+                photoBtn.disabled = true;
+
+                try{
+                  const csrf = _get('csrf_token');
+                  const fd = new FormData();
+                  fd.append('csrf_token', csrf);
+                  fd.append('photo', photoInput.files[0]);
+
+                  const resp = await fetch('{{ url_for("api_profile_photo_upload") }}', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: fd,
+                  });
+
+                  const data = await resp.json().catch(()=>null);
+
+                  if(resp.status === 401 && data && data.login_url){
+                    window.location.href = data.login_url;
+                    return;
+                  }
+
+                  if(!data || !data.ok){
+                    setMsg((data && data.message) ? data.message : 'Upload failed.');
+                    return;
+                  }
+
+                  setMsg('Saved.');
+                  await updateImgs(data.avatar_url_sm, data.avatar_url_lg);
+
+                  // If remove button exists, keep it; otherwise, refresh to show it.
+                  if(!removeBtn){
+                    setTimeout(()=>{ window.location.reload(); }, 400);
+                  }
+                }catch(err){
+                  setMsg('Upload failed.');
+                }finally{
+                  photoBtn.disabled = false;
+                }
+              });
+            }
+
+            if(removeBtn){
+              removeBtn.addEventListener('click', async function(){
+                setMsg('Removing…');
+                removeBtn.disabled = true;
+                try{
+                  const csrf = _get('csrf_token');
+                  const body = new URLSearchParams();
+                  body.set('csrf_token', csrf);
+
+                  const resp = await fetch('{{ url_for("api_profile_photo_remove") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    credentials: 'same-origin',
+                    body: body.toString(),
+                  });
+
+                  const data = await resp.json().catch(()=>null);
+                  if(!data || !data.ok){
+                    setMsg((data && data.message) ? data.message : 'Remove failed.');
+                    return;
+                  }
+                  setMsg('Removed.');
+                  await updateImgs(data.avatar_url_sm, data.avatar_url_lg);
+                  setTimeout(()=>{ window.location.reload(); }, 350);
+                }catch(err){
+                  setMsg('Remove failed.');
+                }finally{
+                  removeBtn.disabled = false;
+                }
+              });
+            }
           })();
         </script>
       {% endif %}

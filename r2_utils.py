@@ -23,11 +23,25 @@ def _r2_client():
     )
 
 
-def put_bytes(bucket: str, key: str, data: bytes, content_type: str = "image/jpeg") -> bool:
+def put_bytes(
+    bucket: str,
+    key: str,
+    data: bytes,
+    content_type: str = "image/jpeg",
+    cache_control: Optional[str] = None,
+) -> bool:
     c = _r2_client()
     if c is None:
         return False
-    c.put_object(Bucket=bucket, Key=key, Body=data, ContentType=content_type)
+    kwargs = {
+        "Bucket": bucket,
+        "Key": key,
+        "Body": data,
+        "ContentType": content_type,
+    }
+    if cache_control:
+        kwargs["CacheControl"] = cache_control
+    c.put_object(**kwargs)
     return True
 
 

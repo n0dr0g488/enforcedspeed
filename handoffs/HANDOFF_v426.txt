@@ -1,0 +1,55 @@
+HANDOFF — EnforcedSpeed Web (v426)
+
+Current live target
+- /healthz is the source of truth for what’s live (ok v### pid=...).
+- Going live = git add/commit/push (Render deploys from GitHub).
+
+What shipped in v426 (Stage 9.5B — Profile photo upload + Vision SafeSearch)
+- Added optional profile photo upload (1 max) on your own profile page.
+- Upload is synchronous: normalize -> SafeSearch scan -> upload to R2 -> save to DB.
+  - If SafeSearch fails or is unavailable, upload is rejected (fail closed).
+- Profile photo displays everywhere avatars appear:
+  - header “My Profile”
+  - Home feed post cards
+  - comments + replies
+  - profile header
+- Includes a Remove photo button to revert to the built-in avatar.
+
+Implementation notes
+- User model: added users.profile_photo_key (nullable).
+  - Stores a base key WITHOUT suffix, e.g. profile_photos/<user_id>/<uuid>
+  - R2 objects written:
+    - <base>_64.jpg  (header/feed)
+    - <base>_256.jpg (profile)
+- System avatar choice remains in users.avatar_key (a01–a30).
+- When a profile photo is set, the built-in avatar picker is visually disabled (remove photo to switch back).
+
+R2 + URL configuration
+- Uses existing R2 credentials:
+  - R2_ENDPOINT
+  - R2_ACCESS_KEY_ID
+  - R2_SECRET_ACCESS_KEY
+- Bucket/prefix for profile photos (defaults are safe for the existing public static bucket):
+  - R2_PROFILE_BUCKET (default: enforcedspeed-static)
+  - R2_PROFILE_PREFIX (default: profile_photos/)
+- Public serving URL base for profile photos:
+  - PROFILE_PHOTO_BASE_URL (recommended) e.g. https://static.enforcedspeed.com/profile_photos
+  - If not set, app derives from STATIC_PIN_BASE_URL (…/pins -> …/profile_photos)
+
+SafeSearch policy
+- Reject if adult OR racy is LIKELY / VERY_LIKELY.
+
+Non-negotiable guardrails (NO REGRESSIONS)
+- Ticket card static maps must continue to render on Home feed.
+- Static ticket map centering logic stays: county-centered unless explicitly pin-centered.
+- Custom pin sizing stays (no massive pins).
+- Right-rail layout stays: flush/sharp panel style (no wrapper duplication).
+- Trending/Follow tables must keep county/state names (never raw GEOIDs).
+- No expensive geometry unions at request time (cache/precompute only).
+- One theme per ZIP.
+
+Render deploy SOP (avoid “spinning deploy” confusion)
+- Health check path: /healthz
+- Start command: gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Never set PORT in Render env vars (Render supplies it).
+- If /healthz shows the new version → it’s live.

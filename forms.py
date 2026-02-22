@@ -235,6 +235,25 @@ class AvatarPickForm(FlaskForm):
     submit = SubmitField("Save")
 
 
+class ProfilePhotoUploadForm(FlaskForm):
+    """Upload a single profile photo (v426)."""
+
+    photo = FileField(
+        "Profile photo",
+        validators=[
+            DataRequired(),
+            FileAllowed(["jpg", "jpeg", "png", "webp", "heic", "heif"], "Upload a JPG/JPEG/PNG/WebP/HEIC/HEIF image."),
+        ],
+    )
+    submit = SubmitField("Upload")
+
+
+class CSRFOnlyForm(FlaskForm):
+    """CSRF-only form helper."""
+
+    submit = SubmitField("Submit")
+
+
 class ChangePasswordForm(FlaskForm):
     current_password = PasswordField("Current Password", validators=[DataRequired()])
     new_password = PasswordField("New Password", validators=[DataRequired(), Length(min=8, max=128)])

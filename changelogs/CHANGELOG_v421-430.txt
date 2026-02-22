@@ -30,3 +30,10 @@ v425
 - Profile: added built-in system avatars (picker + display across the site).
   - Users can pick from ~30 avatars on their profile.
   - Avatar shows next to usernames on posts/comments and in the header “My Profile” button.
+
+
+v426
+- Profile: added optional uploaded profile photo (1 max) stored in R2.
+  - Upload is blocked unless Google Vision SafeSearch passes (adult/racy).
+  - Auto-crops to square and stores 64px + 256px JPEG sizes.
+  - Photo displays everywhere avatars appear; remove button reverts to built-in avatar.

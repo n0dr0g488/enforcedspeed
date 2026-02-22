@@ -77,6 +77,27 @@ def normalize_avatar_key(key: str | None) -> str:
         return k
     return _DEFAULT_SYSTEM_AVATAR_KEY
 
+
+# -----------------------------------------------------------------------------
+# PROFILE PHOTO AVATARS (v426)
+#
+# Users may upload ONE profile photo (square-cropped + resized). We store the
+# profile photo in Cloudflare R2 (public bucket) after a Google Vision SafeSearch
+# check (adult/racy). We keep `users.avatar_key` for the system avatar choice,
+# and store the uploaded photo base key separately on the user:
+#   users.profile_photo_key = "profile_photos/<uid>/<uuid>"  (NO suffix)
+# We then store two objects:
+#   <profile_photo_key>_64.jpg  (header/feed)
+#   <profile_photo_key>_256.jpg (profile)
+# -----------------------------------------------------------------------------
+
+
+def user_profile_photo_key(user) -> str:
+    try:
+        return (getattr(user, "profile_photo_key", None) or "").strip().lstrip("/")
+    except Exception:
+        return ""
+
 def _get_county_filter_from_request():
     """Parse county filter from query params.
 
@@ -188,6 +209,8 @@ from forms import (
     FollowCountyForm,
     ProfileCarForm,
     AvatarPickForm,
+    ProfilePhotoUploadForm,
+    CSRFOnlyForm,
     ProfileDefaultFiltersForm,
 )
 from models import db, SpeedReport, User, Like, Comment, FollowedCounty, normalize_road, state_code_from_value
@@ -290,7 +313,7 @@ def ensure_schema_patches() -> None:
         _ensure_col(conn, "users", "birthdate", "birthdate DATE")
 
 from queue_utils import get_queue
-from r2_utils import put_bytes
+from r2_utils import put_bytes, delete_object
 
 
 STATE_OPTIONS = [
@@ -1262,18 +1285,65 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_helpers():
-        def user_avatar_url(user) -> str:
+        def _profile_photo_base_url() -> str:
+            """Public URL base for profile photos.
+
+            Priority:
+              1) PROFILE_PHOTO_BASE_URL (env/config) — e.g. https://static.enforcedspeed.com/profile_photos
+              2) derive from STATIC_PIN_BASE_URL — e.g. https://static.enforcedspeed.com/pins -> /profile_photos
+            """
             try:
-                key = normalize_avatar_key(getattr(user, "avatar_key", None))
+                cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
+            except Exception:
+                cfg = (os.environ.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
+            if cfg:
+                return cfg
+
+            try:
+                pin = (app.config.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+            except Exception:
+                pin = (os.environ.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+            if not pin:
+                return ""
+            base = pin
+            if base.endswith("/pins"):
+                base = base[: -len("/pins")]
+            base = base.rstrip("/")
+            return base + "/profile_photos"
+
+        def user_avatar_url(user, size: str = "sm") -> str:
+            """Return a URL for the user's avatar.
+
+            size:
+              - "sm" => 64px (header/feed)
+              - "lg" => 256px (profile)
+            """
+            try:
+                base_key = user_profile_photo_key(user) if user else ""
+                if base_key:
+                    base_url = _profile_photo_base_url()
+                    if base_url and base_key:
+                        suffix = "_256.jpg" if str(size).lower() in ("lg", "large", "256") else "_64.jpg"
+                        return f"{base_url.rstrip('/')}/{base_key}{suffix}"
+
+                raw = getattr(user, "avatar_key", None) if user else None
+                key = normalize_avatar_key(raw)
                 return url_for("static", filename=f"img/avatars/{key}.png")
             except Exception:
                 return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png")
+
+        def user_avatar_is_photo(user) -> bool:
+            try:
+                return bool(user_profile_photo_key(user) if user else "")
+            except Exception:
+                return False
 
         return {
             "format_road_bucket": format_road_bucket,
             "static_map_url": static_map_url,
             "county_static_map_url": county_static_map_url,
             "user_avatar_url": user_avatar_url,
+            "user_avatar_is_photo": user_avatar_is_photo,
             "system_avatars": system_avatars,
             "default_avatar_key": _DEFAULT_SYSTEM_AVATAR_KEY,
         }
@@ -4067,6 +4137,233 @@ GROUP BY UPPER(TRIM(stusps));
             "auth": True,
             "avatar_key": key,
             "avatar_url": url_for("static", filename=f"img/avatars/{key}.png"),
+        })
+
+
+    # --- Profile photo upload (v426) ---
+    @app.post("/api/profile/photo")
+    def api_profile_photo_upload():
+        """Upload/replace the current user's profile photo (1 max), SafeSearch gated."""
+        if not current_user.is_authenticated:
+            try:
+                login_url = url_for("login", next=(request.form.get("next") or request.args.get("next") or request.referrer or "/"))
+            except Exception:
+                login_url = url_for("login")
+            return jsonify({"ok": False, "auth": False, "login_url": login_url}), 401
+
+        form = ProfilePhotoUploadForm()
+        if not form.validate_on_submit():
+            return jsonify({"ok": False, "error": "bad_request", "message": "Invalid upload."}), 400
+
+        file_obj = form.photo.data
+        if not file_obj:
+            return jsonify({"ok": False, "error": "no_file", "message": "Choose an image."}), 400
+
+        # Tight-ish limits to keep things snappy + cheap.
+        max_bytes = int(os.environ.get("PROFILE_PHOTO_MAX_BYTES", str(6 * 1024 * 1024)))
+        try:
+            raw = file_obj.read()
+        except Exception:
+            raw = b""
+        if not raw:
+            return jsonify({"ok": False, "error": "empty", "message": "That file was empty."}), 400
+        if len(raw) > max_bytes:
+            mb = round(max_bytes / (1024 * 1024), 1)
+            return jsonify({"ok": False, "error": "too_large", "message": f"Keep it under ~{mb} MB."}), 400
+
+        # Normalize: square crop + RGB
+        try:
+            im = Image.open(io.BytesIO(raw))
+            if im.mode in ("RGBA", "P"):
+                im = im.convert("RGB")
+            else:
+                im = im.convert("RGB")
+
+            w, h = im.size
+            side = min(w, h)
+            left = int((w - side) / 2)
+            top = int((h - side) / 2)
+            im = im.crop((left, top, left + side, top + side))
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_image", "message": "Could not read that image."}), 400
+
+        # SafeSearch scan on a smaller normalized version
+        try:
+            scan = im.copy()
+            scan.thumbnail((1024, 1024))
+            scan_buf = io.BytesIO()
+            scan.save(scan_buf, format="JPEG", quality=80, optimize=True)
+            scan_bytes = scan_buf.getvalue()
+
+            from google.cloud import vision
+
+            client = vision.ImageAnnotatorClient()
+            img = vision.Image(content=scan_bytes)
+            resp = client.safe_search_detection(image=img)
+
+            if getattr(resp, "error", None) and getattr(resp.error, "message", ""):
+                raise RuntimeError(resp.error.message)
+
+            ann = getattr(resp, "safe_search_annotation", None)
+            if ann is None:
+                raise RuntimeError("no_annotation")
+
+            # Reject if adult OR racy is LIKELY / VERY_LIKELY.
+            if int(ann.adult) >= int(vision.Likelihood.LIKELY) or int(ann.racy) >= int(vision.Likelihood.LIKELY):
+                return jsonify({
+                    "ok": False,
+                    "error": "unsafe_image",
+                    "message": "Photo rejected (adult/racy content).",
+                }), 400
+        except Exception:
+            # Fail closed.
+            return jsonify({
+                "ok": False,
+                "error": "scan_failed",
+                "message": "Could not verify photo safety. Try again.",
+            }), 500
+
+        # Render sizes
+        try:
+            im64 = im.resize((64, 64), Image.LANCZOS)
+            b64 = io.BytesIO()
+            im64.save(b64, format="JPEG", quality=85, optimize=True)
+            bytes64 = b64.getvalue()
+
+            im256 = im.resize((256, 256), Image.LANCZOS)
+            b256 = io.BytesIO()
+            im256.save(b256, format="JPEG", quality=85, optimize=True)
+            bytes256 = b256.getvalue()
+        except Exception:
+            return jsonify({"ok": False, "error": "encode_failed", "message": "Could not process that photo."}), 400
+
+        # R2 upload (public bucket)
+        missing = [k for k in ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY") if not (os.environ.get(k) or "").strip()]
+        if missing:
+            return jsonify({"ok": False, "error": "missing_r2", "message": "R2 is not configured."}), 500
+
+        bucket = (os.environ.get("R2_PROFILE_BUCKET") or app.config.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip() or "enforcedspeed-static"
+        prefix = (os.environ.get("R2_PROFILE_PREFIX") or app.config.get("R2_PROFILE_PREFIX") or "profile_photos/").strip() or "profile_photos/"
+        prefix = prefix.lstrip("/")
+        if prefix and not prefix.endswith("/"):
+            prefix = prefix + "/"
+
+        base_key = f"{prefix}{current_user.id}/{uuid.uuid4().hex}"
+        key64 = base_key + "_64.jpg"
+        key256 = base_key + "_256.jpg"
+
+        cache = "public, max-age=31536000, immutable"
+        ok1 = put_bytes(bucket=bucket, key=key64, data=bytes64, content_type="image/jpeg", cache_control=cache)
+        ok2 = put_bytes(bucket=bucket, key=key256, data=bytes256, content_type="image/jpeg", cache_control=cache)
+        if not (ok1 and ok2):
+            # best-effort cleanup
+            try:
+                if ok1:
+                    delete_object(bucket, key64)
+            except Exception:
+                pass
+            try:
+                if ok2:
+                    delete_object(bucket, key256)
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "upload_failed", "message": "Upload failed."}), 500
+
+        # Delete previous photo (if any)
+        try:
+            old_base = user_profile_photo_key(current_user)
+            if old_base:
+                try:
+                    delete_object(bucket, old_base + "_64.jpg")
+                except Exception:
+                    pass
+                try:
+                    delete_object(bucket, old_base + "_256.jpg")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Persist
+        try:
+            current_user.profile_photo_key = base_key
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error", "message": "Could not save."}), 500
+
+        # Build URLs (match template helper behavior)
+        def _profile_base() -> str:
+            cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
+            if cfg:
+                return cfg
+            pin = (app.config.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+            if not pin:
+                pin = (os.environ.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+            if not pin:
+                return ""
+            b = pin
+            if b.endswith("/pins"):
+                b = b[: -len("/pins")]
+            return b.rstrip("/") + "/profile_photos"
+
+        pb = _profile_base()
+        url_sm = f"{pb}/{base_key}_64.jpg" if pb else url_for("static", filename=f"img/avatars/{normalize_avatar_key(current_user.avatar_key)}.png")
+        url_lg = f"{pb}/{base_key}_256.jpg" if pb else url_sm
+
+        return jsonify({
+            "ok": True,
+            "auth": True,
+            "profile_photo_key": base_key,
+            "avatar_url_sm": url_sm,
+            "avatar_url_lg": url_lg,
+        })
+
+
+    @app.post("/api/profile/photo/remove")
+    def api_profile_photo_remove():
+        """Remove the current user's profile photo (revert to system avatar)."""
+        if not current_user.is_authenticated:
+            return jsonify({"ok": False, "auth": False}), 401
+
+        form = CSRFOnlyForm()
+        if not form.validate_on_submit():
+            return jsonify({"ok": False, "error": "bad_csrf", "message": "Invalid request."}), 400
+
+        old_base = user_profile_photo_key(current_user)
+        if old_base:
+            missing = [k for k in ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY") if not (os.environ.get(k) or "").strip()]
+            if not missing:
+                bucket = (os.environ.get("R2_PROFILE_BUCKET") or app.config.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip() or "enforcedspeed-static"
+                try:
+                    delete_object(bucket, old_base + "_64.jpg")
+                except Exception:
+                    pass
+                try:
+                    delete_object(bucket, old_base + "_256.jpg")
+                except Exception:
+                    pass
+
+        try:
+            current_user.profile_photo_key = None
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error", "message": "Could not save."}), 500
+
+        # Return system avatar URLs
+        key = normalize_avatar_key(getattr(current_user, "avatar_key", None))
+        url = url_for("static", filename=f"img/avatars/{key}.png")
+        return jsonify({
+            "ok": True,
+            "avatar_url_sm": url,
+            "avatar_url_lg": url,
         })
 
     def _admin_email_set() -> set[str]:

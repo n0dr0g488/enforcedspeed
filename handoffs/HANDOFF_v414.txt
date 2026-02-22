@@ -1,0 +1,51 @@
+HANDOFF — EnforcedSpeed Web (v414)
+
+Goal (bugfix on v413)
+- Ticket-card Static Maps: fix context pin icon sizing (gray/ghost pins were massive).
+- Ghost pins: make them ~25% less ghosted and eliminate the pink-ish bleed on Static Maps.
+
+What was wrong in v413
+1) Ticket-card Static Maps used 64×64 context icons:
+   - In-county: pin_outside_warmgray.png
+   - Out-of-county: pin_outside_ghostgray.png
+   Result: non-selected pins appeared huge compared to the selected red pin (which already used a 32×32 *_static icon).
+2) Ghost pin looked “pink-ish” on Static Maps because its center was highly transparent, letting map colors bleed through.
+
+What changed in v414
+A) Static Maps context pin sizing
+- app.py (county_static_map_url)
+  - Static Maps marker icons now use app-served /static/img/pins and the 32×32 *_static variants:
+    - Selected: pin_inside_deepred_static.png
+    - In-focus: pin_outside_warmgray_static.png (NEW)
+    - Out-of-focus: pin_outside_ghostgray_static.png (recreated at 32×32)
+  - This guarantees the *_static files exist without requiring pin-host (R2) updates.
+
+B) Ghost pins less ghosted (interactive + static)
+- static/img/pins/pin_outside_ghostgray.png
+  - Increased alpha by ~25% (less transparent).
+- static/img/pins/pin_outside_ghostgray_static.png
+  - Rebuilt from the updated ghost icon at 32×32.
+
+Files added/changed
+- app.py
+- static/img/pins/pin_outside_warmgray_static.png (NEW)
+- static/img/pins/pin_outside_ghostgray.png (alpha boosted)
+- static/img/pins/pin_outside_ghostgray_static.png (32×32 rebuilt)
+- VERSION.txt -> v414
+- changelogs/CHANGELOG_v411-420.txt updated
+
+Non‑negotiable guardrails (still)
+- Do NOT regress ticket card static maps rendering.
+- Do NOT change county-centered static map framing logic.
+- No runtime expensive geometry unions.
+
+Render deploy note (still important)
+- Do NOT set PORT manually in Render. Let Render provide $PORT.
+- Start Command:
+  gunicorn app:app --bind 0.0.0.0:${PORT} --access-logfile - --error-logfile -
+- Health check path: /healthz
+
+Smoke tests
+- Home feed: ticket static maps show red selected pin + correctly sized gray pins + correctly sized ghost pins.
+- Map page: ghost pins are slightly more visible than before (still clearly de-emphasized).
+- No new 500s.

@@ -850,12 +850,19 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
             return val
         return f"{base_url}/static/img/pins"
 
-    pin_base = _static_pin_base_url()
-    icon_url = f"{pin_base}/pin_inside_deepred_static.png"
+    # For Static Maps custom marker icons, we prefer app-served assets so we can guarantee
+    # consistent sizing (the *_static icons) without requiring an external pin host to be
+    # updated in lockstep. Google fetches these URLs directly.
+    pin_base_app = f"{base_url}/static/img/pins"
+
+    # Selected pin (deep red) uses the small static icon.
+    icon_url = f"{pin_base_app}/pin_inside_deepred_static.png"
 
     # Context marker icons (for multi-pin Static Maps):
-    icon_inside_url = f"{pin_base}/pin_outside_warmgray.png"
-    icon_outside_url = f"{pin_base}/pin_outside_ghostgray.png"
+    # - In-focus: mid-gray (small static icon)
+    # - Out-of-focus: ghost gray (small static icon, slightly less transparent)
+    icon_inside_url = f"{pin_base_app}/pin_outside_warmgray_static.png"
+    icon_outside_url = f"{pin_base_app}/pin_outside_ghostgray_static.png"
 
     def _qs(items: list[tuple[str, str]]) -> str:
         """Query-string builder tuned for Google Static Maps.

@@ -19,3 +19,9 @@ v413
   - Selected pin: deep red
   - In-county context pins: mid-gray
   - Out-of-county context pins: ghost gray
+
+v414
+- Ticket-card Static Maps: fix context pin sizing to match the selected red pin (no more massive gray/ghost pins).
+  - Added 32×32 *_static variants for warmgray + ghostgray and updated Static Maps builder to use them.
+- Ghost pins: increased opacity ~25% (less “ghosted”) and reduced background color bleed (eliminates the pink-ish look).
+- Note: Static Maps marker icons are now served from the app’s public /static/img/pins URLs to guarantee the new *_static assets are available.

@@ -18,3 +18,5 @@ python-dotenv>=1.0
 PyJWT>=2.8
 pillow-heif>=0.18.0
 PyMuPDF>=1.24.0
+
+PyJWT>=2.8.0

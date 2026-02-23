@@ -1,0 +1,20 @@
+HANDOFF — EnforcedSpeed Web (v445)
+
+Base
+- Built from v444.
+
+Change (single-theme)
+- Home feed first “blue +” submit tile: fix missing plus sign.
+
+Root cause
+- CSS pseudo-elements for .home-submit-plus-sign (::before/::after) had no content/background/positioning, so the bars never rendered.
+
+Fix
+- Added content:"", position:absolute, and background:#fff to the pseudo-elements.
+- Kept stroke weight aligned with the ring (4px) as requested.
+
+Guardrails
+- No changes to ticket card static maps, centering, pin sizing, right-rail layout, or trending/follow tables.
+
+Deploy
+- Going live = commit + push (Render deploys from GitHub).

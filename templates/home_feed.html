@@ -1145,8 +1145,11 @@ function startAutoLoad(){
   })();
 </script>
 
+{% endif %}
+
 <script>
   // v442 — Home clickwrap (Welcome + policies) with DB-backed acceptance for logged-in users.
+  // IMPORTANT: This script must run for BOTH anonymous and logged-in users.
   (function(){
     const TOS_VERSION = "{{ clickwrap_version|e }}";
     const SERVER_ACCEPTED = {{ 'true' if clickwrap_server_accepted else 'false' }};
@@ -1196,9 +1199,7 @@ function startAutoLoad(){
       const wrap = document.getElementById("es-clickwrap");
       if(!wrap) return;
 
-      if(!hasAccepted()){
-        show();
-      }
+      if(!hasAccepted()) show();
 
       const cb = document.getElementById("es-clickwrap-check");
       const btn = document.getElementById("es-clickwrap-continue");
@@ -1216,5 +1217,4 @@ function startAutoLoad(){
     });
   })();
 </script>
-{% endif %}
 {% endblock %}

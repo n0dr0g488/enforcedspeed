@@ -1,0 +1,30 @@
+HANDOFF — EnforcedSpeed Web (Base: v442)
+
+Change theme (single theme):
+1) Clickwrap robustness fix
+2) Make the blue “+” first tile half-height
+
+What changed
+
+A) Clickwrap robustness
+Problem observed:
+- In v442, the clickwrap HTML existed for everyone, but the JS that opens it was accidentally placed inside a conditional block that only rendered when:
+  current_user.is_authenticated AND maps_api_key is present.
+- Result: anonymous users (including friends / incognito not logged in) often never saw the clickwrap.
+
+Fix:
+- Moved the clickwrap JS out of that conditional so it always runs for both anonymous and logged-in users.
+- Still uses DB-backed acceptance for logged-in users (users.tos_accepted_at + users.tos_version) and localStorage/cookie for anonymous.
+
+B) “+” first tile sizing
+- Reduced the blue “+” tile height to ~half of v442 by changing --plus-card-h in templates/_mvp_styles.html:
+  Desktop: 48px (was 96px)
+  Mobile: 42px (was 84px)
+- Slightly reduced ring border thickness (5px -> 4px) so it still looks balanced.
+
+Guardrails
+- No changes to ticket maps, centering logic, right rail, or county names.
+
+Deploy
+- Going live = git add/commit/push, then confirm /healthz shows v443.
+- Confirm clickwrap appears for new/anonymous users (incognito) and persists in DB for logged-in users.

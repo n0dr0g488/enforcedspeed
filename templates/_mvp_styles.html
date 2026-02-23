@@ -329,7 +329,8 @@
       a.home-welcome-link.home-welcome-card{
         background:#2563eb;
         /* Match a thinner "composer row" feel (FB-like) */
-        --plus-card-h: 96px;
+        /* User refinement: make this roughly half-height */
+        --plus-card-h: 48px;
         padding: 6px;
         display:flex;
         align-items:center;
@@ -342,7 +343,7 @@
       .home-submit-plus-ring{
         width: calc(var(--plus-card-h) - 14px);
         height: calc(var(--plus-card-h) - 14px);
-        border: 5px solid #ffffff;
+        border: 4px solid #ffffff;
         border-radius: 999px;
         display:flex;
         align-items:center;
@@ -360,7 +361,7 @@
       .home-submit-plus-sign::after{ top:0; bottom:0; left:44%; width:12%; }
 
       @media (max-width: 640px){
-        a.home-welcome-link.home-welcome-card{ --plus-card-h: 84px; }
+        a.home-welcome-link.home-welcome-card{ --plus-card-h: 42px; }
       }
 
 

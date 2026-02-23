@@ -1,0 +1,15 @@
+HANDOFF — EnforcedSpeed Web (v446)
+
+Base
+- Built from v445 (no other changes).
+
+Change (single theme)
+- Home feed first blue “+” submit tile: reduce the blue bar height by ~20%.
+
+What changed
+- templates/_mvp_styles.html
+  - --plus-card-h: 48px -> 38px (desktop)
+  - mobile override: 42px -> 34px
+
+Guardrails
+- No changes to ticket card static maps, minimap, tables, routes, or clickwrap logic.

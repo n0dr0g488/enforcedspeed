@@ -1,0 +1,13 @@
+HANDOFF — EnforcedSpeed Web v444
+
+Base: v443
+Change scope (one tweak only)
+- Home feed first blue “+” submit tile: make the plus stroke thickness match the white ring stroke.
+
+What changed
+- templates/_mvp_styles.html
+  - Replaced percentage-based plus bar thickness with a fixed stroke variable (--plus-stroke: 4px)
+  - Centered bars using calc(50% - stroke/2) so it scales cleanly.
+
+Guardrails
+- No changes to maps, minimap, trending tables, clickwrap logic, or routes.

@@ -349,16 +349,11 @@
         align-items:center;
         justify-content:center;
       }
-      .home-submit-plus-sign{ width: 44%; height: 44%; position:relative; }
+      .home-submit-plus-sign{ width: 44%; height: 44%; position:relative; --plus-stroke:4px; }
       .home-submit-plus-sign::before,
-      .home-submit-plus-sign::after{
-        content:"";
-        position:absolute;
-        background:#ffffff;
-        border-radius: 999px;
-      }
-      .home-submit-plus-sign::before{ left:0; right:0; top:44%; height:12%; }
-      .home-submit-plus-sign::after{ top:0; bottom:0; left:44%; width:12%; }
+      .home-submit-plus-sign::after{ top:0; bottom:0; left: calc(50% - (var(--plus-stroke) / 2)); width: var(--plus-stroke); }
+      .home-submit-plus-sign::before{ left:0; right:0; top: calc(50% - (var(--plus-stroke) / 2)); height: var(--plus-stroke); }
+      .home-submit-plus-sign::after{ top:0; bottom:0; left: calc(50% - (var(--plus-stroke) / 2)); width: var(--plus-stroke); }
 
       @media (max-width: 640px){
         a.home-welcome-link.home-welcome-card{ --plus-card-h: 42px; }

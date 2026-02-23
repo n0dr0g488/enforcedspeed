@@ -328,18 +328,21 @@
       /* First tile: blue submit "+" */
       a.home-welcome-link.home-welcome-card{
         background:#2563eb;
-        padding: 10px;
+        /* Match a thinner "composer row" feel (FB-like) */
+        --plus-card-h: 96px;
+        padding: 6px;
         display:flex;
         align-items:center;
         justify-content:center;
-        min-height: 124px;
+        height: var(--plus-card-h);
+        min-height: var(--plus-card-h);
       }
       a.home-welcome-link.home-welcome-card:hover{ opacity:.98; }
       .home-submit-plus-inner{ width:100%; display:flex; align-items:center; justify-content:center; }
       .home-submit-plus-ring{
-        width: 92%;
-        aspect-ratio: 1 / 1;
-        border: 6px solid #ffffff;
+        width: calc(var(--plus-card-h) - 14px);
+        height: calc(var(--plus-card-h) - 14px);
+        border: 5px solid #ffffff;
         border-radius: 999px;
         display:flex;
         align-items:center;
@@ -355,6 +358,10 @@
       }
       .home-submit-plus-sign::before{ left:0; right:0; top:44%; height:12%; }
       .home-submit-plus-sign::after{ top:0; bottom:0; left:44%; width:12%; }
+
+      @media (max-width: 640px){
+        a.home-welcome-link.home-welcome-card{ --plus-card-h: 84px; }
+      }
 
 
       .preview {

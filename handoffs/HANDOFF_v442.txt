@@ -1,0 +1,48 @@
+HANDOFF — EnforcedSpeed Web v442 (Clickwrap DB acceptance + thinner “+” tile)
+
+Base
+- Built strictly on v441 (no other feature work).
+
+What changed (only these items)
+1) Clickwrap acceptance is now DB-backed for logged-in users
+- Added users.tos_accepted_at (timestamp) and users.tos_version (string).
+- Added CLICKWRAP_TOS_VERSION constant (currently: 2026-02-22).
+- Home page clickwrap now considers BOTH:
+  - server acceptance (logged-in users)
+  - localStorage/cookie (device)
+- When a logged-in user clicks Continue, client POSTs to /api/accept_terms and stores:
+  - tos_accepted_at = utcnow
+  - tos_version = CLICKWRAP_TOS_VERSION
+
+2) First “submit +” tile is now thin (FB-like row)
+- Reduced tile height to a fixed ~96px desktop / 84px mobile.
+- Kept the same link destination as before.
+
+Important fix included (within the same clickwrap theme)
+- v441 had a broken <script> injection inside the pin-refine JS block in templates/home_feed.html.
+- v442 repairs that so pin refine JS is syntactically valid again and the clickwrap script lives outside that block.
+
+Smoke checklist
+- /healthz returns v442
+- Home loads: ticket static maps still render
+- Clickwrap appears for new users, can be dismissed
+- Logged-in users who accept should not be prompted again (even on a fresh browser) once DB is updated
+- Pin refine modal (if used) still works (no JS console syntax errors)
+
+DB / Migration notes
+- This repo includes a conservative runtime schema patcher that auto-adds missing columns.
+  => On Render, deploying v442 will typically add users.tos_accepted_at + users.tos_version automatically at startup.
+
+If you WANT a formal migration anyway (optional)
+- Local:
+  flask db migrate -m "add tos acceptance fields"
+  flask db upgrade
+- Render:
+  run the same upgrade via a one-off shell/command runner if you use it, or deploy and rely on schema patcher.
+
+Files touched
+- models.py (User: tos_accepted_at, tos_version)
+- app.py (CLICKWRAP_TOS_VERSION, /api/accept_terms, pass server acceptance to template)
+- templates/home_feed.html (fixed broken script, DB-backed clickwrap POST)
+- templates/_mvp_styles.html (thin + tile sizing)
+- VERSION.txt

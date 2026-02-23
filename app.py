@@ -14,6 +14,11 @@ except Exception:
     _ES_VERSION = "unknown"
 
 
+# Clickwrap agreement version (v442).
+# Bump this string only when Terms/Privacy/Cookie policies meaningfully change.
+CLICKWRAP_TOS_VERSION = "2026-02-22"
+
+
 # -----------------------------------------------------------------------------
 # SYSTEM AVATARS (v425)
 #
@@ -3710,6 +3715,18 @@ GROUP BY UPPER(TRIM(stusps));
             trending_counties = []
             followed_counties = []
             followed_geoids = set()
+
+        # Clickwrap acceptance: if a logged-in user has accepted the current policy
+        # version, we should not show the modal even if localStorage is empty.
+        clickwrap_server_accepted = False
+        try:
+            if current_user.is_authenticated:
+                v = getattr(current_user, "tos_version", None)
+                ts = getattr(current_user, "tos_accepted_at", None)
+                clickwrap_server_accepted = bool(ts and (v == CLICKWRAP_TOS_VERSION))
+        except Exception:
+            clickwrap_server_accepted = False
+
         return render_template(
 
             "home_feed.html",
@@ -3759,6 +3776,8 @@ GROUP BY UPPER(TRIM(stusps));
             show_deleted=show_deleted,
             deleted_mode=deleted_mode,
             deleted_only=deleted_only,
+            clickwrap_version=CLICKWRAP_TOS_VERSION,
+            clickwrap_server_accepted=clickwrap_server_accepted,
         )
 
 
@@ -4152,6 +4171,36 @@ GROUP BY UPPER(TRIM(stusps));
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "db_error"}), 500
+
+
+
+    # --- Clickwrap acceptance (v442) ---
+    @app.post("/api/accept_terms")
+    @login_required
+    def api_accept_terms():
+        """Record the current user's acceptance of Terms/Privacy/Cookies clickwrap."""
+        try:
+            payload = request.get_json(silent=True) or {}
+        except Exception:
+            payload = {}
+
+        ver = (payload.get("version") or "").strip()
+        # Only accept the current active version.
+        if ver != CLICKWRAP_TOS_VERSION:
+            return jsonify({"ok": False, "error": "bad_version", "version": CLICKWRAP_TOS_VERSION}), 400
+
+        try:
+            current_user.tos_accepted_at = datetime.utcnow()
+            current_user.tos_version = CLICKWRAP_TOS_VERSION
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+        return jsonify({"ok": True, "version": CLICKWRAP_TOS_VERSION})
 
 
 

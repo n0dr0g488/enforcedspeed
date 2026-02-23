@@ -1123,11 +1123,38 @@ function startAutoLoad(){
           body: JSON.stringify({ report_id: activeReportId, lat: lat, lng: lng })
         });
         const data = await res.json().catch(()=>({}));
-        if(res.ok && data
+        if(res.ok && data && data.ok){
+          showStatus(data.snapped ? 'Saved. Pin snapped to nearest road.' : 'Saved.');
+          // Reload to refresh static map image + any downstream aggregates.
+          setTimeout(()=>{ window.location.reload(); }, 450);
+        }else{
+          showStatus('Could not save pin. Please try again.');
+          btnSave.disabled = false;
+        }
+      }catch(e){
+        showStatus('Could not save pin. Please try again.');
+        btnSave.disabled = false;
+      }
+    }
+
+    if(backdrop) backdrop.addEventListener('click', close);
+    if(btnCancel) btnCancel.addEventListener('click', close);
+    if(btnSave) btnSave.addEventListener('click', save);
+
+    bindTriggers();
+  })();
+</script>
+
 <script>
+  // v442 — Home clickwrap (Welcome + policies) with DB-backed acceptance for logged-in users.
   (function(){
-    const KEY = "es_clickwrap_v1";
+    const TOS_VERSION = "{{ clickwrap_version|e }}";
+    const SERVER_ACCEPTED = {{ 'true' if clickwrap_server_accepted else 'false' }};
+    const IS_AUTH = {{ 'true' if current_user.is_authenticated else 'false' }};
+    const KEY = "es_clickwrap_" + TOS_VERSION;
+
     function hasAccepted(){
+      if(SERVER_ACCEPTED) return true;
       try { return window.localStorage && localStorage.getItem(KEY) === "1"; } catch(e) {}
       // cookie fallback
       return document.cookie.split(";").some(v => v.trim().startsWith(KEY + "=1"));
@@ -1152,6 +1179,19 @@ function startAutoLoad(){
       document.body.classList.remove("es-modal-open");
     }
 
+    async function persistServerAcceptance(){
+      if(!IS_AUTH) return;
+      try{
+        await fetch('/api/accept_terms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ version: TOS_VERSION })
+        });
+      }catch(e){
+        // Non-blocking: local acceptance still prevents repeat prompts on this device.
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", function(){
       const wrap = document.getElementById("es-clickwrap");
       if(!wrap) return;
@@ -1169,31 +1209,11 @@ function startAutoLoad(){
         btn.addEventListener("click", function(){
           if(!cb.checked) return;
           setAccepted();
+          persistServerAcceptance();
           hide();
         });
       }
     });
-  })();
-</script>
- && data.ok){
-          showStatus(data.snapped ? 'Saved. Pin snapped to nearest road.' : 'Saved.');
-          // Reload to refresh static map image + any downstream aggregates.
-          setTimeout(()=>{ window.location.reload(); }, 450);
-        }else{
-          showStatus('Could not save pin. Please try again.');
-          btnSave.disabled = false;
-        }
-      }catch(e){
-        showStatus('Could not save pin. Please try again.');
-        btnSave.disabled = false;
-      }
-    }
-
-    if(backdrop) backdrop.addEventListener('click', close);
-    if(btnCancel) btnCancel.addEventListener('click', close);
-    if(btnSave) btnSave.addEventListener('click', save);
-
-    bindTriggers();
   })();
 </script>
 {% endif %}

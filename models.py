@@ -138,6 +138,11 @@ class User(UserMixin, db.Model):
     # Profile photo (v426): optional uploaded avatar photo stored in R2.
     # Stores a base key WITHOUT the size suffix, e.g. "profile_photos/<uid>/<uuid>".
     profile_photo_key = db.Column(db.String(255), nullable=True)
+
+    # Clickwrap acceptance (v442): store user's agreement timestamp + version.
+    tos_accepted_at = db.Column(db.DateTime, nullable=True)
+    tos_version = db.Column(db.String(32), nullable=True)
+
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     # Password reset rate limiting (per account)

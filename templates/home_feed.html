@@ -16,6 +16,33 @@
   .minimap-crop img{width:100%; height:130%; object-fit:cover; object-position:50% 42%; display:block;}
 
 </style>
+<!-- v441 — Home clickwrap (Welcome + policies) -->
+<div id="es-clickwrap" class="es-clickwrap" aria-hidden="true">
+  <div class="es-clickwrap-backdrop"></div>
+  <div class="es-clickwrap-panel" role="dialog" aria-modal="true" aria-labelledby="es-clickwrap-title">
+    <div class="es-clickwrap-title" id="es-clickwrap-title">Welcome to EnforcedSpeed.</div>
+    <div class="es-clickwrap-body">EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.</div>
+    <div class="es-clickwrap-terms">
+      By using this service you agree to our
+      <a href="{{ url_for('terms') }}" target="_blank" rel="noopener">Terms</a>,
+      <a href="{{ url_for('privacy') }}" target="_blank" rel="noopener">Privacy</a>,
+      and
+      <a href="{{ url_for('cookies') }}" target="_blank" rel="noopener">Cookie Policy</a>.
+    </div>
+
+    <label class="es-clickwrap-check">
+      <input id="es-clickwrap-check" type="checkbox" />
+      <span>I agree</span>
+    </label>
+
+    <button id="es-clickwrap-continue" class="es-clickwrap-btn" type="button" disabled>Continue</button>
+
+    <div class="es-clickwrap-footer">
+      <a href="{{ url_for('login', next=request.path) }}">Log in</a> to prevent this message again.
+    </div>
+  </div>
+</div>
+
 
 
 <div class="home-shell">
@@ -232,20 +259,12 @@
       {% endif %}
 
       <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
-        <div class="home-intro">
-          <div class="home-intro-titleline">
-            <span class="home-intro-title">Welcome to EnforcedSpeed.</span>
-            <span class="home-intro-dash">—</span>
-            <span class="home-intro-cta-wrap">
-              <span class="home-intro-cta">Click this tile to create an account and post your ticket.</span>
-              <img class="home-intro-arrow" src="{{ url_for('static', filename='img/cta_arrow_right_blue.png') }}" alt="">
-            </span>
-          </div>
-          <div class="home-intro-body">
-            EnforcedSpeed aggregates real-world speeding ticket data submitted by drivers. Posted speed limits are the law and must always be obeyed. This site does not provide legal advice, encourage speeding, or suggest that any enforcement patterns replace posted limits.
-          </div>
-        </div>
-      </a>
+  <div class="home-submit-plus-inner" aria-hidden="true">
+    <div class="home-submit-plus-ring">
+      <div class="home-submit-plus-sign"></div>
+    </div>
+  </div>
+</a>
 
       {# Feed starts immediately below welcome card. #}
 
@@ -1104,7 +1123,59 @@ function startAutoLoad(){
           body: JSON.stringify({ report_id: activeReportId, lat: lat, lng: lng })
         });
         const data = await res.json().catch(()=>({}));
-        if(res.ok && data && data.ok){
+        if(res.ok && data
+<script>
+  (function(){
+    const KEY = "es_clickwrap_v1";
+    function hasAccepted(){
+      try { return window.localStorage && localStorage.getItem(KEY) === "1"; } catch(e) {}
+      // cookie fallback
+      return document.cookie.split(";").some(v => v.trim().startsWith(KEY + "=1"));
+    }
+    function setAccepted(){
+      try { if (window.localStorage) localStorage.setItem(KEY, "1"); } catch(e) {}
+      // 180-day cookie fallback
+      try { document.cookie = KEY + "=1; Max-Age=" + (60*60*24*180) + "; Path=/; SameSite=Lax"; } catch(e) {}
+    }
+    function show(){
+      const wrap = document.getElementById("es-clickwrap");
+      if(!wrap) return;
+      wrap.setAttribute("aria-hidden","false");
+      wrap.classList.add("is-open");
+      document.body.classList.add("es-modal-open");
+    }
+    function hide(){
+      const wrap = document.getElementById("es-clickwrap");
+      if(!wrap) return;
+      wrap.setAttribute("aria-hidden","true");
+      wrap.classList.remove("is-open");
+      document.body.classList.remove("es-modal-open");
+    }
+
+    document.addEventListener("DOMContentLoaded", function(){
+      const wrap = document.getElementById("es-clickwrap");
+      if(!wrap) return;
+
+      if(!hasAccepted()){
+        show();
+      }
+
+      const cb = document.getElementById("es-clickwrap-check");
+      const btn = document.getElementById("es-clickwrap-continue");
+      if(cb && btn){
+        const sync = () => { btn.disabled = !cb.checked; };
+        cb.addEventListener("change", sync);
+        sync();
+        btn.addEventListener("click", function(){
+          if(!cb.checked) return;
+          setAccepted();
+          hide();
+        });
+      }
+    });
+  })();
+</script>
+ && data.ok){
           showStatus(data.snapped ? 'Saved. Pin snapped to nearest road.' : 'Saved.');
           // Reload to refresh static map image + any downstream aggregates.
           setTimeout(()=>{ window.location.reload(); }, 450);

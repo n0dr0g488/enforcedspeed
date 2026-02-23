@@ -1,0 +1,29 @@
+HANDOFF — EnforcedSpeed Web (v441)
+
+Theme: Home clickwrap + submit tile (one change)
+
+What changed
+- Home page now shows a blocking clickwrap modal on first visit:
+  - Reuses the exact “Welcome to EnforcedSpeed…” copy that used to live in the first tile.
+  - Adds: “By using this service you agree to our Terms, Privacy, and Cookie Policy” (links open in new tab).
+  - Requires an unchecked “I agree” checkbox, then “Continue” (button disabled until checked).
+  - Small footer: “Log in to prevent this message again.”
+
+Persistence
+- Acceptance is stored client-side:
+  - localStorage key: es_clickwrap_v1 = "1"
+  - cookie fallback (SameSite=Lax, 180 days)
+
+Home feed first tile
+- The previous Welcome/CTA tile is replaced by a large, intuitive submit tile:
+  - Blue card, large white ring and white plus inside.
+  - Same link target as before (register->submit for logged-out, submit for logged-in).
+
+Files touched
+- templates/home_feed.html
+- templates/_mvp_styles.html
+- VERSION.txt
+
+Guardrails respected
+- No changes to ticket card static maps, minimap logic, or trending tables.
+- No deployment/start-command changes.

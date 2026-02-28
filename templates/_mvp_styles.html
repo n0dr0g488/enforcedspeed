@@ -325,32 +325,48 @@
       .es-clickwrap-footer a{ color:#2563eb; text-decoration:none; }
       .es-clickwrap-footer a:hover{ text-decoration:underline; }
 
-      /* First tile: blue submit "+" */
+      /* First tile: blue submit CTA pill (v448) */
       a.home-welcome-link.home-welcome-card{
-        background:#2563eb;
-        /* Match a thinner "composer row" feel (FB-like) */
-        /* User refinement: make this roughly half-height */
-        /* v446: reduce bar height by 20% */
-        --plus-card-h: 38px;
-        padding: 6px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        --plus-card-h: 44px;
+        padding: 0 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         height: var(--plus-card-h);
         min-height: var(--plus-card-h);
+        width: fit-content;
+        min-width: 220px;
+        max-width: 60%;
+        margin: 6px auto !important;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.15);
+        box-shadow: 0 2px 8px rgba(37,99,235,0.35);
+        gap: 10px;
+        text-decoration: none;
+        transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
       }
-      a.home-welcome-link.home-welcome-card:hover{ opacity:.98; }
-      .home-submit-plus-inner{ width:100%; display:flex; align-items:center; justify-content:center; }
+      a.home-welcome-link.home-welcome-card:hover{
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        box-shadow: 0 4px 16px rgba(37,99,235,0.45);
+        transform: translateY(-1px);
+      }
+      a.home-welcome-link.home-welcome-card:active{
+        transform: translateY(0px);
+        box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+      }
+      .home-submit-plus-inner{ display:flex; align-items:center; justify-content:center; gap:10px; }
       .home-submit-plus-ring{
-        width: calc(var(--plus-card-h) - 14px);
-        height: calc(var(--plus-card-h) - 14px);
+        width: calc(var(--plus-card-h) - 20px);
+        height: calc(var(--plus-card-h) - 20px);
         border: 1.5px solid rgba(255,255,255,0.85);
         border-radius: 999px;
         display:flex;
         align-items:center;
         justify-content:center;
+        flex-shrink: 0;
       }
-      /* Plus sign: match ring stroke weight and ensure pseudo-elements actually render */
+      /* Plus sign */
       .home-submit-plus-sign{ width: 40%; height: 40%; position:relative; --plus-stroke:1.5px; }
       .home-submit-plus-sign::before,
       .home-submit-plus-sign::after{
@@ -373,9 +389,16 @@
         left: calc(50% - (var(--plus-stroke) / 2));
         width: var(--plus-stroke);
       }
+      .home-submit-cta-label{
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+      }
 
       @media (max-width: 640px){
-        a.home-welcome-link.home-welcome-card{ --plus-card-h: 34px; }
+        a.home-welcome-link.home-welcome-card{ max-width: 80%; min-width: 180px; }
       }
 
 

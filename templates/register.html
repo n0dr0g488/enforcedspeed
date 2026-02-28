@@ -63,11 +63,17 @@
     <span class="es-tooltip">Password must be at least 8 characters.</span>
   </span>
 </label>
-            {{ form.password(id="password", autocomplete="new-password") }}
+            <div style="position:relative;">
+              {{ form.password(id="password", autocomplete="new-password") }}
+              <button type="button" onclick="esTogglePasswordVis('password', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6b7280;font-size:13px;padding:0;">Show</button>
+            </div>
           </div>
           <div>
             <label for="confirm_password" class="es-label">{{ form.confirm_password.label.text }}</label>
-            {{ form.confirm_password(id="confirm_password", autocomplete="new-password") }}
+            <div style="position:relative;">
+              {{ form.confirm_password(id="confirm_password", autocomplete="new-password") }}
+              <button type="button" onclick="esTogglePasswordVis('confirm_password', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6b7280;font-size:13px;padding:0;">Show</button>
+            </div>
           </div>
         </div>
 

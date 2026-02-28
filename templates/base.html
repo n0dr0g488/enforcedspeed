@@ -124,7 +124,7 @@
       <nav class="header-nav">
         <a href="{{ url_for('home') }}" class="{{ 'active' if request.endpoint=='home' else '' }}">Home</a>
         <a href="{{ url_for('map_view') }}" class="{{ 'active' if request.endpoint=='map_view' else '' }}">Map</a>
-        <a href="{{ url_for('submit') }}" class="{{ 'active' if request.endpoint=='submit' else '' }}">Submit a Ticket</a>
+        <a href="{{ url_for('submit') }}" class="{{ 'active' if request.endpoint=='submit' else '' }}">Submit Ticket</a>
         <a href="{{ url_for('strictness') }}" class="{{ 'active' if request.endpoint=='strictness' else '' }}">Statistics</a>
 
         {% if current_user.is_authenticated %}
@@ -287,6 +287,20 @@
 
   document.addEventListener('DOMContentLoaded', setupCountyFilterAutocomplete);
 })();
+</script>
+
+<script>
+function esTogglePasswordVis(fieldId, btn) {
+  var field = document.getElementById(fieldId);
+  if (!field) return;
+  if (field.type === 'password') {
+    field.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    field.type = 'password';
+    btn.textContent = 'Show';
+  }
+}
 </script>
 
 </body>

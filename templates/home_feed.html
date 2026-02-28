@@ -263,7 +263,7 @@
     <div class="home-submit-plus-ring">
       <div class="home-submit-plus-sign"></div>
     </div>
-    <span class="home-submit-cta-label">Submit a Ticket</span>
+    <span class="home-submit-cta-label">Submit Ticket</span>
   </div>
 </a>
 
@@ -401,7 +401,7 @@
 
   .ticket-speedpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:#111827;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:2;white-space:nowrap}
   .ticket-speedpill--pinmode{top:50%;left:50%;transform:translate(-50%,calc(-100% - 56px))}
-  .ticket-speedpill-over{font-weight:700;color:#f97316;margin-left:8px}
+  .ticket-speedpill-over{font-weight:700;color:#dc2626;margin-left:8px}
   .ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:2}
 
   /* Ticket card center (Version 5). */
@@ -442,7 +442,13 @@
   function toggleComment(id){
     var el=document.getElementById('commentbox-'+id);
     if(!el){return;}
-    el.style.display = (el.style.display==='none' || el.style.display==='') ? 'block' : 'none';
+    var isHidden = (el.style.display==='none' || el.style.display==='');
+    el.style.display = isHidden ? 'block' : 'none';
+    if(isHidden){
+      // Focus the textarea when opened
+      var ta = el.querySelector('textarea');
+      if(ta){ setTimeout(function(){ ta.focus(); }, 50); }
+    }
   }
   function toggleReply(commentId){
     var el=document.getElementById('replybox-'+rootId);

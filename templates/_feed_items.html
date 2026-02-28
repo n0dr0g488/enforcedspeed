@@ -150,26 +150,50 @@
             <form method="post" action="{{ url_for('toggle_like', report_id=r.id) }}" class="js-preserve-scroll" style="margin:0;display:inline;">
               {{ like_form.hidden_tag() }}
               <input type="hidden" name="next" value="{{ return_to }}">
-              <button type="submit" class="action-btn">
-                {% if r.id in user_liked %}Liked{% else %}Like{% endif %}
+              <button type="submit" class="action-btn" style="display:inline-flex;align-items:center;gap:5px;">
+                {% if r.id in user_liked %}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#dc2626" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                {% else %}
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                {% endif %}
+                {{ lc }}
               </button>
             </form>
 
-            <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
-
-            <a class="action-link" href="#" onclick="toggleComment({{ r.id }}); return false;">Comment</a>
+            <a class="action-link" href="#" onclick="toggleComment({{ r.id }}); return false;" style="display:inline-flex;align-items:center;gap:5px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              Comment
+            </a>
 
           {% else %}
-            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Like</a>
-            <span class="subtle">{{ lc }} like{% if lc != 1 %}s{% endif %}</span>
-            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;">Comment</a>
+            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;" style="display:inline-flex;align-items:center;gap:5px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+              {{ lc }}
+            </a>
+            <a class="action-link" href="#" onclick="membersOnly({{ r.id }}); return false;" style="display:inline-flex;align-items:center;gap:5px;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              Comment
+            </a>
             <span id="mo-{{ r.id }}" class="subtle" style="display:none; margin-left:8px;">(must log in)</span>
           {% endif %}
         </div>
 
         {% set bucket_total = a_counts.get((r.state, r.road_key), 0) %}
-        <div class="ticket-total" style="margin-left:auto;text-align:right;">
-</div>
+        <div class="ticket-total" style="margin-left:auto;text-align:right;display:flex;align-items:center;gap:8px;">
+          {% if is_admin %}
+            {% if r.is_deleted %}
+              <form method="post" action="{{ url_for('admin_restore_report', report_id=r.id) }}" class="js-preserve-scroll" style="margin:0;">
+                <input type="hidden" name="next" value="{{ return_to }}">
+                <button type="submit" title="Restore ticket" style="background:none;border:1px solid #d1d5db;border-radius:6px;padding:3px 8px;font-size:11px;color:#6b7280;cursor:pointer;line-height:1.4;">↩ Restore</button>
+              </form>
+            {% else %}
+              <form method="post" action="{{ url_for('admin_delete_report', report_id=r.id) }}" class="js-preserve-scroll" style="margin:0;">
+                <input type="hidden" name="next" value="{{ return_to }}">
+                <button type="submit" title="Soft delete ticket" style="background:none;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:11px;color:#dc2626;cursor:pointer;line-height:1.4;">🗑 Delete</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </div>
         {# Report link later (v3) #}
       
 </div>
@@ -284,15 +308,14 @@
 
       {% if current_user.is_authenticated %}
         <div id="commentbox-{{ r.id }}" style="display:none; margin-top:12px;">
-          <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll">
-            {# Render CSRF only. We'll provide parent_id manually to avoid duplicate fields. #}
+          <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll js-no-collapse-comment">
             {{ comment_form.csrf_token }}
             <input type="hidden" name="next" value="{{ return_to }}">
             <input type="hidden" name="parent_id" value="">
-            <textarea class="js-comment-body" name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a comment…"></textarea>
-            <div style="margin-top:0;">
-              <button type="submit">Post</button>
-              <span class="subtle" style="margin-left:10px;">280 characters max.</span>
+            <textarea class="js-comment-body es-comment-textarea" name="body" maxlength="280" rows="2" placeholder="Add a comment…"></textarea>
+            <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+              <button type="submit" class="es-btn" style="padding:6px 16px;font-size:13px;height:32px;">Post</button>
+              <span class="subtle" style="font-size:12px;">280 characters max</span>
             </div>
           </form>
         </div>

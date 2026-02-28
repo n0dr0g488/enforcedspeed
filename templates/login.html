@@ -37,7 +37,10 @@
         {{ form.email(id="email", autocomplete="email") }}
 
         <label for="password">{{ form.password.label.text }}</label>
-        {{ form.password(id="password", autocomplete="current-password") }}
+        <div style="position:relative;">
+          {{ form.password(id="password", autocomplete="current-password") }}
+          <button type="button" onclick="esTogglePasswordVis('password', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#6b7280;font-size:13px;padding:0;">Show</button>
+        </div>
 
         <button type="submit" class="es-btn" style="width:50%; max-width:320px; min-width:200px; height:44px; display:block; margin:14px auto 0; font-weight:600;">Log In</button>
       </form>

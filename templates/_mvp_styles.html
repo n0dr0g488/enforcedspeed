@@ -555,7 +555,7 @@
 .pill-photo-submitted { background: #2563eb; color: #ffffff; }
 
 .ticket-ocr { display:flex; justify-content:flex-end; }
-.ticket-actions{ font-size: 14px; font-weight: 600; color: #111827; }
+.ticket-actions{ font-size: 14px; font-weight: 600; color: #111827; margin-top: 14px; padding-top: 10px; border-top: 1px solid #f3f4f6; }
 .ticket-actions .action-link,
 .ticket-actions .action-btn,
 .ticket-actions .ticket-total-link{ font-size: 14px !important; font-weight: 600 !important; line-height: 1 !important; color: inherit !important; }
@@ -883,6 +883,29 @@
 
 /* Admin soft delete */
 .pill-deleted{background:#eee;color:#333;border:1px solid rgba(0,0,0,0.12);}
+
+/* Modern comment textarea */
+.es-comment-textarea{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 14px;
+  border:1px solid #e5e7eb;
+  border-radius:20px;
+  font-size:14px;
+  font-family:inherit;
+  color:#111827;
+  background:#f9fafb;
+  resize:none;
+  outline:none;
+  transition:border-color 0.15s, background 0.15s;
+  line-height:1.45;
+}
+.es-comment-textarea:focus{
+  border-color:#2563eb;
+  background:#fff;
+  box-shadow:0 0 0 3px rgba(37,99,235,0.08);
+}
+.es-comment-textarea::placeholder{ color:#9ca3af; }
 
   /* Admin meta action link (admin-only) */
   .admin-meta-link{

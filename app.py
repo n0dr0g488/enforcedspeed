@@ -6356,8 +6356,8 @@ GROUP BY UPPER(TRIM(stusps));
                             .limit(40))
                     inside_pts = [(float(r.lat), float(r.lng)) for r in q_in.all() if r.lat is not None and r.lng is not None]
                     # Drop any point that is close to the selected pin (prevents visual overlap).
-                    _PIN_PROXIMITY = 0.004  # ~450m — keeps grey pins from stacking on the red pin
-                    inside_pts = [(a,b) for (a,b) in inside_pts if (abs(a - pin_lat) > _PIN_PROXIMITY or abs(b - pin_lng) > _PIN_PROXIMITY)]
+                    # Drop any point that is essentially the selected pin (prevents double-stacking).
+                    inside_pts = [(a,b) for (a,b) in inside_pts if (abs(a - pin_lat) > 1e-6 or abs(b - pin_lng) > 1e-6)]
 
                     # Out-of-county context: tickets in the same state but different county,
                     # biased toward nearby points so they are likely to appear in the county-framed map.
@@ -6398,7 +6398,7 @@ GROUP BY UPPER(TRIM(stusps));
                                 return 9e9
                         cand_sorted = sorted(cand, key=dist2)
                         outside_pts = [(float(r.lat), float(r.lng)) for r in cand_sorted if r.lat is not None and r.lng is not None]
-                        outside_pts = [(a,b) for (a,b) in outside_pts if (abs(a - pin_lat) > _PIN_PROXIMITY or abs(b - pin_lng) > _PIN_PROXIMITY)]
+                        outside_pts = [(a,b) for (a,b) in outside_pts if (abs(a - pin_lat) > 1e-6 or abs(b - pin_lng) > 1e-6)]
                 except Exception:
                     inside_pts = []
                     outside_pts = []
@@ -6466,7 +6466,7 @@ GROUP BY UPPER(TRIM(stusps));
         cache_key = None
         try:
             import hashlib
-            cache_key = "es:staticmap:" + hashlib.sha256(upstream.encode("utf-8")).hexdigest()
+            cache_key = "es:staticmap:v2:" + hashlib.sha256(upstream.encode("utf-8")).hexdigest()
         except Exception:
             cache_key = None
 

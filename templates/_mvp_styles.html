@@ -248,9 +248,12 @@
         .home-filters-toggle{ display:inline-block; }
       }
 
-      /* If the viewport can't comfortably fit both rails, hide the right rail first. */
-      @media (max-width: 1400px){
+      /* Show right rail only when there's enough room for it */
+      @media (min-width: 1101px) and (max-width: 1400px){
         .home-right{ display:none; }
+      }
+      @media (min-width: 1401px){
+        .home-right{ display:block; }
       }
       .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 8px 26px rgba(0,0,0,.08); }
       h1 { margin: 0; font-size: 28px; text-align: center; }

@@ -18,37 +18,33 @@
         {% set user_count = user_ticket_counts.get(r.user_id, 0) %}
         <div class="ticket-userline">
           <img class="ticket-avatar" src="{{ user_avatar_url(r.user) }}" alt="">
-          <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
-          <span class="ticket-usercount">({{ user_count }})</span>
-
-          {% if is_admin and r.is_deleted %}
-            <span class="pill pill-deleted" title="This ticket is soft-deleted and excluded from public views and analytics.">Deleted</span>
-          {% endif %}
-        </div>
-
-        {# Under-username metadata line (State / County / Road). #}
-        <div class="ticket-submeta">
-          {# State click should focus the interactive map without forcing a state filter. #}
-          <span class="ticket-submeta-item">
-            {% if state_focus_url %}
-              <a class="ticket-state-link" href="{{ state_focus_url }}">{{ state_name }}</a>
-              <a class="ticket-submeta-count" href="{{ state_focus_url }}">({{ state_ticket_counts.get(r.state, 0) }})</a>
-            {% else %}
-              {{ state_name }} <span class="ticket-submeta-count">({{ state_ticket_counts.get(r.state, 0) }})</span>
+          <div class="ticket-user-info">
+            <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
+            {% if is_admin and r.is_deleted %}
+              <span class="pill pill-deleted" title="This ticket is soft-deleted and excluded from public views and analytics.">Deleted</span>
             {% endif %}
-          </span>
-          <span class="ticket-submeta-sep">·</span>
-          {# County click should focus the interactive map without forcing a county filter. #}
-          <span class="ticket-submeta-item">
-            {% if county_focus_url %}
-              <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }}</a>
-              <a class="ticket-submeta-count" href="{{ county_focus_url }}">({{ county_ticket_counts.get(r.county_geoid, 0) }})</a>
-            {% else %}
-              {{ r.county_name or '—' }} <span class="ticket-submeta-count">({{ county_ticket_counts.get(r.county_geoid, 0) }})</span>
-            {% endif %}
-          </span>
-          <span class="ticket-submeta-sep">·</span>
-          <span class="ticket-submeta-item">{{ format_road_bucket(r.road_name) }}</span>
+
+            {# Under-username metadata line (State / County / Road). #}
+            <div class="ticket-submeta">
+              <span class="ticket-submeta-item">
+                {% if state_focus_url %}
+                  <a class="ticket-state-link" href="{{ state_focus_url }}">{{ state_name }}</a>
+                {% else %}
+                  {{ state_name }}
+                {% endif %}
+              </span>
+              <span class="ticket-submeta-sep">·</span>
+              <span class="ticket-submeta-item">
+                {% if county_focus_url %}
+                  <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }}</a>
+                {% else %}
+                  {{ r.county_name or '—' }}
+                {% endif %}
+              </span>
+              <span class="ticket-submeta-sep">·</span>
+              <span class="ticket-submeta-item">{{ format_road_bucket(r.road_name) }}</span>
+            </div>
+          </div>
         </div>
       {% else %}
         <div class="ticket-userline">Anonymous</div>
@@ -93,7 +89,7 @@
                 title="Details">i</button>
       </div>
       <div class="ticket-date-right">
-        <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }} UTC</span>
+        <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }}</span>
       </div>
     </div>
   </div>

@@ -269,10 +269,10 @@
 
       <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
   <div class="home-submit-plus-inner" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="25" height="25">
-      <circle cx="12" cy="12" r="9"/>
-      <line x1="12" y1="7.5" x2="12" y2="16.5"/>
-      <line x1="7.5" y1="12" x2="16.5" y2="12"/>
+    <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <line x1="12" y1="8" x2="12" y2="16"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
     </svg>
     <span class="home-submit-cta-label">Submit Ticket</span>
   </div>
@@ -347,8 +347,9 @@
   /* Header layout: username on the left, OCR pill top-right aligned to username line. */
   .ticket-headwrap{display:block}
   .ticket-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-  .ticket-userline{display:flex;align-items:center;gap:8px}
-  .ticket-avatar{width:22px;height:22px;border-radius:999px;object-fit:cover;display:block;background:#e5e7eb;flex:0 0 auto}
+  .ticket-userline{display:flex;align-items:flex-start;gap:10px}
+  .ticket-avatar{width:40px;height:40px;border-radius:999px;object-fit:cover;display:block;background:#e5e7eb;flex:0 0 auto}
+  .ticket-user-info{display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0}
   .comment-userline{display:inline-flex;align-items:center;gap:6px}
   .comment-avatar{width:18px;height:18px;border-radius:999px;object-fit:cover;display:inline-block;background:#e5e7eb;vertical-align:middle}
 

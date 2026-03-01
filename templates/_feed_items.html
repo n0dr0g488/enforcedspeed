@@ -120,10 +120,10 @@
 
   <div class="ticket-staticmap-frame">
   <div class="ticket-staticmap-wrap">
-    {# Centered speed pill overlay ("84 in a 65 (+19 mph)") #}
-    <div class="ticket-speedpill{% if _pin_lat is not none %} ticket-speedpill--onpin{% endif %}{% if _pinmode %} ticket-speedpill--pinmode{% endif %}">
-      {{ disp_ticketed }} in {{ disp_posted }}
-      <span class="ticket-speedpill-over">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
+    {# Speed pill — positioned over red pin via JS when pin coords available #}
+    <div class="ticket-speedpill{% if _pinmode %} ticket-speedpill--pinmode{% endif %}"
+      {% if _pin_lat is not none %}data-pin-lat="{{ _pin_lat }}" data-pin-lng="{{ _pin_lng }}"{% endif %}>
+      {{ disp_ticketed }} in {{ disp_posted }}<span class="ticket-speedpill-over">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
     </div>
     {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
       <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">Refine pin</button>

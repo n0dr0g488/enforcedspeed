@@ -1013,16 +1013,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     def _fmt_pt(lat: float, lng: float) -> str:
         return f"{float(lat):.6f},{float(lng):.6f}"
 
-    # Selected pin (deep red)
-    if pin_lat is not None and pin_lng is not None:
-        sel_center = _fmt_pt(pin_lat, pin_lng)
-        if use_custom_icon:
-            encoded_icon = urllib.parse.quote(icon_url, safe="")
-            items.append(('markers', f"icon:{encoded_icon}|{sel_center}"))
-        else:
-            items.append(('markers', sel_center))
-
-    # In-county context pins (mid-gray)
+    # In-county context pins (mid-gray) — added first so red pin renders on top
     pts_in = [p for p in (inside_points or []) if p and len(p) == 2]
     if pts_in:
         pts_in = pts_in[:12]
@@ -1035,6 +1026,15 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         pts_out = pts_out[:12]
         encoded_icon = urllib.parse.quote(icon_outside_url, safe="")
         items.append(('markers', f"icon:{encoded_icon}|" + "|".join(_fmt_pt(a,b) for a,b in pts_out)))
+
+    # Selected pin (deep red) — added LAST so it renders on top of grey pins
+    if pin_lat is not None and pin_lng is not None:
+        sel_center = _fmt_pt(pin_lat, pin_lng)
+        if use_custom_icon:
+            encoded_icon = urllib.parse.quote(icon_url, safe="")
+            items.append(('markers', f"icon:{encoded_icon}|{sel_center}"))
+        else:
+            items.append(('markers', sel_center))
 
     return 'https://maps.googleapis.com/maps/api/staticmap?' + _qs(items)
 

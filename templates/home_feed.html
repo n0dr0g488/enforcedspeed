@@ -413,8 +413,7 @@
 .ticket-staticmap-wrap{width:100%;overflow:hidden;background:#f3f4f6;position:relative;}
   .ticket-caption--clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 
-  .ticket-speedpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:#111827;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:2;white-space:nowrap}
-  .ticket-speedpill--onpin{top:auto;bottom:calc(50% + 18px);transform:translateX(-50%)}
+  .ticket-speedpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:#111827;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:3;white-space:nowrap;transition:none}
   .ticket-speedpill--pinmode{top:50%;left:50%;transform:translate(-50%,calc(-100% - 56px))}
   .ticket-speedpill-over{font-weight:700;color:#dc2626;margin-left:8px}
   .ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:2}
@@ -492,6 +491,63 @@
       ta.selectionStart = ta.selectionEnd = ta.value.length;
     }catch(e){}
   }
+
+
+  // Position speed pills over red pins using Mercator projection
+  (function(){
+    function mercatorY(lat){
+      var r = Math.PI/180;
+      return Math.log(Math.tan(Math.PI/4 + lat*r/2));
+    }
+    function positionPill(pill, img){
+      var pinLat = parseFloat(pill.dataset.pinLat);
+      var pinLng = parseFloat(pill.dataset.pinLng);
+      if(isNaN(pinLat)||isNaN(pinLng)) return;
+      // Parse center lat/lng and zoom from img src URL
+      var src = img.src || img.dataset.src || '';
+      var centerMatch = src.match(/center=([^&]+)/);
+      var zoomMatch = src.match(/zoom=(\d+)/);
+      var sizeMatch = src.match(/size=(\d+)x(\d+)/);
+      if(!centerMatch||!zoomMatch) return;
+      var parts = decodeURIComponent(centerMatch[1]).split(',');
+      var cLat = parseFloat(parts[0]), cLng = parseFloat(parts[1]);
+      var zoom = parseInt(zoomMatch[1]);
+      var imgW = sizeMatch ? parseInt(sizeMatch[1]) : 640;
+      var imgH = sizeMatch ? parseInt(sizeMatch[2]) : 640;
+      // Displayed size
+      var dispW = img.offsetWidth || img.clientWidth || imgW;
+      var dispH = img.offsetHeight || img.clientHeight || imgH;
+      var scale = dispW / imgW;
+      // Mercator pixel offset per degree at this zoom
+      var tileSize = 256;
+      var pixPerDeg = (tileSize * Math.pow(2, zoom)) / 360;
+      var dx = (pinLng - cLng) * pixPerDeg * scale;
+      var cY = mercatorY(cLat), pY = mercatorY(pinLat);
+      var pixPerMerc = (tileSize * Math.pow(2, zoom)) / (2*Math.PI) * scale;
+      var dy = (cY - pY) * pixPerMerc;
+      var px = dispW/2 + dx;
+      var py = dispH/2 + dy;
+      // Position pill above pin (pin icon is ~30px tall)
+      pill.style.left = px + 'px';
+      pill.style.top = (py - 44) + 'px';
+      pill.style.transform = 'translateX(-50%)';
+    }
+    function initPills(){
+      document.querySelectorAll('.ticket-speedpill[data-pin-lat]').forEach(function(pill){
+        var wrap = pill.closest('.ticket-staticmap-wrap');
+        if(!wrap) return;
+        var img = wrap.querySelector('.ticket-staticmap');
+        if(!img) return;
+        if(img.complete && img.naturalWidth) positionPill(pill, img);
+        else img.addEventListener('load', function(){ positionPill(pill, img); });
+      });
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initPills);
+    else initPills();
+    // Re-run after lazy images load
+    setTimeout(initPills, 800);
+    setTimeout(initPills, 2000);
+  })();
 
   // --- Preserve scroll position across POST/redirect actions (Like / Comment / Delete) ---
   // The home feed posts back to the server and redirects to the same URL.

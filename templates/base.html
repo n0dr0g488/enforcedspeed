@@ -39,7 +39,7 @@
       padding:0 4px;
     }
     .brand-logo{height:36px;width:auto;display:block;}
-    .brand-text{font-weight:700;font-size:18px;letter-spacing:-.2px;color:#111;white-space:nowrap;}
+    .brand-text{font-weight:500;font-size:18px;letter-spacing:-.1px;color:#1c1e21;}
     .tm{font-size:0.6em;vertical-align:super;line-height:0;margin-left:1px;}
 
     /* Center: icon tab nav */
@@ -47,12 +47,13 @@
       grid-column:2;
       display:flex;align-items:stretch;
       gap:2px;
+      width:100%;
+      max-width:720px;
     }
     .nav-tab{
       position:relative;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
-      gap:2px;
-      min-width:80px;
+      flex:1;
       padding:0 6px;
       text-decoration:none;
       color:#65676b;
@@ -80,11 +81,7 @@
       width:24px;height:24px;
       flex-shrink:0;
     }
-    .nav-tab-label{
-      font-size:10px;font-weight:600;
-      line-height:1;
-      white-space:nowrap;
-    }
+    .nav-tab-label{ display:none; }
     .nav-tab.active{
       color:#1877f2;
       border-bottom-color:#1877f2;
@@ -225,7 +222,7 @@
         <a class="nav-tab {% if request.endpoint=='submit' %}active{% endif %}" href="{{ url_for('submit') }}">
           <div class="nav-tab-bg">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="12" cy="12" r="9"/>
               <line x1="12" y1="8" x2="12" y2="16"/>
               <line x1="8" y1="12" x2="16" y2="12"/>
             </svg>

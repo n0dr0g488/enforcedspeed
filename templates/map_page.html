@@ -149,6 +149,13 @@
 
 <div class="home-shell map-shell">
     <aside class="home-left" id="homeFiltersSidebar">
+      <button type="button" class="home-filter-collapse-btn" id="homeFilterCollapseBtn" aria-label="Toggle filters">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
       <div class="filters-rail">
         <div class="filters-scroll">
           <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
@@ -842,6 +849,33 @@ window.esInitMap = async function() {
         if(d.contains(e.target)) return;
         d.open = false;
         submitIfDirty(d);
+      });
+    });
+  })();
+</script>
+
+<script>
+  // Filter panel drawer handle (map page)
+  (function(){
+    document.addEventListener('DOMContentLoaded', function(){
+      var sidebar = document.getElementById('homeFiltersSidebar');
+      var btn = document.getElementById('homeFilterCollapseBtn');
+      if(!sidebar || !btn) return;
+      btn.style.display = 'flex';
+
+      function setCollapsed(v, save){
+        if(v){ sidebar.classList.add('is-collapsed'); btn.style.left = '0px'; }
+        else { sidebar.classList.remove('is-collapsed'); btn.style.left = '275px'; }
+        if(save){ try{ localStorage.setItem('es_filters_collapsed', v ? '1' : '0'); }catch(e){} }
+      }
+
+      try{
+        var saved = localStorage.getItem('es_filters_collapsed');
+        setCollapsed(saved === '1', false);
+      }catch(e){ setCollapsed(false, false); }
+
+      btn.addEventListener('click', function(){
+        setCollapsed(!sidebar.classList.contains('is-collapsed'), true);
       });
     });
   })();

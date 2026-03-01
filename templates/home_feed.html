@@ -695,7 +695,38 @@
 document.addEventListener('DOMContentLoaded', function(){
     try{ convertLocalTimes(); }catch(e){}
     try{ initHomeFiltersToggle(); }catch(e){}
+    try{ initHomeRightToggle(); }catch(e){}
   });
+
+  function initHomeRightToggle(){
+    var sidebar = document.getElementById('homeRightSidebar');
+    var btn = document.getElementById('homeRightCollapseBtn');
+    if(!sidebar || !btn) return;
+    var isDesktop = window.matchMedia && window.matchMedia('(min-width: 1401px)').matches;
+    if(!isDesktop) return;
+
+    btn.style.display = 'flex';
+
+    function setCollapsed(v, save){
+      if(v){
+        sidebar.classList.add('is-collapsed');
+        btn.style.right = '0px';
+      } else {
+        sidebar.classList.remove('is-collapsed');
+        btn.style.right = '320px';
+      }
+      if(save){ try{ localStorage.setItem('es_right_collapsed', v ? '1' : '0'); }catch(e){} }
+    }
+
+    try{
+      var saved = localStorage.getItem('es_right_collapsed');
+      setCollapsed(saved === '1', false);
+    }catch(e){ setCollapsed(false, false); }
+
+    btn.addEventListener('click', function(){
+      setCollapsed(!sidebar.classList.contains('is-collapsed'), true);
+    });
+  }
 </script>
 
 <script>
@@ -890,7 +921,14 @@ function startAutoLoad(){
     </div> {# /home-center #}
 
     {# Right rail: static mini-map (trending counties). Click anywhere to open the full interactive map. #}
-    <aside class="home-right" aria-label="Ticket map">
+    <aside class="home-right" id="homeRightSidebar" aria-label="Ticket map">
+      <button type="button" class="home-right-collapse-btn" id="homeRightCollapseBtn" aria-label="Toggle right panel">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
       {# Card 1: Static mini-map (no title; full-bleed image + tiny overlay link) #}
       <div class="rail-card" style="border-radius:0;">
         {% if maps_api_key %}

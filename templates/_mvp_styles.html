@@ -172,8 +172,36 @@
       }
       .filters-footer-links .dot{color:#c1c7d0;}
 
-      /* Right rail (mini-map). Pinned to viewport right; does NOT affect feed centering. */
+      /* Right panel drawer handle */
+      .home-right-collapse-btn{
+        position: fixed;
+        top: 50vh;
+        right: 320px;
+        transform: translate(50%, -50%);
+        z-index: 200;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        transition: right 0.22s ease;
+        padding: 0;
+      }
+      .home-right-collapse-btn:hover{ background: #f9fafb; }
+      .home-right.is-collapsed{
+        width: 0 !important;
+        opacity: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
       .home-right{
+        transition: width 0.22s ease, opacity 0.22s ease;
+      }
         position: fixed;
         right: 0;
         top: 62px;

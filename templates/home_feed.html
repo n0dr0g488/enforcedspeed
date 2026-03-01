@@ -274,16 +274,24 @@
         {% set welcome_url = url_for('register', next=submit_url) %}
       {% endif %}
 
-      {# State quick-filter circles — all 50 states always shown #}
+      {# State quick-filter circles — inverted triangle: 20 / 17 / 14 centered rows #}
       {% set all_states = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY'] %}
       <div class="state-circles-wrap" id="stateCirclesWrap">
-        {% for code in all_states %}
-          {% set is_active = code in filter_state_list %}
-          <button type="button"
-            class="state-circle{% if is_active %} state-circle--active{% endif %}"
-            data-state="{{ code }}"
-            onclick="esStateCircleClick('{{ code }}')">{{ code }}</button>
-        {% endfor %}
+        <div class="state-circles-row">
+          {% for code in all_states[:20] %}
+            <button type="button" class="state-circle{% if code in filter_state_list %} state-circle--active{% endif %}" data-state="{{ code }}" onclick="esStateCircleClick('{{ code }}')">{{ code }}</button>
+          {% endfor %}
+        </div>
+        <div class="state-circles-row">
+          {% for code in all_states[20:37] %}
+            <button type="button" class="state-circle{% if code in filter_state_list %} state-circle--active{% endif %}" data-state="{{ code }}" onclick="esStateCircleClick('{{ code }}')">{{ code }}</button>
+          {% endfor %}
+        </div>
+        <div class="state-circles-row">
+          {% for code in all_states[37:51] %}
+            <button type="button" class="state-circle{% if code in filter_state_list %} state-circle--active{% endif %}" data-state="{{ code }}" onclick="esStateCircleClick('{{ code }}')">{{ code }}</button>
+          {% endfor %}
+        </div>
       </div>
 
       <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">

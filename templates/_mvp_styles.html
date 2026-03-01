@@ -333,20 +333,25 @@
       /* v407 — Home feed: merge Welcome + CTA into one clickable tile. */
       a.home-welcome-link{ display:block; text-decoration:none; color:inherit; }
 
-      /* State quick-filter circles */
+      /* State quick-filter circles — flush sticky bar under nav */
       .state-circles-wrap{
-        display:flex;
-        flex-wrap:wrap;
-        gap:5px;
-        padding:10px 12px;
-        background:#fff;
-        border-radius:0;
-        box-shadow:none;
-        border-bottom:1px solid #e5e7eb;
         position:sticky;
         top:62px;
         z-index:100;
-        margin-bottom:12px;
+        background:#fff;
+        border-bottom:1px solid #e5e7eb;
+        border-top:1px solid #e5e7eb;
+        padding:10px 0 10px;
+        margin:0 -20px 12px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        gap:5px;
+      }
+      .state-circles-row{
+        display:flex;
+        gap:5px;
+        justify-content:center;
       }
       .state-circle{
         width:28px;
@@ -365,6 +370,7 @@
         padding:0;
         line-height:1;
         letter-spacing:0.01em;
+        flex-shrink:0;
       }
       .state-circle:hover{
         border-color:#93c5fd;

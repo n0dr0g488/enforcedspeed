@@ -59,17 +59,24 @@
               <div class="filterbar-item">
                 <label class="filterbar-label" for="filter-state">State</label>
                 <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
-                  <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
+                  <option value="" {% if not filter_state_list %}selected{% endif %}>All states</option>
+                  {% if filter_state_list|length > 1 %}
+                    <option value="MULTIPLE" selected>Multiple</option>
+                  {% endif %}
                   {% for opt in state_filter_options %}
-                    <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
+                    <option value="{{ opt.code }}" {% if filter_state_list|length == 1 and opt.code == filter_state_list[0] %}selected{% endif %}>{{ opt.code }}</option>
                   {% endfor %}
                 </select>
               </div>
 
-                            <div class="filterbar-item">
+              <div class="filterbar-item">
                 <label class="filterbar-label" for="filter-county">County</label>
-                <div class="filter-autocomplete-wrap">
-                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
+                <div class="filter-autocomplete-wrap" {% if filter_state_list|length > 1 %}title="Select a single state to filter by county"{% endif %}>
+                  <input id="filter-county"
+                    value="{{ filter_county_label or '' }}"
+                    placeholder="{% if filter_state_list|length > 1 %}Single state only{% else %}Start typing (e.g., Franklin){% endif %}"
+                    autocomplete="off"
+                    {% if filter_state_list|length > 1 %}disabled style="opacity:0.45;cursor:not-allowed;"{% endif %}>
                   <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
                   <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
                 </div>
@@ -265,6 +272,19 @@
         {% set welcome_url = submit_url %}
       {% else %}
         {% set welcome_url = url_for('register', next=submit_url) %}
+      {% endif %}
+
+      {# State quick-filter circles #}
+      {% if state_filter_options %}
+      <div class="state-circles-wrap" id="stateCirclesWrap">
+        {% for opt in state_filter_options %}
+          {% set is_active = opt.code in filter_state_list %}
+          <button type="button"
+            class="state-circle{% if is_active %} state-circle--active{% endif %}"
+            data-state="{{ opt.code }}"
+            onclick="esStateCircleClick('{{ opt.code }}')">{{ opt.code }}</button>
+        {% endfor %}
+      </div>
       {% endif %}
 
       <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
@@ -692,6 +712,23 @@
       }catch(e){}
     }
   }
+
+  function esStateCircleClick(code){
+    try{
+      var params = new URLSearchParams(window.location.search);
+      var active = params.getAll('state').map(function(s){ return s.toUpperCase(); });
+      active = active.filter(function(s){ return s !== 'MULTIPLE'; });
+      var idx = active.indexOf(code);
+      if(idx >= 0){ active.splice(idx, 1); }
+      else { active.push(code); }
+      params.delete('state');
+      params.delete('page');
+      params.delete('county_geoid');
+      active.forEach(function(s){ params.append('state', s); });
+      window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    }catch(e){}
+  }
+
 document.addEventListener('DOMContentLoaded', function(){
     try{ convertLocalTimes(); }catch(e){}
     try{ initHomeFiltersToggle(); }catch(e){}

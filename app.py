@@ -2571,7 +2571,10 @@ GROUP BY UPPER(TRIM(stusps));
         if deleted_mode not in ("hide", "include", "only"):
             deleted_mode = "hide"
 
-        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_state_list = [v.strip().upper() for v in request.args.getlist("state") if (v or "").strip()]
+        filter_state_list = [v for v in filter_state_list if len(v) == 2 and v.isalpha()]
+        filter_state_list = list(dict.fromkeys(filter_state_list))
+        filter_state = filter_state_list[0] if len(filter_state_list) == 1 else ("" if not filter_state_list else "MULTIPLE")
         filter_road = (request.args.get("road") or "").strip()
 
         filter_speed_limit_list = [v.strip() for v in request.args.getlist("speed_limit") if (v or "").strip()]
@@ -2938,7 +2941,10 @@ GROUP BY UPPER(TRIM(stusps));
         return_to = _build_home_return_to_url()
 
         # --- Feed filters (GET) ---
-        filter_state = (request.args.get("state") or "").strip().upper()
+        filter_state_list = [v.strip().upper() for v in request.args.getlist("state") if (v or "").strip()]
+        filter_state_list = [v for v in filter_state_list if len(v) == 2 and v.isalpha()]
+        filter_state_list = list(dict.fromkeys(filter_state_list))
+        filter_state = filter_state_list[0] if len(filter_state_list) == 1 else ("" if not filter_state_list else "MULTIPLE")
         filter_road = (request.args.get("road") or "").strip()
 
         # Speed limit buckets (posted_speed)
@@ -3063,9 +3069,12 @@ GROUP BY UPPER(TRIM(stusps));
         if hide_anon:
             q = q.filter(SpeedReport.user_id.isnot(None))
 
-        # State filter (2-letter code prefix)
-        if filter_state:
-            q = q.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+        # State filter (2-letter code prefix, supports multi-select via filter_state_list)
+        if filter_state_list:
+            if len(filter_state_list) == 1:
+                q = q.filter(SpeedReport.state.ilike(f"{filter_state_list[0]}%"))
+            else:
+                q = q.filter(or_(*[SpeedReport.state.ilike(f"{s}%") for s in filter_state_list]))
 
         # County filter (GEOID)
         # If we're focused on a county in viewport mode, do NOT force the query to only that county.
@@ -3197,8 +3206,11 @@ GROUP BY UPPER(TRIM(stusps));
         road_suggestions: List[str] = []
         try:
             rq = db.session.query(SpeedReport.road_name).filter(SpeedReport.road_name.isnot(None))
-            if filter_state:
-                rq = rq.filter(SpeedReport.state.ilike(f"{filter_state}%"))
+            if filter_state_list:
+                if len(filter_state_list) == 1:
+                    rq = rq.filter(SpeedReport.state.ilike(f"{filter_state_list[0]}%"))
+                else:
+                    rq = rq.filter(or_(*[SpeedReport.state.ilike(f"{s}%") for s in filter_state_list]))
             rows = rq.distinct().order_by(SpeedReport.road_name.asc()).limit(40).all()
             road_suggestions = [rn for (rn,) in rows if rn]
         except Exception:
@@ -3751,6 +3763,7 @@ GROUP BY UPPER(TRIM(stusps));
             comment_form=comment_form,
             state_filter_options=state_filter_options,
             filter_state=filter_state,
+            filter_state_list=filter_state_list,
             filter_road=filter_road,
             filter_county_geoid=filter_county_geoid,
             filter_county_label=filter_county_label,

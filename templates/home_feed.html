@@ -920,15 +920,17 @@ function startAutoLoad(){
 
     </div> {# /home-center #}
 
+    {# Right rail drawer handle — outside the aside so it stays visible when collapsed #}
+    <button type="button" class="home-right-collapse-btn" id="homeRightCollapseBtn" aria-label="Toggle right panel">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+
     {# Right rail: static mini-map (trending counties). Click anywhere to open the full interactive map. #}
     <aside class="home-right" id="homeRightSidebar" aria-label="Ticket map">
-      <button type="button" class="home-right-collapse-btn" id="homeRightCollapseBtn" aria-label="Toggle right panel">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
       {# Card 1: Static mini-map (no title; full-bleed image + tiny overlay link) #}
       <div class="rail-card" style="border-radius:0;">
         {% if maps_api_key %}

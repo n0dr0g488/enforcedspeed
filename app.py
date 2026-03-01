@@ -594,6 +594,42 @@ def _mercator_y(lat: float) -> float:
     return math.log(math.tan((rad / 2.0) + (math.pi / 4.0)))
 
 
+def county_center_zoom(geoid: str, width: int = 640, height: int = 640):
+    """Return (center_lat, center_lng, zoom_int) for a county's static map framing.
+
+    Used by templates to supply data attributes for JS pill positioning so the
+    browser-side code does not need to parse the proxy URL.
+    """
+    geoid = (geoid or '').strip()
+    if not geoid:
+        return (None, None, None)
+    info = _county_bbox_and_outline_polyline(geoid)
+    if not info:
+        return (None, None, None)
+    min_lat, min_lng, max_lat, max_lng, _poly = info
+
+    pad_px = 24
+    pad_pct = 0.12
+    y_min = _mercator_y(float(min_lat))
+    y_max = _mercator_y(float(max_lat))
+    y_center = (y_min + y_max) / 2.0
+    center_lat = math.degrees(2.0 * math.atan(math.exp(y_center)) - (math.pi / 2.0))
+    center_lng = (float(min_lng) + float(max_lng)) / 2.0
+
+    avail_w = max(1, width - 2 * pad_px)
+    avail_h = max(1, height - 2 * pad_px)
+    lng_diff = max(abs(float(max_lng) - float(min_lng)), 1e-9) * (1.0 + pad_pct)
+    y_diff = max(abs(y_max - y_min), 1e-9) * (1.0 + pad_pct)
+
+    zoom_lng = math.log2((avail_w * 360.0) / (lng_diff * 256.0))
+    zoom_lat = math.log2((avail_h * 2.0 * math.pi) / (y_diff * 256.0))
+    z = min(zoom_lng, zoom_lat)
+    z = max(0.0, min(z, 18.0))
+    zoom_int = int(math.floor(z))
+
+    return (center_lat, center_lng, zoom_int)
+
+
 def _zoom_for_bbox(
     min_lat: float,
     min_lng: float,
@@ -1354,6 +1390,7 @@ def create_app() -> Flask:
             "format_road_bucket": format_road_bucket,
             "static_map_url": static_map_url,
             "county_static_map_url": county_static_map_url,
+            "county_center_zoom": county_center_zoom,
             "user_avatar_url": user_avatar_url,
             "user_avatar_is_photo": user_avatar_is_photo,
             "system_avatars": system_avatars,
@@ -6318,8 +6355,9 @@ GROUP BY UPPER(TRIM(stusps));
                             .order_by(SpeedReport.created_at.desc())
                             .limit(40))
                     inside_pts = [(float(r.lat), float(r.lng)) for r in q_in.all() if r.lat is not None and r.lng is not None]
-                    # Drop any point that is essentially the selected pin (prevents double-stacking).
-                    inside_pts = [(a,b) for (a,b) in inside_pts if (abs(a - pin_lat) > 1e-6 or abs(b - pin_lng) > 1e-6)]
+                    # Drop any point that is close to the selected pin (prevents visual overlap).
+                    _PIN_PROXIMITY = 0.004  # ~450m — keeps grey pins from stacking on the red pin
+                    inside_pts = [(a,b) for (a,b) in inside_pts if (abs(a - pin_lat) > _PIN_PROXIMITY or abs(b - pin_lng) > _PIN_PROXIMITY)]
 
                     # Out-of-county context: tickets in the same state but different county,
                     # biased toward nearby points so they are likely to appear in the county-framed map.
@@ -6360,7 +6398,7 @@ GROUP BY UPPER(TRIM(stusps));
                                 return 9e9
                         cand_sorted = sorted(cand, key=dist2)
                         outside_pts = [(float(r.lat), float(r.lng)) for r in cand_sorted if r.lat is not None and r.lng is not None]
-                        outside_pts = [(a,b) for (a,b) in outside_pts if (abs(a - pin_lat) > 1e-6 or abs(b - pin_lng) > 1e-6)]
+                        outside_pts = [(a,b) for (a,b) in outside_pts if (abs(a - pin_lat) > _PIN_PROXIMITY or abs(b - pin_lng) > _PIN_PROXIMITY)]
                 except Exception:
                     inside_pts = []
                     outside_pts = []

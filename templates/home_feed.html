@@ -414,7 +414,7 @@
   .ticket-caption--clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 
   .ticket-speedpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:#111827;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:3;white-space:nowrap;transition:none}
-  .ticket-speedpill--pinmode{top:50%;left:50%;transform:translate(-50%,calc(-100% - 36px))}
+  .ticket-speedpill--pinmode{top:50%;left:50%;transform:translate(-50%,calc(-100% - 56px))}
   .ticket-speedpill-over{font-weight:700;color:#dc2626;margin-left:8px}
   .ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:2}
 
@@ -503,17 +503,12 @@
       var pinLat = parseFloat(pill.dataset.pinLat);
       var pinLng = parseFloat(pill.dataset.pinLng);
       if(isNaN(pinLat)||isNaN(pinLng)) return;
-      // Parse center lat/lng and zoom from img src URL
-      var src = img.src || img.dataset.src || '';
-      var centerMatch = src.match(/center=([^&]+)/);
-      var zoomMatch = src.match(/zoom=(\d+)/);
-      var sizeMatch = src.match(/size=(\d+)x(\d+)/);
-      if(!centerMatch||!zoomMatch) return;
-      var parts = decodeURIComponent(centerMatch[1]).split(',');
-      var cLat = parseFloat(parts[0]), cLng = parseFloat(parts[1]);
-      var zoom = parseInt(zoomMatch[1]);
-      var imgW = sizeMatch ? parseInt(sizeMatch[1]) : 640;
-      var imgH = sizeMatch ? parseInt(sizeMatch[2]) : 640;
+      // Read center/zoom from data attributes (set by server-side template)
+      var cLat = parseFloat(img.dataset.mapClat);
+      var cLng = parseFloat(img.dataset.mapClng);
+      var zoom = parseInt(img.dataset.mapZoom);
+      if(isNaN(cLat)||isNaN(cLng)||isNaN(zoom)) return;
+      var imgW = 640, imgH = 640;
       // Displayed size
       var dispW = img.offsetWidth || img.clientWidth || imgW;
       var dispH = img.offsetHeight || img.clientHeight || imgH;

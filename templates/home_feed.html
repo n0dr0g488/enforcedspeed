@@ -487,6 +487,13 @@
       if(card && card.id){ sessionStorage.setItem('es_home_restore_target', card.id); }
       sessionStorage.setItem('es_home_restore_y', String(window.scrollY || 0));
       sessionStorage.setItem('es_home_restore_ts', String(Date.now()));
+      // Remember which comment box was open so we can reopen it after reload
+      try{
+        var commentBox = (node && node.closest) ? node.closest('[id^="commentbox-"]') : null;
+        if(commentBox && commentBox.id){
+          sessionStorage.setItem('es_home_restore_commentbox', commentBox.id.replace('commentbox-',''));
+        }
+      }catch(e){}
     }catch(e){}
   }
   function esClearRememberedScroll(){
@@ -494,6 +501,7 @@
       sessionStorage.removeItem('es_home_restore_target');
       sessionStorage.removeItem('es_home_restore_y');
       sessionStorage.removeItem('es_home_restore_ts');
+      sessionStorage.removeItem('es_home_restore_commentbox');
     }catch(e){}
   }
   function esBindPreserveScroll(root){
@@ -517,7 +525,14 @@
       if(Date.now() - ts > 60000){ esClearRememberedScroll(); return; }
       var targetId = sessionStorage.getItem('es_home_restore_target');
       var y = parseInt(sessionStorage.getItem('es_home_restore_y') || '0', 10);
+      var commentboxId = sessionStorage.getItem('es_home_restore_commentbox');
       esClearRememberedScroll();
+
+      // Reopen the comment box first (before scroll)
+      if(commentboxId){
+        var cb = document.getElementById('commentbox-' + commentboxId);
+        if(cb){ cb.style.display = 'block'; }
+      }
 
       setTimeout(function(){
         try{

@@ -56,46 +56,48 @@
     </div>
 
     <div class="ticket-ocr">
-      {# Pin pill: only when the user has a refined pin. (Pin left) #}
-      {% if r.location_source in ['user_pin','user_pin_snapped'] %}
-        <span class="pill pill-photo pill-photo-ok">Pin ✓</span>
-      {% endif %}
-
-      {# Photo pill with status (Option 2): one pill when a photo exists. (Photo right) #}
-      {% set has_photo = (r.photo_key is not none) %}
-      {% if has_photo %}
-        {% set pk = (r.photo_key|string) %}
-        {% set st = (r.ocr_status or '') %}
-        {% set vs = (r.verification_status or '') %}
-        {% if pk.startswith('pending:') or st in ['pending','processing'] %}
-          <span class="pill pill-photo pill-photo-processing">Photo …</span>
-        {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
-          <span class="pill pill-photo pill-photo-fail">Photo !</span>
-        {% elif st == 'verified' or vs == 'verified' %}
-          <span class="pill pill-photo pill-photo-ok">Photo ✓</span>
-        {% else %}
-          <span class="pill pill-photo pill-photo-fail">Photo !</span>
+      <div class="ticket-ocr-pills">
+        {# Pin pill: only when the user has a refined pin. (Pin left) #}
+        {% if r.location_source in ['user_pin','user_pin_snapped'] %}
+          <span class="pill pill-photo pill-photo-ok">Pin ✓</span>
         {% endif %}
-      {% endif %}
 
-      {# Info icon (top-right) - click for verification details. (far right of pills row) #}
-      <button type="button" class="ticket-info" data-report-id="{{ r.id }}"
-              data-photo-key="{{ r.photo_key or '' }}"
-              data-ocr-status="{{ r.ocr_status or '' }}"
-              data-ocr-error="{{ r.ocr_error or '' }}"
-              data-verification-status="{{ r.verification_status or '' }}"
-              data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
-              data-verify-reason="{{ r.verify_reason or '' }}"
-              data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
-              data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
-              data-overage="{{ r.overage if r.overage is not none else '' }}"
-              title="Details">i</button>
-          <div class="ticket-date-right">
-            <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }} UTC</span>
-          </div>
-            </div>
-	</div>
-	</div>
+        {# Photo pill with status (Option 2): one pill when a photo exists. (Photo right) #}
+        {% set has_photo = (r.photo_key is not none) %}
+        {% if has_photo %}
+          {% set pk = (r.photo_key|string) %}
+          {% set st = (r.ocr_status or '') %}
+          {% set vs = (r.verification_status or '') %}
+          {% if pk.startswith('pending:') or st in ['pending','processing'] %}
+            <span class="pill pill-photo pill-photo-processing">Photo …</span>
+          {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
+            <span class="pill pill-photo pill-photo-fail">Photo !</span>
+          {% elif st == 'verified' or vs == 'verified' %}
+            <span class="pill pill-photo pill-photo-ok">Photo ✓</span>
+          {% else %}
+            <span class="pill pill-photo pill-photo-fail">Photo !</span>
+          {% endif %}
+        {% endif %}
+
+        {# Info icon (top-right) - click for verification details. (far right of pills row) #}
+        <button type="button" class="ticket-info" data-report-id="{{ r.id }}"
+                data-photo-key="{{ r.photo_key or '' }}"
+                data-ocr-status="{{ r.ocr_status or '' }}"
+                data-ocr-error="{{ r.ocr_error or '' }}"
+                data-verification-status="{{ r.verification_status or '' }}"
+                data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
+                data-verify-reason="{{ r.verify_reason or '' }}"
+                data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
+                data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
+                data-overage="{{ r.overage if r.overage is not none else '' }}"
+                title="Details">i</button>
+      </div>
+      <div class="ticket-date-right">
+        <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }} UTC</span>
+      </div>
+    </div>
+  </div>
+</div>
 {# --- Precompute speeds for map overlay + display --- #}
 {% set disp_posted = r.posted_speed %}
 {% set disp_ticketed = r.ticketed_speed %}
@@ -282,14 +284,13 @@
               {% if current_user.is_authenticated %}
                 <div id="replybox-{{ c.id }}" style="display:none; margin-top:10px; margin-left:18px;">
                   <form method="post" action="{{ url_for('add_comment', report_id=r.id) }}" class="js-preserve-scroll">
-                    {# Render CSRF only. We'll provide parent_id manually to avoid duplicate fields. #}
                     {{ comment_form.csrf_token }}
                     <input type="hidden" name="next" value="{{ return_to }}">
                     <input type="hidden" name="parent_id" value="{{ c.id }}">
-                    <textarea class="js-comment-body" name="body" maxlength="280" rows="2" style="width:100%;" placeholder="Write a reply…"></textarea>
-                    <div style="margin-top:0;">
-                      <button type="submit">Reply</button>
-                      <span class="subtle" style="margin-left:10px;">280 characters max.</span>
+                    <textarea class="js-comment-body es-comment-textarea" name="body" maxlength="280" rows="2" placeholder="Write a reply…"></textarea>
+                    <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
+                      <button type="submit" class="es-btn" style="padding:6px 16px;font-size:13px;height:32px;">Reply</button>
+                      <span class="subtle" style="font-size:12px;">280 characters max</span>
                     </div>
                   </form>
                 </div>

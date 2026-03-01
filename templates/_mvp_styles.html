@@ -48,12 +48,41 @@
         position: fixed;
         left: 0;
         top: 62px;
-        width: 275px;
+        width: 220px;
         height: calc(100vh - 62px);
         max-height: none;
-        overflow: hidden; /* scroll handled inside .filters-scroll */
+        overflow: hidden;
         align-self: start;
+        transition: width 0.22s ease, opacity 0.22s ease;
       }
+      .home-left.is-collapsed{
+        width: 0 !important;
+        opacity: 0;
+        pointer-events: none;
+        overflow: hidden;
+      }
+
+      /* Desktop filter toggle button — sits just above the feed */
+      .home-filter-collapse-btn{
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        padding: 5px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        cursor: pointer;
+        margin-bottom: 12px;
+        transition: background 0.12s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+      .home-filter-collapse-btn:hover{ background: #f9fafb; }
+      .home-filter-collapse-btn svg{ flex-shrink:0; transition: transform 0.22s ease; }
+      .home-left.is-collapsed ~ .home-center .home-filter-collapse-btn svg,
+      .filters-collapsed .home-filter-collapse-btn svg{ transform: rotate(180deg); }
 
       /* v136: Left rail should feel built-in (no card bubble). */
       .filters-rail{

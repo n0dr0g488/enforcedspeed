@@ -36,9 +36,9 @@
               <span class="ticket-submeta-sep">·</span>
               <span class="ticket-submeta-item">
                 {% if county_focus_url %}
-                  <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }}</a>
+                  <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }} ({{ county_ticket_counts.get(r.county_geoid, 0) }})</a>
                 {% else %}
-                  {{ r.county_name or '—' }}
+                  {{ r.county_name or '—' }} ({{ county_ticket_counts.get(r.county_geoid, 0) }})
                 {% endif %}
               </span>
               <span class="ticket-submeta-sep">·</span>
@@ -121,8 +121,8 @@
   <div class="ticket-staticmap-frame">
   <div class="ticket-staticmap-wrap">
     {# Centered speed pill overlay ("84 in a 65 (+19 mph)") #}
-    <div class="ticket-speedpill{% if _pinmode %} ticket-speedpill--pinmode{% endif %}">
-      {{ disp_ticketed }} in a {{ disp_posted }}
+    <div class="ticket-speedpill{% if _pin_lat is not none %} ticket-speedpill--onpin{% endif %}{% if _pinmode %} ticket-speedpill--pinmode{% endif %}">
+      {{ disp_ticketed }} in {{ disp_posted }}
       <span class="ticket-speedpill-over">({% if ticket_over > 0 %}+{{ ticket_over }}{% elif ticket_over < 0 %}{{ ticket_over }}{% else %}0{% endif %} mph)</span>
     </div>
     {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}

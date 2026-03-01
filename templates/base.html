@@ -120,24 +120,33 @@
     /* Right: profile/login */
     .header-right{
       grid-column:3;justify-self:end;
-      display:flex;align-items:center;gap:8px;
+      display:flex;align-items:stretch;gap:4px;
     }
     .header-right a{
       display:flex;align-items:center;gap:7px;
-      padding:7px 12px;
-      border-radius:20px;
+      padding:0 12px;
+      border-bottom:3px solid transparent;
       font-size:14px;font-weight:600;
-      color:#1c1e21;
+      color:#65676b;
       text-decoration:none;
       white-space:nowrap;
-      transition:background 0.1s;
+      transition:color 0.1s;
+      position:relative;
     }
-    .header-right a:hover{ background:#f0f2f5; }
+    .header-right a:hover{ color:#1877f2; }
+    .header-right a:hover::after{
+      content:'';
+      position:absolute;
+      inset:8px 4px;
+      background:#f0f2f5;
+      border-radius:10px;
+      z-index:-1;
+    }
     .header-right .btn-logout{
       color:#65676b;
       font-weight:500;
       font-size:13px;
-      padding:6px 10px;
+      padding:0 10px;
     }
     .avatar{width:28px;height:28px;border-radius:50%;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
     .avatar svg{width:16px;height:16px;opacity:.7;}

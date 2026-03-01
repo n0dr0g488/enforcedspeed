@@ -692,7 +692,7 @@ async function esLoadPins(opts) {
     const isInside = !!p.inside_focus;
     const icon = isSelected ? esGetPinIcon('selected') : (isInside ? esGetPinIcon('inside') : esGetPinIcon('outside'));
 
-    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isSelected ? 999999 : undefined) });
+    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isSelected ? 999999 : (isInside ? 2 : 1)) });
     m.addListener('click', () => {
       const title = `${p.road || 'Road'}, ${p.state || ''}`;
       const over = (Number(p.ticketed) - Number(p.posted));

@@ -201,7 +201,6 @@
       }
       .home-right{
         transition: width 0.22s ease, opacity 0.22s ease;
-      }
         position: fixed;
         right: 0;
         top: 62px;
@@ -237,7 +236,7 @@
         cursor: pointer;
       }
       .home-filters-toggle:hover{ background:#f9fafb; }
-      .home-left.is-collapsed{ display:none; }
+      .home-left.is-collapsed{ width: 0 !important; opacity: 0; pointer-events: none; overflow: hidden; }
 
       /* When the viewport is too narrow for a pinned rail + centered feed, collapse the rail into the mobile toggle. */
       @media (max-width: 1100px){

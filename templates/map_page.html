@@ -149,13 +149,6 @@
 
 <div class="home-shell map-shell">
     <aside class="home-left" id="homeFiltersSidebar">
-      <button type="button" class="home-filter-collapse-btn" id="homeFilterCollapseBtn" aria-label="Toggle filters">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
       <div class="filters-rail">
         <div class="filters-scroll">
           <form method="get" action="{{ url_for('map_view') }}" class="filterbar" id="mapFilters">
@@ -275,6 +268,15 @@
         </div>
       </div>
     </aside>
+
+    {# Filter drawer handle — fixed position, outside the aside so it survives collapse #}
+    <button type="button" class="home-filter-collapse-btn" id="homeFilterCollapseBtn" aria-label="Toggle filters">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
 
     <main class="home-center">
       <div class="card ticket-card map-card">

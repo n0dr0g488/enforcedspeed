@@ -274,18 +274,17 @@
         {% set welcome_url = url_for('register', next=submit_url) %}
       {% endif %}
 
-      {# State quick-filter circles #}
-      {% if state_filter_options %}
+      {# State quick-filter circles — all 50 states always shown #}
+      {% set all_states = ['AK','AL','AR','AZ','CA','CO','CT','DC','DE','FL','GA','HI','IA','ID','IL','IN','KS','KY','LA','MA','MD','ME','MI','MN','MO','MS','MT','NC','ND','NE','NH','NJ','NM','NV','NY','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VA','VT','WA','WI','WV','WY'] %}
       <div class="state-circles-wrap" id="stateCirclesWrap">
-        {% for opt in state_filter_options %}
-          {% set is_active = opt.code in filter_state_list %}
+        {% for code in all_states %}
+          {% set is_active = code in filter_state_list %}
           <button type="button"
             class="state-circle{% if is_active %} state-circle--active{% endif %}"
-            data-state="{{ opt.code }}"
-            onclick="esStateCircleClick('{{ opt.code }}')">{{ opt.code }}</button>
+            data-state="{{ code }}"
+            onclick="esStateCircleClick('{{ code }}')">{{ code }}</button>
         {% endfor %}
       </div>
-      {% endif %}
 
       <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
   <div class="home-submit-plus-inner" aria-hidden="true">

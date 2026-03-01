@@ -46,7 +46,6 @@
     .header-tabs{
       grid-column:2;
       display:flex;align-items:stretch;
-      gap:2px;
       width:100%;
       max-width:720px;
     }
@@ -54,7 +53,8 @@
       position:relative;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       flex:1;
-      padding:0 6px;
+      min-width:80px;
+      padding:0 4px;
       text-decoration:none;
       color:#65676b;
       border-bottom:3px solid transparent;
@@ -222,9 +222,9 @@
         <a class="nav-tab {% if request.endpoint=='submit' %}active{% endif %}" href="{{ url_for('submit') }}">
           <div class="nav-tab-bg">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="12" y1="8" x2="12" y2="16"/>
-              <line x1="8" y1="12" x2="16" y2="12"/>
+              <circle cx="12" cy="12" r="9"/>
+              <line x1="12" y1="7.5" x2="12" y2="16.5"/>
+              <line x1="7.5" y1="12" x2="16.5" y2="12"/>
             </svg>
             <span class="nav-tab-label">Submit</span>
           </div>

@@ -247,10 +247,13 @@
     {# Main column: welcome tile + feed (unchanged) #}
     <div class="home-center">
 
-      {# Desktop collapsible filter toggle #}
-      <button type="button" class="home-filter-collapse-btn" id="homeFilterCollapseBtn" style="display:none;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        <span id="homeFilterCollapseBtnLabel">Hide Filters</span>
+      {# Desktop filter drawer handle — sits on the right edge of the filter panel #}
+      <button type="button" class="home-filter-collapse-btn" id="homeFilterCollapseBtn" aria-label="Toggle filters">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
       </button>
 
       {# Mobile-only toggle button for the filter sidebar #}
@@ -643,7 +646,6 @@
     var btn = document.getElementById('homeFiltersToggle');
     var sidebar = document.getElementById('homeFiltersSidebar');
     var desktopBtn = document.getElementById('homeFilterCollapseBtn');
-    var desktopBtnLabel = document.getElementById('homeFilterCollapseBtnLabel');
     if(!sidebar) return;
 
     var isDesktop = window.matchMedia && window.matchMedia('(min-width: 1101px)').matches;
@@ -651,32 +653,25 @@
     function setCollapsed(v, save){
       if(v){
         sidebar.classList.add('is-collapsed');
-        if(desktopBtnLabel) desktopBtnLabel.textContent = 'Show Filters';
+        if(desktopBtn){ desktopBtn.style.left = '0px'; desktopBtn.classList.add('is-collapsed'); }
       } else {
         sidebar.classList.remove('is-collapsed');
-        if(desktopBtnLabel) desktopBtnLabel.textContent = 'Hide Filters';
+        if(desktopBtn){ desktopBtn.style.left = '275px'; desktopBtn.classList.remove('is-collapsed'); }
       }
       if(save){
         try{ localStorage.setItem('es_filters_collapsed', v ? '1' : '0'); }catch(e){}
       }
     }
 
-    // Restore desktop state from localStorage
-    if(isDesktop){
-      if(desktopBtn) desktopBtn.style.display = 'inline-flex';
+    if(isDesktop && desktopBtn){
+      desktopBtn.style.display = 'flex';
+      // Restore from localStorage
       try{
         var saved = localStorage.getItem('es_filters_collapsed');
         if(saved === '1'){ setCollapsed(true, false); }
-      }catch(e){}
-    } else {
-      // Mobile: start collapsed
-      try{
-        if(window.matchMedia('(max-width: 980px)').matches){ setCollapsed(true, false); }
-      }catch(e){}
-    }
+        else { setCollapsed(false, false); }
+      }catch(e){ setCollapsed(false, false); }
 
-    // Desktop toggle
-    if(desktopBtn){
       desktopBtn.addEventListener('click', function(){
         var collapsed = sidebar.classList.contains('is-collapsed');
         setCollapsed(!collapsed, true);
@@ -688,6 +683,13 @@
       btn.addEventListener('click', function(){
         sidebar.classList.toggle('is-collapsed');
       });
+    }
+
+    // Mobile: start collapsed
+    if(!isDesktop){
+      try{
+        if(window.matchMedia('(max-width: 980px)').matches){ setCollapsed(true, false); }
+      }catch(e){}
     }
   }
 document.addEventListener('DOMContentLoaded', function(){

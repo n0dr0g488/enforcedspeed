@@ -791,14 +791,6 @@
       }catch(e){}
     }
   }
-      else { active.push(code); }
-      params.delete('state');
-      params.delete('page');
-      params.delete('county_geoid');
-      active.forEach(function(s){ params.append('state', s); });
-      window.location.href = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
-    }catch(e){}
-  }
 
 document.addEventListener('DOMContentLoaded', function(){
     try{ convertLocalTimes(); }catch(e){}

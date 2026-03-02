@@ -500,7 +500,7 @@
       var r = Math.PI/180;
       return Math.log(Math.tan(Math.PI/4 + lat*r/2));
     }
-    // Returns {px, py} — the pixel position of pinLat/pinLng on the displayed map image
+    // Returns {px, py, scale} — pixel position + scale factor for the displayed map
     function pinToPixel(pinLat, pinLng, img){
       var cLat = parseFloat(img.dataset.mapClat);
       var cLng = parseFloat(img.dataset.mapClng);
@@ -528,7 +528,24 @@
       var cY = mercatorY(cLat), pY = mercatorY(pinLat);
       var pixPerMerc = (tileSize * Math.pow(2, zoom)) / (2*Math.PI) * scale;
       var dy = (cY - pY) * pixPerMerc;
-      return { px: offX + visW/2 + dx, py: offY + visH/2 + dy };
+      return { px: offX + visW/2 + dx, py: offY + visH/2 + dy, scale: scale };
+    }
+    // Grey pins are 32px icons in a scale=2 (1280px) image = 16px in 640px base.
+    // Red pin overlay should match: 16 * scale CSS px.
+    var PIN_BASE_SIZE = 16;
+    function positionPin(pin, img){
+      var pinLat = parseFloat(pin.dataset.pinLat);
+      var pinLng = parseFloat(pin.dataset.pinLng);
+      if(isNaN(pinLat)||isNaN(pinLng)) return;
+      var pos = pinToPixel(pinLat, pinLng, img);
+      if(!pos) return;
+      var pinSize = Math.round(PIN_BASE_SIZE * pos.scale);
+      pin.style.width = pinSize + 'px';
+      pin.style.height = pinSize + 'px';
+      pin.style.left = pos.px + 'px';
+      pin.style.top = pos.py + 'px';
+      pin.style.transform = 'translate(-50%, -100%)';
+      pin.style.display = 'block';
     }
     function positionPill(pill, img){
       var pinLat = parseFloat(pill.dataset.pinLat);
@@ -536,20 +553,11 @@
       if(isNaN(pinLat)||isNaN(pinLng)) return;
       var pos = pinToPixel(pinLat, pinLng, img);
       if(!pos) return;
+      var pinSize = Math.round(PIN_BASE_SIZE * pos.scale);
+      // Place pill above the pin with a small gap; translateY(-100%) pushes it up by its own height
       pill.style.left = pos.px + 'px';
-      pill.style.top = (pos.py - 60) + 'px';
-      pill.style.transform = 'translateX(-50%)';
-    }
-    function positionPin(pin, img){
-      var pinLat = parseFloat(pin.dataset.pinLat);
-      var pinLng = parseFloat(pin.dataset.pinLng);
-      if(isNaN(pinLat)||isNaN(pinLng)) return;
-      var pos = pinToPixel(pinLat, pinLng, img);
-      if(!pos) return;
-      pin.style.left = pos.px + 'px';
-      pin.style.top = pos.py + 'px';
-      pin.style.transform = 'translate(-50%, -100%)';
-      pin.style.display = 'block';
+      pill.style.top = (pos.py - pinSize - 4) + 'px';
+      pill.style.transform = 'translate(-50%, -100%)';
     }
     function initPills(root){
       (root || document).querySelectorAll('.ticket-speedpill[data-pin-lat]').forEach(function(pill){

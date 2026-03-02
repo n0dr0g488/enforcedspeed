@@ -128,7 +128,7 @@
     </div>
     {# Red pin overlay — positioned via JS Mercator math, always on top of grey pins in the map image #}
     {% if _pin_lat is not none %}
-      <img class="ticket-pin-overlay" src="/static/img/pins/pin_selected_red.png" data-pin-lat="{{ _pin_lat }}" data-pin-lng="{{ _pin_lng }}" width="32" height="32" alt="">
+      <img class="ticket-pin-overlay" src="/static/img/pins/pin_selected_red.png" data-pin-lat="{{ _pin_lat }}" data-pin-lng="{{ _pin_lng }}" alt="">
     {% endif %}
     {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
       <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">Refine pin</button>

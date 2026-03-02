@@ -530,9 +530,8 @@
       var dy = (cY - pY) * pixPerMerc;
       return { px: offX + visW/2 + dx, py: offY + visH/2 + dy, scale: scale };
     }
-    // Grey pins are 32px icons in a scale=2 (1280px) image = 16px in 640px base.
-    // Red pin overlay should match: 16 * scale CSS px.
-    var PIN_BASE_SIZE = 16;
+    // Grey pins are 32px icons doubled to 64px by Google scale=2 in 1280px image = 32px in 640px base.
+    var PIN_BASE_SIZE = 32;
     function positionPin(pin, img){
       var pinLat = parseFloat(pin.dataset.pinLat);
       var pinLng = parseFloat(pin.dataset.pinLng);

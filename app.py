@@ -1063,11 +1063,9 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
         encoded_icon = urllib.parse.quote(icon_outside_url, safe="")
         items.append(('markers', f"icon:{encoded_icon}|" + "|".join(_fmt_pt(a,b) for a,b in pts_out)))
 
-    # Selected pin (deep red) — uses Google's native marker styling (not a custom icon)
-    # so it always renders on top of the custom-icon grey context pins.
-    if pin_lat is not None and pin_lng is not None:
-        sel_center = _fmt_pt(pin_lat, pin_lng)
-        items.append(('markers', f"color:0xDC2626|size:mid|{sel_center}"))
+    # Selected pin (deep red) — NOT included in the Static Maps URL.
+    # Instead, it is overlaid as an HTML element in the browser so we have full
+    # control over z-index (always on top of grey context pins).
 
     return 'https://maps.googleapis.com/maps/api/staticmap?' + _qs(items)
 
@@ -6463,7 +6461,7 @@ GROUP BY UPPER(TRIM(stusps));
         cache_key = None
         try:
             import hashlib
-            cache_key = "es:staticmap:v3:" + hashlib.sha256(upstream.encode("utf-8")).hexdigest()
+            cache_key = "es:staticmap:v4:" + hashlib.sha256(upstream.encode("utf-8")).hexdigest()
         except Exception:
             cache_key = None
 

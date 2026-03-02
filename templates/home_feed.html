@@ -416,7 +416,8 @@
   .ticket-speedpill{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:rgba(255,255,255,.95);border:1px solid #e5e7eb;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:#111827;box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:3;white-space:nowrap;transition:none}
   .ticket-speedpill--pinmode{top:50%;left:50%;transform:translate(-50%,calc(-100% - 56px))}
   .ticket-speedpill-over{font-weight:700;color:#dc2626;margin-left:8px}
-  .ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:2}
+  .ticket-pin-overlay{position:absolute;z-index:2;pointer-events:none;left:50%;top:50%;transform:translate(-50%,-100%);display:none}
+  .ticket-pin-refine{position:absolute;left:12px;top:12px;z-index:4}
 
   /* Ticket card center (Version 5). */
   .ticket-center{margin-top:12px;text-align:center;position:relative}
@@ -493,30 +494,25 @@
   }
 
 
-  // Position speed pills over red pins using Mercator projection
+  // Position speed pills and red pin overlays using Mercator projection
   (function(){
     function mercatorY(lat){
       var r = Math.PI/180;
       return Math.log(Math.tan(Math.PI/4 + lat*r/2));
     }
-    function positionPill(pill, img){
-      var pinLat = parseFloat(pill.dataset.pinLat);
-      var pinLng = parseFloat(pill.dataset.pinLng);
-      if(isNaN(pinLat)||isNaN(pinLng)) return;
-      // Read center/zoom from data attributes (set by server-side template)
+    // Returns {px, py} — the pixel position of pinLat/pinLng on the displayed map image
+    function pinToPixel(pinLat, pinLng, img){
       var cLat = parseFloat(img.dataset.mapClat);
       var cLng = parseFloat(img.dataset.mapClng);
       var zoom = parseInt(img.dataset.mapZoom);
-      if(isNaN(cLat)||isNaN(cLng)||isNaN(zoom)) return;
+      if(isNaN(cLat)||isNaN(cLng)||isNaN(zoom)) return null;
       var imgW = 640, imgH = 640;
-      // Displayed size — use the wrapper dimensions (more reliable than img when object-fit is used)
       var wrap = img.closest('.ticket-staticmap-wrap');
       var dispW = (wrap ? wrap.offsetWidth : 0) || img.offsetWidth || img.clientWidth || imgW;
       var dispH = (wrap ? wrap.offsetHeight : 0) || img.offsetHeight || img.clientHeight || imgH;
-      if(dispW < 10 || dispH < 10) return; // not laid out yet
-      // Account for object-fit:contain — image may be letter/pillar-boxed inside the container.
+      if(dispW < 10 || dispH < 10) return null;
       var containerRatio = dispW / dispH;
-      var imgRatio = imgW / imgH; // 1.0 for square maps
+      var imgRatio = imgW / imgH;
       var visW, visH, offX, offY;
       if(containerRatio > imgRatio){
         visH = dispH; visW = dispH * imgRatio;
@@ -526,19 +522,34 @@
         offX = 0; offY = (dispH - visH) / 2;
       }
       var scale = visW / imgW;
-      // Mercator pixel offset per degree at this zoom
       var tileSize = 256;
       var pixPerDeg = (tileSize * Math.pow(2, zoom)) / 360;
       var dx = (pinLng - cLng) * pixPerDeg * scale;
       var cY = mercatorY(cLat), pY = mercatorY(pinLat);
       var pixPerMerc = (tileSize * Math.pow(2, zoom)) / (2*Math.PI) * scale;
       var dy = (cY - pY) * pixPerMerc;
-      var px = offX + visW/2 + dx;
-      var py = offY + visH/2 + dy;
-      // Position pill above pin (pin icon is ~30px tall)
-      pill.style.left = px + 'px';
-      pill.style.top = (py - 60) + 'px';
+      return { px: offX + visW/2 + dx, py: offY + visH/2 + dy };
+    }
+    function positionPill(pill, img){
+      var pinLat = parseFloat(pill.dataset.pinLat);
+      var pinLng = parseFloat(pill.dataset.pinLng);
+      if(isNaN(pinLat)||isNaN(pinLng)) return;
+      var pos = pinToPixel(pinLat, pinLng, img);
+      if(!pos) return;
+      pill.style.left = pos.px + 'px';
+      pill.style.top = (pos.py - 60) + 'px';
       pill.style.transform = 'translateX(-50%)';
+    }
+    function positionPin(pin, img){
+      var pinLat = parseFloat(pin.dataset.pinLat);
+      var pinLng = parseFloat(pin.dataset.pinLng);
+      if(isNaN(pinLat)||isNaN(pinLng)) return;
+      var pos = pinToPixel(pinLat, pinLng, img);
+      if(!pos) return;
+      pin.style.left = pos.px + 'px';
+      pin.style.top = pos.py + 'px';
+      pin.style.transform = 'translate(-50%, -100%)';
+      pin.style.display = 'block';
     }
     function initPills(root){
       (root || document).querySelectorAll('.ticket-speedpill[data-pin-lat]').forEach(function(pill){
@@ -547,6 +558,16 @@
         var img = wrap.querySelector('.ticket-staticmap');
         if(!img) return;
         function tryPosition(){ positionPill(pill, img); }
+        tryPosition();
+        img.addEventListener('load', tryPosition);
+      });
+      // Position red pin overlays
+      (root || document).querySelectorAll('.ticket-pin-overlay[data-pin-lat]').forEach(function(pin){
+        var wrap = pin.closest('.ticket-staticmap-wrap');
+        if(!wrap) return;
+        var img = wrap.querySelector('.ticket-staticmap');
+        if(!img) return;
+        function tryPosition(){ positionPin(pin, img); }
         tryPosition();
         img.addEventListener('load', tryPosition);
       });

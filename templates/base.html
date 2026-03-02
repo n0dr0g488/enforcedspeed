@@ -143,22 +143,32 @@
       position:relative;
     }
     .header-right a:hover{ color:#1877f2; }
-    .header-right a:hover::after{
-      content:'';
-      position:absolute;
-      inset:8px 4px;
+    .header-right a:hover .header-right-bg{
       background:#f0f2f5;
       border-radius:10px;
-      z-index:-1;
+    }
+    .header-right-bg{
+      display:flex;align-items:center;gap:7px;
+      height:100%;
+      padding:0 12px;
+      box-sizing:border-box;
+      border-radius:10px;
+      transition:background 0.1s;
+    }
+    .header-right a{
+      padding:0 4px;
+    }
+    .header-right a.active{
+      color:#1877f2;
+      border-bottom-color:#1877f2;
     }
     .header-right .btn-logout{
       color:#65676b;
-      font-weight:500;
-      font-size:13px;
-      padding:0 10px;
+      font-weight:600;
+      font-size:14px;
     }
-    .avatar{width:28px;height:28px;border-radius:50%;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
-    .avatar svg{width:16px;height:16px;opacity:.7;}
+    .avatar{width:36px;height:36px;border-radius:50%;background:#e5e7eb;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+    .avatar svg{width:20px;height:20px;opacity:.7;}
     .avatar img{width:100%;height:100%;object-fit:cover;display:block;}
 
     /* Search suggest dropdown */
@@ -176,7 +186,7 @@
       .nav-tab{ min-width:44px; }
       .nav-tab-label{ display:none; }
       .site-header .inner{ padding:0 8px; }
-      .header-right a span{ display:none; }
+      .header-right a span:not(.avatar){ display:none; }
       .nav-search-expand{ width:calc(100vw - 32px); left:16px; transform:none; }
     }
     @media(max-width:480px){
@@ -285,14 +295,22 @@
       <div class="header-right">
         {% if current_user.is_authenticated %}
           <a class="{% if request.endpoint=='profile' %}active{% endif %}" href="{{ url_for('profile', username=current_user.username) }}">
-            <span class="avatar"><img src="{{ user_avatar_url(current_user) }}" alt=""></span>
-            <span>My Profile</span>
+            <div class="header-right-bg">
+              <span class="avatar"><img src="{{ user_avatar_url(current_user) }}" alt=""></span>
+              <span>My Profile</span>
+            </div>
           </a>
-          <a class="btn-logout" href="{{ url_for('logout') }}">Log out</a>
+          <a class="btn-logout" href="{{ url_for('logout') }}">
+            <div class="header-right-bg">
+              <span>Log out</span>
+            </div>
+          </a>
         {% else %}
           <a href="{{ url_for('login') }}">
-            <span class="avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z" fill="currentColor"/><path d="M4 22c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-            <span>Log In</span>
+            <div class="header-right-bg">
+              <span class="avatar"><svg viewBox="0 0 24 24" fill="none"><path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z" fill="currentColor"/><path d="M4 22c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+              <span>Log In</span>
+            </div>
           </a>
         {% endif %}
       </div>

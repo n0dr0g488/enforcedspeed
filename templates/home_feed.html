@@ -127,7 +127,7 @@
                 </select>
               </div>
 
-              <div class="filterbar-item">
+              <div class="filterbar-item" style="display:none;">
                 <label class="filterbar-label" for="filter-sort">Sort by</label>
                 <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
@@ -259,28 +259,22 @@
       {# Mobile-only toggle button for the filter sidebar #}
       <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Filters</button>
 
-      {# --- Welcome tile (clickable CTA) --- #}
-      {% set submit_url = url_for('submit') %}
-      {% if current_user.is_authenticated %}
-        {% set welcome_url = submit_url %}
-      {% else %}
-        {% set welcome_url = url_for('register', next=submit_url) %}
+      {# Feed starts immediately below. #}
+
+      {# Onboarding callout: show when logged in with no follows #}
+      {% if current_user.is_authenticated and not feed_is_following %}
+        <div class="onboarding-callout" id="onboardingCallout" style="display:none;">
+          <div class="onboarding-callout-inner">
+            <button type="button" class="onboarding-close" id="onboardingClose" aria-label="Dismiss">&times;</button>
+            <div class="onboarding-icon">★</div>
+            <div class="onboarding-text">
+              <strong>Welcome to EnforcedSpeed!</strong><br>
+              Follow a state or county to see speeding tickets in your feed.
+            </div>
+            <a class="onboarding-btn" href="{{ url_for('following') }}">Set up following</a>
+          </div>
+        </div>
       {% endif %}
-
-      <a class="card home-welcome-card home-welcome-link" href="{{ welcome_url }}" style="margin:0;">
-  <div class="home-submit-plus-inner" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
-      <circle cx="12" cy="12" r="9"/>
-      <line x1="12" y1="7.5" x2="12" y2="16.5"/>
-      <line x1="7.5" y1="12" x2="16.5" y2="12"/>
-    </svg>
-    <span class="home-submit-cta-label">Submit Ticket</span>
-  </div>
-</a>
-
-      {# Feed starts immediately below welcome card. #}
-
-      {# Feed starts immediately below welcome card. #}
 
       {# Preserve active query params (used for infinite scroll + fallback pagination). #}
       {% set q = request.args.to_dict(flat=False) %}
@@ -324,6 +318,37 @@
 </div>
 
 <style>
+
+  /* Onboarding callout */
+  .onboarding-callout{ margin:0 0 16px; }
+  .onboarding-callout-inner{
+    position:relative;
+    background:linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+    border:1px solid #bfdbfe;
+    border-radius:12px;
+    padding:20px 20px 20px 20px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .onboarding-icon{ font-size:28px; opacity:0.6; flex-shrink:0; }
+  .onboarding-text{ flex:1; font-size:14px; color:#1e3a5f; line-height:1.4; }
+  .onboarding-text strong{ font-size:15px; }
+  .onboarding-btn{
+    flex-shrink:0;
+    background:#1877f2; color:#fff;
+    padding:8px 18px; border-radius:8px;
+    font-size:14px; font-weight:600;
+    text-decoration:none;
+    white-space:nowrap;
+  }
+  .onboarding-btn:hover{ background:#1565c0; }
+  .onboarding-close{
+    position:absolute; top:8px; right:10px;
+    background:none; border:none; font-size:18px;
+    color:#6b7280; cursor:pointer; padding:2px 6px;
+  }
+  .onboarding-close:hover{ color:#111; }
 
   /* Reuse the exact thank_you thermometer styling (scoped to this template). */
   .ticket-card{padding-top:18px;padding-bottom:18px;overflow:hidden}
@@ -796,6 +821,25 @@ document.addEventListener('DOMContentLoaded', function(){
     try{ convertLocalTimes(); }catch(e){}
     try{ initHomeFiltersToggle(); }catch(e){}
     try{ initHomeRightToggle(); }catch(e){}
+
+    // Onboarding callout: show once for users with no follows
+    try{
+      var callout = document.getElementById('onboardingCallout');
+      var closeBtn = document.getElementById('onboardingClose');
+      if(callout){
+        var dismissed = false;
+        try{ dismissed = localStorage.getItem('es_onboarding_dismissed') === '1'; }catch(e){}
+        if(!dismissed){
+          callout.style.display = 'block';
+        }
+        if(closeBtn){
+          closeBtn.addEventListener('click', function(){
+            callout.style.display = 'none';
+            try{ localStorage.setItem('es_onboarding_dismissed', '1'); }catch(e){}
+          });
+        }
+      }
+    }catch(e){}
   });
 
   function initHomeRightToggle(){
@@ -1031,26 +1075,12 @@ function startAutoLoad(){
       </svg>
     </button>
 
-    {# Right rail: static mini-map (trending counties). Click anywhere to open the full interactive map. #}
+    {# Right rail: trending + following counties #}
     <aside class="home-right" id="homeRightSidebar" aria-label="Ticket map">
-      {# Card 1: Static mini-map (no title; full-bleed image + tiny overlay link) #}
-      <div class="rail-card" style="border-radius:0;">
-        {% if maps_api_key %}
-          <a href="{{ url_for('map_view') }}" style="display:block; position:relative; width:100%;">
-            <div class="minimap-crop">
-              <img src="{{ url_for('api_home_minimap_staticmap') }}" alt="Trending counties map">
-            </div>
-            <span class="subtle" style="position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.92); border:1px solid rgba(0,0,0,0.08); padding:4px 8px; border-radius:999px; font-size:12px; text-decoration:none;">Open full map</span>
-          </a>
-        {% else %}
-          <div class="subtle" style="padding:12px 14px 14px;">Map not configured yet (missing GOOGLE_MAPS_API_KEY).</div>
-        {% endif %}
-      </div>
 
-      {# Card 2: Trending + Followed (separate container, flush aligned) #}
+      {# Trending + Following #}
       <div class="rail-card" style="border-radius:0;">
 
-      {# Card 2: Trending + Followed (separate container, flush aligned) #}
       <div class="rail-card">
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
@@ -1094,7 +1124,7 @@ function startAutoLoad(){
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-weight:600;">Counties you follow</div>
+      <div style="font-weight:600;">Following counties</div>
     </div>
   </div>
 

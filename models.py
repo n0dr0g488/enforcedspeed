@@ -304,3 +304,21 @@ class FollowedCounty(db.Model):
 
     def __repr__(self):
         return f"<FollowedCounty user={self.user_id} geoid={self.county_geoid}>"
+
+
+class FollowedState(db.Model):
+    __tablename__ = "user_follow_states"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    state_code = db.Column(db.String(2), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "state_code", name="uq_follow_user_state"),
+    )
+
+    user = db.relationship("User", backref=db.backref("followed_states", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f"<FollowedState user={self.user_id} state={self.state_code}>"

@@ -328,8 +328,20 @@
 {% endfor %}
 {% else %}
   {% if show_empty %}
-    <div class="card ticket-card" style="margin-top:16px;">
-      <p>No posts yet. Be the first to <a href="{{ url_for('submit') }}">submit a ticket</a>.</p>
-    </div>
+    {% if feed_is_following is defined and feed_is_following %}
+      <div class="card ticket-card" style="margin-top:16px; text-align:center; padding:32px 20px;">
+        <div style="font-size:28px; opacity:0.25; margin-bottom:8px;">★</div>
+        <div style="font-weight:600; font-size:15px; color:#111827; margin-bottom:6px;">No speeding tickets yet</div>
+        <div style="font-size:13px; color:#6b7280; line-height:1.4;">
+          There are no tickets for the states or counties you follow.<br>
+          <a href="{{ url_for('submit') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Be the first to submit one</a>
+          or <a href="{{ url_for('following') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">follow more areas</a>.
+        </div>
+      </div>
+    {% else %}
+      <div class="card ticket-card" style="margin-top:16px;">
+        <p>No posts yet. Be the first to <a href="{{ url_for('submit') }}">submit a ticket</a>.</p>
+      </div>
+    {% endif %}
   {% endif %}
 {% endif %}

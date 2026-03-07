@@ -82,7 +82,7 @@
                 </select>
               </div>
 
-              <div class="filterbar-item">
+              <div class="filterbar-item" style="display:none;">
                 <label class="filterbar-label" for="filter-sort">Sort by</label>
                 <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
                   <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>

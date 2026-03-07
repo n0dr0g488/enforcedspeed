@@ -40,6 +40,41 @@
   .map-frame{ position: relative; flex: 1 1 auto; width: 100%; border-radius: 14px; overflow: hidden; min-height: 0; }
   #esMap{ position: absolute; inset: 0; }
 
+  /* Map selection overlay */
+  .map-select-overlay{
+    position:absolute; inset:0; z-index:50;
+    background:rgba(0,0,0,0.35);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .map-select-box{
+    background:#fff; border-radius:14px;
+    padding:28px 24px; max-width:380px; width:90%;
+    box-shadow:0 8px 32px rgba(0,0,0,0.18);
+    text-align:center;
+  }
+  .map-select-title{ font-size:16px; font-weight:600; color:#111827; margin-bottom:12px; }
+  .map-select-subtitle{ font-size:13px; color:#6b7280; margin-bottom:8px; }
+  .map-select-list{
+    max-height:200px; overflow-y:auto;
+    display:flex; flex-direction:column; gap:4px;
+    margin-bottom:16px;
+    text-align:left;
+  }
+  .map-select-item{
+    display:block; padding:8px 12px;
+    border:1px solid #e5e7eb; border-radius:8px;
+    text-decoration:none; color:#111827;
+    font-size:14px; font-weight:500;
+    transition:background 0.1s;
+  }
+  .map-select-item:hover{ background:#f0f2f5; border-color:#bfdbfe; }
+  .map-select-dismiss{
+    background:none; border:none;
+    color:#6b7280; font-size:13px;
+    cursor:pointer; padding:6px 0;
+  }
+  .map-select-dismiss:hover{ color:#111; text-decoration:underline; }
+
   .map-pill-row{
     position: absolute;
     top: 12px;
@@ -224,7 +259,7 @@
                   </select>
                 </div>
 
-                <div class="filterbar-item">
+                <div class="filterbar-item" style="display:none;">
                   <label class="filterbar-label" for="filter-sort">Sort by</label>
                   <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
                     <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
@@ -315,6 +350,32 @@
               <button type="button" class="map-zoom-btn" id="esZoomOut" aria-label="Zoom out">−</button>
             </div>
             <div id="esMap"></div>
+
+            {# Overlay: prompt to select a county/state when nothing is selected #}
+            {% if not filter_state and not filter_county_geoid %}
+            <div class="map-select-overlay" id="mapSelectOverlay">
+              <div class="map-select-box">
+                <div class="map-select-title">Select a county or state for detailed information</div>
+                {% if map_following_items %}
+                  <div class="map-select-subtitle">Your followed areas:</div>
+                  <div class="map-select-list">
+                    {% for item in map_following_items %}
+                      <a class="map-select-item" href="{{ item.url }}">{{ item.label }}</a>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="map-select-subtitle" style="margin-bottom:6px;">
+                    {% if current_user.is_authenticated %}
+                      <a href="{{ url_for('following') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Follow states or counties</a> to see them here.
+                    {% else %}
+                      <a href="{{ url_for('login') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Log in</a> to follow states and counties.
+                    {% endif %}
+                  </div>
+                {% endif %}
+                <button type="button" class="map-select-dismiss" id="mapSelectDismiss">Continue without selecting</button>
+              </div>
+            </div>
+            {% endif %}
           </div>
         {% endif %}
       </div>
@@ -880,6 +941,19 @@ window.esInitMap = async function() {
         setCollapsed(!sidebar.classList.contains('is-collapsed'), true);
       });
     });
+  })();
+</script>
+
+<script>
+  // Map selection overlay dismiss
+  (function(){
+    var overlay = document.getElementById('mapSelectOverlay');
+    var btn = document.getElementById('mapSelectDismiss');
+    if(overlay && btn){
+      btn.addEventListener('click', function(){
+        overlay.style.display = 'none';
+      });
+    }
   })();
 </script>
 

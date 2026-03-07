@@ -128,6 +128,10 @@ class User(UserMixin, db.Model):
     car_make = db.Column(db.String(50), nullable=True)
     car_model = db.Column(db.String(60), nullable=True)
     car_year = db.Column(db.Integer, nullable=True)
+    # Vehicle photos (v510): R2 keys, same pattern as profile_photo_key
+    car_photo_1 = db.Column(db.String(256), nullable=True)
+    car_photo_2 = db.Column(db.String(256), nullable=True)
+    car_photo_3 = db.Column(db.String(256), nullable=True)
 
     # Profile settings (v424): default feed/statistics filters stored as JSON
     default_filters_json = db.Column(db.Text, nullable=True)

@@ -1381,6 +1381,20 @@ def create_app() -> Flask:
             except Exception:
                 return False
 
+        def car_photo_url(user, slot: int) -> str:
+            """Return URL for a user's car photo in the given slot (1-3), or empty."""
+            try:
+                key = getattr(user, f"car_photo_{slot}", None) or ""
+                key = key.strip()
+                if not key:
+                    return ""
+                base = _profile_photo_base_url()
+                if base:
+                    return f"{base}/{key}"
+                return ""
+            except Exception:
+                return ""
+
         return {
             "format_road_bucket": format_road_bucket,
             "static_map_url": static_map_url,
@@ -1388,6 +1402,7 @@ def create_app() -> Flask:
             "county_center_zoom": county_center_zoom,
             "user_avatar_url": user_avatar_url,
             "user_avatar_is_photo": user_avatar_is_photo,
+            "car_photo_url": car_photo_url,
             "system_avatars": system_avatars,
             "default_avatar_key": _DEFAULT_SYSTEM_AVATAR_KEY,
             "asset_v": _ES_VERSION,
@@ -4702,6 +4717,128 @@ GROUP BY UPPER(TRIM(stusps));
             "avatar_url_sm": url,
             "avatar_url_lg": url,
         })
+
+    @app.post("/api/profile/car_photo/upload")
+    def api_car_photo_upload():
+        """Upload a car photo (slot 1, 2, or 3)."""
+        if not current_user.is_authenticated:
+            return jsonify({"ok": False, "auth": False}), 401
+
+        slot = request.form.get("slot", "1").strip()
+        if slot not in ("1", "2", "3"):
+            return jsonify({"ok": False, "error": "bad_slot"}), 400
+
+        col = f"car_photo_{slot}"
+
+        file_obj = request.files.get("photo")
+        if not file_obj:
+            return jsonify({"ok": False, "error": "no_file", "message": "Choose an image."}), 400
+
+        max_bytes = 25 * 1024 * 1024
+        try:
+            raw = file_obj.read()
+        except Exception:
+            raw = b""
+        if not raw or len(raw) > max_bytes:
+            return jsonify({"ok": False, "error": "too_large", "message": "Keep it under 25 MB."}), 400
+
+        try:
+            im = Image.open(io.BytesIO(raw)).convert("RGB")
+            im.thumbnail((1200, 1200), Image.LANCZOS)
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_image", "message": "Could not read image."}), 400
+
+        # SafeSearch
+        try:
+            scan = im.copy()
+            scan.thumbnail((800, 800))
+            scan_buf = io.BytesIO()
+            scan.save(scan_buf, format="JPEG", quality=80, optimize=True)
+            from google.cloud import vision
+            client = vision.ImageAnnotatorClient()
+            resp = client.safe_search_detection(image=vision.Image(content=scan_buf.getvalue()))
+            ann = getattr(resp, "safe_search_annotation", None)
+            if ann and (int(ann.adult) >= int(vision.Likelihood.LIKELY) or int(ann.racy) >= int(vision.Likelihood.LIKELY)):
+                return jsonify({"ok": False, "error": "unsafe_image", "message": "Photo rejected (adult/racy)."}), 400
+        except Exception:
+            return jsonify({"ok": False, "error": "scan_failed", "message": "Safety scan failed. Try again."}), 500
+
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=85, optimize=True)
+        img_bytes = buf.getvalue()
+
+        bucket = (os.environ.get("R2_PROFILE_BUCKET") or app.config.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip()
+        prefix = "car_photos/"
+        base_key = f"{prefix}{current_user.id}/{uuid.uuid4().hex}.jpg"
+
+        ok = put_bytes(bucket=bucket, key=base_key, data=img_bytes, content_type="image/jpeg", cache_control="public, max-age=31536000, immutable")
+        if not ok:
+            return jsonify({"ok": False, "error": "upload_failed"}), 500
+
+        # Delete old photo in this slot
+        try:
+            old_key = getattr(current_user, col, None)
+            if old_key:
+                delete_object(bucket, old_key)
+        except Exception:
+            pass
+
+        try:
+            setattr(current_user, col, base_key)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+        # Build URL
+        pb = _car_photo_base_url()
+        photo_url = f"{pb}/{base_key}" if pb else ""
+
+        return jsonify({"ok": True, "photo_url": photo_url, "slot": slot})
+
+    @app.post("/api/profile/car_photo/remove")
+    def api_car_photo_remove():
+        """Remove a car photo from a slot."""
+        if not current_user.is_authenticated:
+            return jsonify({"ok": False, "auth": False}), 401
+
+        slot = request.form.get("slot", "1").strip()
+        if slot not in ("1", "2", "3"):
+            return jsonify({"ok": False, "error": "bad_slot"}), 400
+
+        col = f"car_photo_{slot}"
+        old_key = getattr(current_user, col, None)
+
+        if old_key:
+            bucket = (os.environ.get("R2_PROFILE_BUCKET") or app.config.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip()
+            try:
+                delete_object(bucket, old_key)
+            except Exception:
+                pass
+
+        try:
+            setattr(current_user, col, None)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+        return jsonify({"ok": True, "slot": slot})
+
+    def _car_photo_base_url() -> str:
+        """Public URL base for car photos — same bucket as profile photos."""
+        cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
+        if cfg:
+            if cfg.endswith("/profile_photos"):
+                cfg = cfg[: -len("/profile_photos")]
+            return cfg
+        pin = (app.config.get("STATIC_PIN_BASE_URL") or os.environ.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+        if not pin:
+            return ""
+        b = pin
+        if b.endswith("/pins"):
+            b = b[: -len("/pins")]
+        return b.rstrip("/")
 
     def _admin_email_set() -> set[str]:
         raw = (os.environ.get("ADMIN_EMAILS") or os.environ.get("ADMIN_EMAIL") or "").strip()

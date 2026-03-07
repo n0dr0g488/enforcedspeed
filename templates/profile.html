@@ -1,35 +1,78 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+  .profile-section{ margin-top:18px; }
+  .profile-section-title{ font-size:13px; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 12px; }
+
+  /* Avatar */
+  .avatar-preview{ display:flex; align-items:center; gap:16px; margin-bottom:14px; }
+  .avatar-preview img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; }
+  .avatar-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .avatar-actions .es-btn{ height:36px; padding:0 14px; font-size:13px; font-weight:500; cursor:pointer; border-radius:8px; }
+  .avatar-actions .es-btn-outline{ background:#fff; border:1px solid #d1d5db; color:#111827; }
+  .avatar-actions .es-btn-outline:hover{ background:#f9fafb; }
+
+  .avatar-grid-wrap{ display:none; margin-top:12px; }
+  .avatar-grid-wrap.open{ display:block; }
+  .avatar-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(52px, 1fr)); gap:8px; max-width:520px; }
+
+  /* Vehicle photos */
+  .car-photos{ display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .car-photo-slot{
+    position:relative; width:180px; height:135px;
+    border:2px dashed #d1d5db; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden; cursor:pointer; background:#f9fafb;
+    transition:border-color 0.15s;
+  }
+  .car-photo-slot:hover{ border-color:#93c5fd; }
+  .car-photo-slot.has-photo{ border:2px solid #e5e7eb; cursor:default; }
+  .car-photo-slot img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .car-photo-plus{ font-size:28px; color:#9ca3af; pointer-events:none; }
+  .car-photo-remove{
+    position:absolute; top:4px; right:4px;
+    background:rgba(0,0,0,0.6); color:#fff;
+    border:none; border-radius:50%; width:24px; height:24px;
+    font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .car-photo-remove:hover{ background:rgba(220,38,38,0.8); }
+  .car-photo-input{ display:none; }
+
+  /* Vehicle text fields */
+  .car-fields{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .car-fields .field{ flex:1; min-width:140px; }
+  .car-fields label{ display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:4px; }
+  .car-fields input{ width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box; }
+  .car-fields .es-btn{ height:38px; padding:0 16px; }
+</style>
+
   <div class="wrap">
     <div class="card">
-<div class="row">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:48px;height:48px;border-radius:999px;object-fit:cover;background:#e5e7eb;flex:0 0 auto;">
-          <div>
-            <h1 style="margin:0;">@{{ profile_user.username }}</h1>
-          <div class="subtle" style="margin-top:6px;">
+
+      {# Header #}
+      <div style="display:flex; align-items:center; gap:14px;">
+        <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:56px;height:56px;border-radius:999px;object-fit:cover;background:#e5e7eb;flex:0 0 auto;">
+        <div>
+          <h1 style="margin:0; text-align:left;">@{{ profile_user.username }}</h1>
+          <div class="subtle" style="margin-top:4px;">
             Joined: {{ profile_user.created_at.strftime("%b %d, %Y") }}
           </div>
-          </div>
         </div>
-
-        <div class="subtle">
-          <a href="{{ url_for('home') }}">Home</a>
-
-          {% if current_user.is_authenticated and current_user.id == profile_user.id %}
-              · <a href="{{ url_for('change_password') }}">Change password</a>
-              · <a href="{{ url_for('logout') }}">Log out</a>
-          {% endif %}
-        </div>  
       </div>
 
-      <div style="margin-top:12px;">
-        <span class="pill">Tickets posted: {{ ticket_count }}</span>
+      <div class="subtle" style="margin-top:10px;">
+        <a href="{{ url_for('home') }}">Home</a>
+        {% if current_user.is_authenticated and current_user.id == profile_user.id %}
+          · <a href="{{ url_for('change_password') }}">Change password</a>
+          · <a href="{{ url_for('logout') }}">Log out</a>
+        {% endif %}
+      </div>
 
+      <div style="margin-top:10px;">
+        <span class="pill">Tickets posted: {{ ticket_count }}</span>
         {% if profile_user.car_make or profile_user.car_model or profile_user.car_year %}
           <span class="pill">
-            Car:
             {% if profile_user.car_year %}{{ profile_user.car_year }}{% endif %}
             {% if profile_user.car_make %} {{ profile_user.car_make }}{% endif %}
             {% if profile_user.car_model %} {{ profile_user.car_model }}{% endif %}
@@ -37,510 +80,115 @@
         {% endif %}
       </div>
 
-
-      
+      {# ── Avatar Section (owner only) ── #}
       {% if current_user.is_authenticated and current_user.id == profile_user.id %}
-        <div class="list" style="margin-top:14px;">
-          <h3 style="margin: 14px 0 10px;">Avatar (optional)</h3>
+      <div class="profile-section">
+        <div class="profile-section-title">Avatar</div>
 
-          <div class="item">
-            <form id="esAvatarForm" method="post" action="{{ url_for('profile', username=profile_user.username) }}" style="margin:0;">
-              {{ avatar_form.csrf_token }}
-              <input type="hidden" name="form_name" value="avatar">
-              {{ avatar_form.avatar_key(id="esAvatarKey") }}
-            </form>
+        <form id="esAvatarForm" method="post" action="{{ url_for('profile', username=profile_user.username) }}" style="display:none;">
+          {{ avatar_form.csrf_token }}
+          <input type="hidden" name="form_name" value="avatar">
+          {{ avatar_form.avatar_key(id="esAvatarKey") }}
+        </form>
 
-            <div class="subtle" style="margin-bottom:10px;">
-              Upload a profile photo (optional) or pick a built-in avatar.
-            </div>
-
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
-              <input id="esPhotoInput" type="file" accept="image/*" style="max-width:280px;">
-              <button id="esPhotoUploadBtn" type="button" class="es-btn" style="height:38px; padding:0 12px; font-weight:500;">Upload photo</button>
+        <div class="avatar-preview">
+          <img id="avatarPreviewLarge" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="Current avatar">
+          <div>
+            <div class="avatar-actions">
+              <label class="es-btn es-btn-outline" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
+              <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
+              <button type="button" class="es-btn es-btn-outline" id="toggleAvatarGrid">Choose avatar</button>
               {% if user_avatar_is_photo(profile_user) %}
-                <button id="esPhotoRemoveBtn" type="button" class="es-btn" style="height:38px; padding:0 12px; font-weight:500; background:#fff; border:1px solid #d1d5db; color:#111827;">Remove photo</button>
+                <button id="esPhotoRemoveBtn" type="button" class="es-btn es-btn-outline" style="color:#dc2626; border-color:#fca5a5;">Remove photo</button>
               {% endif %}
-              <span id="esPhotoMsg" class="subtle"></span>
             </div>
-
-            <div class="subtle" style="margin:6px 0 10px;">
-              Photos are scanned for adult/racy content via Google Vision SafeSearch.
-            </div>
-
-            {% if user_avatar_is_photo(profile_user) %}
-              <div class="subtle" style="margin:6px 0 10px;">
-                You’re using an uploaded photo. Remove it to switch back to a built-in avatar.
-              </div>
-            {% endif %}
-
-            <div id="esAvatarGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap:10px; max-width:520px;{% if user_avatar_is_photo(profile_user) %} opacity:.55; pointer-events:none;{% endif %}">
-              {% for a in system_avatars %}
-                {% set k = a.key %}
-                {% set f = a.file %}
-                <button type="button"
-                        class="es-avatar-choice{% if k == selected_avatar_key %} is-selected{% endif %}"
-                        data-key="{{ k }}"
-                        style="padding:0; border:2px solid {% if k == selected_avatar_key %}#111827{% else %}transparent{% endif %}; border-radius:999px; background:transparent; cursor:pointer; width:56px; height:56px; display:flex; align-items:center; justify-content:center;">
-                  <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}"
-                       alt="{{ a.label }}"
-                       style="width:52px;height:52px;border-radius:999px;object-fit:cover;background:#e5e7eb;display:block;">
-                </button>
-              {% endfor %}
-            </div>
-
-            <div class="subtle" style="margin-top:10px;">
-              Click an avatar to save. It will appear next to your name across the site.
-            </div>
+            <div id="esPhotoMsg" class="subtle" style="margin-top:6px;"></div>
           </div>
         </div>
 
-        <script>
-          (function(){
-            const grid = document.getElementById('esAvatarGrid');
-            const keyInput = document.getElementById('esAvatarKey');
-            const form = document.getElementById('esAvatarForm');
-            if(!grid || !keyInput || !form) return;
-
-            function _get(name){
-              const el = form.querySelector(`input[name="${name}"]`);
-              return el ? (el.value || '') : '';
-            }
-
-            function setSelected(key){
-              const buttons = grid.querySelectorAll('.es-avatar-choice');
-              buttons.forEach(btn => {
-                const k = btn.getAttribute('data-key') || '';
-                const on = (k === key);
-                btn.classList.toggle('is-selected', on);
-                btn.style.borderColor = on ? '#111827' : 'transparent';
-              });
-            }
-
-            grid.addEventListener('click', async function(e){
-              const btn = e.target && e.target.closest ? e.target.closest('.es-avatar-choice') : null;
-              if(!btn) return;
-
-              const key = (btn.getAttribute('data-key') || '').trim();
-              if(!key) return;
-
-              setSelected(key);
-              keyInput.value = key;
-
-              try{
-                const csrf = _get('csrf_token');
-                const body = new URLSearchParams();
-                body.set('csrf_token', csrf);
-                body.set('avatar_key', key);
-
-                const resp = await fetch('{{ url_for("api_profile_avatar") }}', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  credentials: 'same-origin',
-                  body: body.toString(),
-                });
-
-                const data = await resp.json().catch(()=>null);
-
-                if(resp.status === 401 && data && data.login_url){
-                  window.location.href = data.login_url;
-                  return;
-                }
-
-                if(!data || !data.ok){
-                  return;
-                }
-
-                // Update header avatar (My Profile)
-                const headImg = document.querySelector('.header-nav .nav-user .avatar img');
-                if(headImg && data.avatar_url){
-                  headImg.src = data.avatar_url + '?v=' + Date.now();
-                }
-
-                // Update profile header avatar
-                const profImg = document.getElementById('profileAvatarImg');
-                if(profImg && data.avatar_url){
-                  profImg.src = data.avatar_url + '?v=' + Date.now();
-                }
-              }catch(err){
-                // best-effort
-              }
-            });
-
-            // --- Profile photo upload/remove (v426) ---
-            const photoInput = document.getElementById('esPhotoInput');
-            const photoBtn = document.getElementById('esPhotoUploadBtn');
-            const photoMsg = document.getElementById('esPhotoMsg');
-            const removeBtn = document.getElementById('esPhotoRemoveBtn');
-
-            function setMsg(t){ if(photoMsg) photoMsg.textContent = t || ''; }
-
-            function _appendCb(url){
-              if(!url) return url;
-              const u = String(url);
-              const sep = u.includes('?') ? '&' : '?';
-              return u + sep + 'cb=' + Date.now();
-            }
-
-            function _mb(n){
-              try{ return (n / (1024*1024)).toFixed(1); }catch(e){ return '0.0'; }
-            }
-
-            async function updateImgs(urlSm, urlLg){
-              const headImg = document.querySelector('.header-nav .nav-user .avatar img');
-              if(headImg && urlSm){ headImg.src = _appendCb(urlSm); }
-              const profImg = document.getElementById('profileAvatarImg');
-              if(profImg && (urlLg || urlSm)){
-                profImg.src = _appendCb(urlLg || urlSm);
-              }
-            }
-
-            // Client-side photo optimization (v428): reduce upload size before hitting the server.
-            async function optimizePhoto(file){
-              if(!file) return { blob: null, name: '', type: '', optimized: false, origBytes: 0, outBytes: 0 };
-
-              const origBytes = file.size || 0;
-              const type = (file.type || '').toLowerCase();
-              const name = file.name || 'photo';
-
-              // Only optimize when it helps (large files, PNGs, very large dimensions).
-              const should = (origBytes > (4 * 1024 * 1024)) || type === 'image/png' || /\.png$/i.test(name);
-              if(!should){
-                return { blob: file, name: name, type: file.type || 'application/octet-stream', optimized: false, origBytes, outBytes: origBytes };
-              }
-
-              // Decode image
-              let bitmap = null;
-              try{
-                if(typeof createImageBitmap === 'function'){
-                  try{
-                    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-                  }catch(_e){
-                    bitmap = await createImageBitmap(file);
-                  }
-                }
-              }catch(e){ bitmap = null; }
-
-              // Fallback for older browsers
-              if(!bitmap){
-                const img = await new Promise((resolve, reject) => {
-                  const el = new Image();
-                  el.onload = () => resolve(el);
-                  el.onerror = reject;
-                  el.src = URL.createObjectURL(file);
-                });
-                const w = img.naturalWidth || img.width;
-                const h = img.naturalHeight || img.height;
-                bitmap = { width: w, height: h, _img: img };
-              }
-
-              const w = bitmap.width || 0;
-              const h = bitmap.height || 0;
-              if(!w || !h){
-                return { blob: file, name: name, type: file.type || 'application/octet-stream', optimized: false, origBytes, outBytes: origBytes };
-              }
-
-              // Center-crop to square (matches server behavior) and downscale.
-              const side = Math.min(w, h);
-              const sx = Math.max(0, Math.floor((w - side) / 2));
-              const sy = Math.max(0, Math.floor((h - side) / 2));
-              const maxDim = 1024;
-              const outDim = Math.min(maxDim, side);
-
-              const canvas = document.createElement('canvas');
-              canvas.width = outDim;
-              canvas.height = outDim;
-              const ctx = canvas.getContext('2d');
-              ctx.imageSmoothingEnabled = true;
-              ctx.imageSmoothingQuality = 'high';
-
-              try{
-                if(bitmap.close){
-                  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, outDim, outDim);
-                }else{
-                  ctx.drawImage(bitmap._img, sx, sy, side, side, 0, 0, outDim, outDim);
-                  try{ URL.revokeObjectURL(bitmap._img.src); }catch(e){}
-                }
-              }catch(e){
-                return { blob: file, name: name, type: file.type || 'application/octet-stream', optimized: false, origBytes, outBytes: origBytes };
-              }finally{
-                try{ if(bitmap && bitmap.close) bitmap.close(); }catch(e){}
-              }
-
-              const blob = await new Promise((resolve) => {
-                if(canvas.toBlob){
-                  canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.86);
-                }else{
-                  // Very old fallback
-                  try{
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.86);
-                    const bin = atob(dataUrl.split(',')[1] || '');
-                    const arr = new Uint8Array(bin.length);
-                    for(let i=0;i<bin.length;i++){ arr[i] = bin.charCodeAt(i); }
-                    resolve(new Blob([arr], { type: 'image/jpeg' }));
-                  }catch(e){ resolve(null); }
-                }
-              });
-
-              if(!blob){
-                return { blob: file, name: name, type: file.type || 'application/octet-stream', optimized: false, origBytes, outBytes: origBytes };
-              }
-
-              return { blob: blob, name: 'profile.jpg', type: 'image/jpeg', optimized: true, origBytes, outBytes: blob.size || 0 };
-            }
-
-            if(photoBtn){
-              photoBtn.addEventListener('click', async function(){
-                if(!photoInput || !photoInput.files || photoInput.files.length < 1){
-                  setMsg('Choose an image first.');
-                  return;
-                }
-
-                const file = photoInput.files[0];
-                setMsg('Optimizing…');
-                photoBtn.disabled = true;
-
-                try{
-                  const csrf = _get('csrf_token');
-                  const optimized = await optimizePhoto(file);
-
-                  const origMb = _mb(optimized.origBytes);
-                  const outMb = _mb(optimized.outBytes);
-                  if(optimized.optimized && optimized.outBytes > 0){
-                    setMsg(`Uploading… (optimized ${origMb} → ${outMb} MB)`);
-                  }else{
-                    setMsg('Uploading…');
-                  }
-
-                  const fd = new FormData();
-                  fd.append('csrf_token', csrf);
-                  // Send optimized blob when available; fall back to original.
-                  if(optimized && optimized.blob){
-                    fd.append('photo', optimized.blob, optimized.name || (file && file.name) || 'profile.jpg');
-                  }else{
-                    fd.append('photo', file);
-                  }
-
-                  const resp = await fetch('{{ url_for("api_profile_photo_upload") }}', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    body: fd,
-                  });
-
-                  const data = await resp.json().catch(()=>null);
-
-                  if(resp.status === 413){
-                    // 413 can be JSON (our errorhandler) or plain. Either way: show a clear fix.
-                    const maxMsg = (data && data.message) ? data.message : 'File too large.';
-                    setMsg(maxMsg + ' Try a normal photo (not iPhone ProRAW).');
-                    return;
-                  }
-
-                  if(resp.status === 401 && data && data.login_url){
-                    window.location.href = data.login_url;
-                    return;
-                  }
-
-                  if(!data || !data.ok){
-                    const code = (data && data.error) ? String(data.error) : '';
-                    if(code === 'unsafe_image'){
-                      setMsg('Rejected by SafeSearch (adult/racy). Pick a different photo.');
-                      return;
-                    }
-                    if(code === 'scan_failed'){
-                      setMsg('SafeSearch scan failed. Try again in a minute.');
-                      return;
-                    }
-                    if(code === 'missing_r2'){
-                      setMsg('Server is missing R2 config.');
-                      return;
-                    }
-                    if(code === 'too_large'){
-                      setMsg((data && data.message) ? data.message : 'File too large.');
-                      return;
-                    }
-                    setMsg((data && data.message) ? data.message : 'Upload failed.');
-                    return;
-                  }
-
-                  setMsg('Saved.');
-                  await updateImgs(data.avatar_url_sm, data.avatar_url_lg);
-
-                  // If remove button exists, keep it; otherwise, refresh to show it.
-                  if(!removeBtn){
-                    setTimeout(()=>{ window.location.reload(); }, 400);
-                  }
-                }catch(err){
-                  setMsg('Upload failed.');
-                }finally{
-                  photoBtn.disabled = false;
-                }
-              });
-            }
-
-            if(removeBtn){
-              removeBtn.addEventListener('click', async function(){
-                setMsg('Removing…');
-                removeBtn.disabled = true;
-                try{
-                  const csrf = _get('csrf_token');
-                  const body = new URLSearchParams();
-                  body.set('csrf_token', csrf);
-
-                  const resp = await fetch('{{ url_for("api_profile_photo_remove") }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    credentials: 'same-origin',
-                    body: body.toString(),
-                  });
-
-                  const data = await resp.json().catch(()=>null);
-                  if(!data || !data.ok){
-                    setMsg((data && data.message) ? data.message : 'Remove failed.');
-                    return;
-                  }
-                  setMsg('Removed.');
-                  await updateImgs(data.avatar_url_sm, data.avatar_url_lg);
-                  setTimeout(()=>{ window.location.reload(); }, 350);
-                }catch(err){
-                  setMsg('Remove failed.');
-                }finally{
-                  removeBtn.disabled = false;
-                }
-              });
-            }
-          })();
-        </script>
-      {% endif %}
-
-{% if current_user.is_authenticated and current_user.id == profile_user.id %}
-        <div class="list" style="margin-top:14px;">
-          <h3 style="margin: 14px 0 10px;">Vehicle (optional)</h3>
-
-          <div class="item">
-            {% if car_form.errors %}
-              <div class="errors" style="margin-bottom:10px;">
-                <strong>Fix these:</strong>
-                <ul>
-                  {% for field, errs in car_form.errors.items() %}
-                    {% for err in errs %}
-                      <li>{{ err }}</li>
-                    {% endfor %}
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endif %}
-
-            <form method="post" action="{{ url_for('profile', username=profile_user.username) }}">
-              {{ car_form.hidden_tag() }}
-              <input type="hidden" name="form_name" value="car">
-
-              <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
-                <div style="flex:1; min-width:160px;">
-                  <label for="car_make">{{ car_form.car_make.label.text }}</label>
-                  {{ car_form.car_make(id="car_make", autocomplete="off") }}
-                </div>
-
-                <div style="flex:1; min-width:160px;">
-                  <label for="car_model">{{ car_form.car_model.label.text }}</label>
-                  {{ car_form.car_model(id="car_model", autocomplete="off") }}
-                </div>
-
-                <div style="width:120px; min-width:120px;">
-                  <label for="car_year">{{ car_form.car_year.label.text }}</label>
-                  {{ car_form.car_year(id="car_year", inputmode="numeric") }}
-                </div>
-
-                <div style="width:140px; min-width:140px;">
-                  <button type="submit" class="es-btn" style="height:44px; width:100%; font-weight:500;">Save</button>
-                </div>
-              </div>
-            </form>
-
-            <div class="subtle" style="margin-top:8px;">
-              This is optional and can be expanded later (photos, visibility controls, etc.).
-            </div>
+        <div class="avatar-grid-wrap" id="avatarGridWrap">
+          <div id="esAvatarGrid" class="avatar-grid"{% if user_avatar_is_photo(profile_user) %} style="opacity:.55; pointer-events:none;"{% endif %}>
+            {% for a in system_avatars %}
+              {% set k = a.key %}
+              {% set f = a.file %}
+              <button type="button"
+                      class="es-avatar-choice{% if k == selected_avatar_key %} is-selected{% endif %}"
+                      data-key="{{ k }}"
+                      style="padding:0; border:2px solid {% if k == selected_avatar_key %}#111827{% else %}transparent{% endif %}; border-radius:999px; background:transparent; cursor:pointer; width:52px; height:52px; display:flex; align-items:center; justify-content:center;">
+                <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}"
+                     alt="{{ a.label }}"
+                     style="width:48px;height:48px;border-radius:999px;object-fit:cover;background:#e5e7eb;display:block;">
+              </button>
+            {% endfor %}
           </div>
+          <div class="subtle" style="margin-top:8px; font-size:12px;">Click an avatar to save instantly.</div>
         </div>
+      </div>
       {% endif %}
 
+      {# ── Vehicle Showcase ── #}
       {% if current_user.is_authenticated and current_user.id == profile_user.id %}
-        <div class="list" style="margin-top:14px;">
-          <h3 style="margin: 14px 0 10px;">Default filters (optional)</h3>
+      <div class="profile-section">
+        <div class="profile-section-title">Vehicle</div>
 
-          <div class="item">
-            <form method="post" action="{{ url_for('profile', username=profile_user.username) }}" data-county-autosubmit="0">
-              {{ defaults_form.hidden_tag() }}
-              <input type="hidden" name="form_name" value="defaults">
+        <div class="car-photos">
+          {% for i in [1, 2, 3] %}
+            {% set photo_url = car_photo_url(profile_user, i) %}
+            <div class="car-photo-slot{% if photo_url %} has-photo{% endif %}" data-slot="{{ i }}" id="carSlot{{ i }}">
+              {% if photo_url %}
+                <img src="{{ photo_url }}" alt="Car photo {{ i }}" id="carImg{{ i }}">
+                <button type="button" class="car-photo-remove" data-slot="{{ i }}" aria-label="Remove photo">&times;</button>
+              {% else %}
+                <div class="car-photo-plus">+</div>
+              {% endif %}
+              <input type="file" accept="image/*" class="car-photo-input" id="carInput{{ i }}" data-slot="{{ i }}">
+            </div>
+          {% endfor %}
+        </div>
 
-              <div class="row" style="gap:12px; flex-wrap:wrap; align-items:flex-end;">
-                <div style="width:140px; min-width:140px;">
-                  <label for="filter-state">State</label>
-                  {{ defaults_form.default_state(id='filter-state', class_='filterbar-select') }}
-                </div>
-
-                <div style="flex:1; min-width:220px;">
-                  <label for="filter-county">County</label>
-                  <div class="filter-autocomplete-wrap">
-                    {{ defaults_form.default_county_label(id='filter-county', autocomplete='off') }}
-                    {{ defaults_form.default_county_geoid(id='filter-county-geoid') }}
-                    <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
-                  </div>
-                </div>
-
-                <div style="width:160px; min-width:160px;">
-                  <label for="default_date">Date</label>
-                  {{ defaults_form.default_date(id='default_date', class_='filterbar-select') }}
-                </div>
-
-                <div style="width:170px; min-width:170px;">
-                  <label for="default_verify">Photo</label>
-                  {{ defaults_form.default_verify(id='default_verify', class_='filterbar-select') }}
-                </div>
-
-                <div style="width:150px; min-width:150px;">
-                  <label for="default_speed_limit">Posted</label>
-                  {{ defaults_form.default_speed_limit(id='default_speed_limit', class_='filterbar-select') }}
-                </div>
-
-                <div style="width:160px; min-width:160px;">
-                  <label for="default_overage">Overage</label>
-                  {{ defaults_form.default_overage(id='default_overage', class_='filterbar-select') }}
-                </div>
-
-                <div style="width:170px; min-width:170px;">
-                  <label for="default_sort">Sort</label>
-                  {{ defaults_form.default_sort(id='default_sort', class_='filterbar-select') }}
-                </div>
-
-                <div style="width:140px; min-width:140px;">
-                  <div class="filterbar-rowline" style="margin-top:0; justify-content:space-between;">
-                    <label for="default_pin" style="margin:0;">Map pin ✓</label>
-                    <label class="switch">
-                      {{ defaults_form.default_pin(id='default_pin') }}
-                      <span class="slider"></span>
-                    </label>
-                  </div>
-                </div>
-
-                <div style="width:140px; min-width:140px;">
-                  <button type="submit" name="save_defaults" value="1" class="es-btn" style="height:44px; width:100%; font-weight:500;">Save</button>
-                </div>
-
-                <div style="width:160px; min-width:160px;">
-                  <button type="submit" name="clear_defaults" value="1" class="es-btn" style="height:44px; width:100%; font-weight:500; background:#fff; border:1px solid #e5e7eb;">Clear defaults</button>
-                </div>
-              </div>
-            </form>
-
-            <div class="subtle" style="margin-top:10px;">
-              Your defaults apply when you open Home or Rankings with no filters. Use the left-rail Clear button to view everything.
+        <form method="post" action="{{ url_for('profile', username=profile_user.username) }}">
+          {{ car_form.hidden_tag() }}
+          <input type="hidden" name="form_name" value="car">
+          <div class="car-fields">
+            <div class="field">
+              <label for="car_make">Brand</label>
+              {{ car_form.car_make(id="car_make", autocomplete="off", placeholder="e.g., Toyota") }}
+            </div>
+            <div class="field">
+              <label for="car_model">Model</label>
+              {{ car_form.car_model(id="car_model", autocomplete="off", placeholder="e.g., Tacoma") }}
+            </div>
+            <div class="field" style="max-width:100px;">
+              <label for="car_year">Year</label>
+              {{ car_form.car_year(id="car_year", inputmode="numeric", placeholder="e.g., 2019") }}
+            </div>
+            <div>
+              <button type="submit" class="es-btn" style="height:38px; padding:0 16px; font-weight:500;">Save</button>
             </div>
           </div>
+        </form>
+      </div>
+
+      {% elif profile_user.car_photo_1 or profile_user.car_photo_2 or profile_user.car_photo_3 %}
+      {# Visitor view: show car photos if any #}
+      <div class="profile-section">
+        <div class="profile-section-title">Vehicle</div>
+        <div class="car-photos">
+          {% for i in [1, 2, 3] %}
+            {% set photo_url = car_photo_url(profile_user, i) %}
+            {% if photo_url %}
+              <div class="car-photo-slot has-photo" style="cursor:default;">
+                <img src="{{ photo_url }}" alt="Car photo {{ i }}">
+              </div>
+            {% endif %}
+          {% endfor %}
         </div>
+      </div>
       {% endif %}
 
-      <div class="list">
-        <h3 style="margin: 14px 0 10px;">Tickets</h3>
+      {# ── Tickets ── #}
+      <div class="profile-section">
+        <div class="profile-section-title">Tickets</div>
 
         {% if reports %}
           {% for r in reports %}
@@ -552,13 +200,11 @@
                 </div>
                 <div class="subtle">{{ r.created_at.strftime("%b %d, %Y") }}</div>
               </div>
-
               <div style="margin-top:10px;">
                 Posted: <strong>{{ r.posted_speed }} mph</strong> ·
                 Ticketed: <strong>{{ r.ticketed_speed }} mph</strong> ·
                 Over: <strong>+{{ (r.ticketed_speed - r.posted_speed) }} mph</strong>
               </div>
-
               <div class="subtle" style="margin-top:8px;">
                 <a href="{{ url_for('result', report_id=r.id) }}">View report</a>
               </div>
@@ -568,6 +214,191 @@
           <div class="subtle">No tickets posted yet.</div>
         {% endif %}
       </div>
+
     </div>
   </div>
+
+{# ── JavaScript ── #}
+<script>
+(function(){
+  // Toggle avatar grid
+  var toggleBtn = document.getElementById('toggleAvatarGrid');
+  var gridWrap = document.getElementById('avatarGridWrap');
+  if(toggleBtn && gridWrap){
+    toggleBtn.addEventListener('click', function(){
+      gridWrap.classList.toggle('open');
+      toggleBtn.textContent = gridWrap.classList.contains('open') ? 'Hide avatars' : 'Choose avatar';
+    });
+  }
+
+  // Avatar grid click
+  var grid = document.getElementById('esAvatarGrid');
+  var keyInput = document.getElementById('esAvatarKey');
+  var form = document.getElementById('esAvatarForm');
+
+  function _get(name){
+    if(!form) return '';
+    var el = form.querySelector('input[name="' + name + '"]');
+    return el ? (el.value || '') : '';
+  }
+
+  if(grid && keyInput && form){
+    function setSelected(key){
+      grid.querySelectorAll('.es-avatar-choice').forEach(function(btn){
+        var k = btn.getAttribute('data-key') || '';
+        var on = (k === key);
+        btn.classList.toggle('is-selected', on);
+        btn.style.borderColor = on ? '#111827' : 'transparent';
+      });
+    }
+
+    grid.addEventListener('click', async function(e){
+      var btn = e.target && e.target.closest ? e.target.closest('.es-avatar-choice') : null;
+      if(!btn) return;
+      var key = (btn.getAttribute('data-key') || '').trim();
+      if(!key) return;
+      setSelected(key);
+      keyInput.value = key;
+      try{
+        var csrf = _get('csrf_token');
+        var body = new URLSearchParams();
+        body.set('csrf_token', csrf);
+        body.set('avatar_key', key);
+        var resp = await fetch('{{ url_for("api_profile_avatar") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          credentials: 'same-origin',
+          body: body.toString(),
+        });
+        var data = await resp.json().catch(function(){return null;});
+        if(data && data.ok && data.avatar_url){
+          var profImg = document.getElementById('profileAvatarImg');
+          var prevImg = document.getElementById('avatarPreviewLarge');
+          var cb = '?v=' + Date.now();
+          if(profImg) profImg.src = data.avatar_url + cb;
+          if(prevImg) prevImg.src = data.avatar_url + cb;
+        }
+      }catch(err){}
+    });
+  }
+
+  // Profile photo upload (auto-trigger on file select)
+  var photoInput = document.getElementById('esPhotoInput');
+  var photoMsg = document.getElementById('esPhotoMsg');
+  var removeBtn = document.getElementById('esPhotoRemoveBtn');
+  function setMsg(t){ if(photoMsg) photoMsg.textContent = t || ''; }
+
+  function updateImgs(sm, lg){
+    var cb = '?v=' + Date.now();
+    var profImg = document.getElementById('profileAvatarImg');
+    var prevImg = document.getElementById('avatarPreviewLarge');
+    if(profImg && lg) profImg.src = lg + cb;
+    if(prevImg && lg) prevImg.src = lg + cb;
+  }
+
+  if(photoInput){
+    photoInput.addEventListener('change', async function(){
+      if(!photoInput.files || photoInput.files.length < 1) return;
+      var file = photoInput.files[0];
+      setMsg('Uploading…');
+      try{
+        var csrf = form ? _get('csrf_token') : '';
+        var fd = new FormData();
+        fd.append('csrf_token', csrf);
+        fd.append('photo', file);
+        var resp = await fetch('{{ url_for("api_profile_photo_upload") }}', {
+          method: 'POST', credentials: 'same-origin', body: fd,
+        });
+        var data = await resp.json().catch(function(){return null;});
+        if(!data || !data.ok){
+          setMsg((data && data.message) ? data.message : 'Upload failed.');
+          return;
+        }
+        setMsg('Saved.');
+        updateImgs(data.avatar_url_sm, data.avatar_url_lg);
+        if(!removeBtn) setTimeout(function(){ window.location.reload(); }, 400);
+      }catch(err){ setMsg('Upload failed.'); }
+    });
+  }
+
+  if(removeBtn){
+    removeBtn.addEventListener('click', async function(){
+      setMsg('Removing…');
+      removeBtn.disabled = true;
+      try{
+        var csrf = form ? _get('csrf_token') : '';
+        var body = new URLSearchParams();
+        body.set('csrf_token', csrf);
+        var resp = await fetch('{{ url_for("api_profile_photo_remove") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          credentials: 'same-origin',
+          body: body.toString(),
+        });
+        var data = await resp.json().catch(function(){return null;});
+        if(!data || !data.ok){ setMsg('Remove failed.'); return; }
+        setMsg('Removed.');
+        updateImgs(data.avatar_url_sm, data.avatar_url_lg);
+        setTimeout(function(){ window.location.reload(); }, 400);
+      }catch(err){ setMsg('Remove failed.'); }
+      finally{ removeBtn.disabled = false; }
+    });
+  }
+
+  // Car photo upload/remove
+  document.querySelectorAll('.car-photo-slot').forEach(function(slot){
+    var slotNum = slot.dataset.slot;
+    var input = document.getElementById('carInput' + slotNum);
+    if(!input) return;
+
+    // Click empty slot to trigger file picker
+    slot.addEventListener('click', function(e){
+      if(e.target.closest('.car-photo-remove')) return;
+      if(slot.classList.contains('has-photo')) return;
+      input.click();
+    });
+
+    input.addEventListener('change', async function(){
+      if(!input.files || input.files.length < 1) return;
+      try{
+        var csrf = form ? _get('csrf_token') : '';
+        var fd = new FormData();
+        fd.append('csrf_token', csrf);
+        fd.append('photo', input.files[0]);
+        fd.append('slot', slotNum);
+        var resp = await fetch('{{ url_for("api_car_photo_upload") }}', {
+          method: 'POST', credentials: 'same-origin', body: fd,
+        });
+        var data = await resp.json().catch(function(){return null;});
+        if(data && data.ok){
+          window.location.reload();
+        }else{
+          alert((data && data.message) ? data.message : 'Upload failed.');
+        }
+      }catch(err){ alert('Upload failed.'); }
+    });
+  });
+
+  document.querySelectorAll('.car-photo-remove').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var slotNum = btn.dataset.slot;
+      try{
+        var csrf = form ? _get('csrf_token') : '';
+        var body = new URLSearchParams();
+        body.set('csrf_token', csrf);
+        body.set('slot', slotNum);
+        var resp = await fetch('{{ url_for("api_car_photo_remove") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          credentials: 'same-origin',
+          body: body.toString(),
+        });
+        var data = await resp.json().catch(function(){return null;});
+        if(data && data.ok) window.location.reload();
+      }catch(err){}
+    });
+  });
+})();
+</script>
+
 {% endblock %}

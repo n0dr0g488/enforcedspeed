@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>document.documentElement.classList.add("js");</script>
-<title>{% block title %}EnforcedSpeed™ — Data Driven{% endblock %}</title>
+<title>{% block title %}EnforcedSpeed™ — Post Your Ticket{% endblock %}</title>
 
   <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}?v=5">
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}?v=5">
@@ -14,9 +14,9 @@
 
   <!-- Open Graph / social sharing -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="{% block og_title %}EnforcedSpeed™ — Data Driven{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}EnforcedSpeed™ — Post Your Ticket{% endblock %}">
   <meta property="og:description" content="{% block og_description %}See real speeding ticket data by county. Community-reported speed enforcement trends across America.{% endblock %}">
-  <meta name="description" content="EnforcedSpeed™ — Data Driven. See real speeding ticket data by county. Community-reported speed enforcement trends across America.">
+  <meta name="description" content="EnforcedSpeed™ — Post Your Ticket. See real speeding ticket data by county. Community-reported speed enforcement trends across America.">
   <meta property="og:image" content="{{ url_for('static', filename='img/og-image.png', _external=True) }}?v=5">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -51,7 +51,7 @@
     .brand-logo{height:46px;width:auto;display:block;}
     .brand-group{display:flex;flex-direction:column;justify-content:center;line-height:1.2;}
     .brand-text{font-weight:500;font-size:18px;letter-spacing:-.1px;color:#1c1e21;}
-    .brand-tagline{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#65676b;}
+    .brand-tagline{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#65676b;}
     .tm{font-size:0.6em;vertical-align:super;line-height:0;margin-left:1px;}
 
     /* Center: icon tab nav */
@@ -223,7 +223,7 @@
         <img class="brand-logo" src="{{ url_for('static', filename='img/logo-sign-header.png') }}?v=14" alt="EnforcedSpeed">
         <div class="brand-group">
           <span class="brand-text">EnforcedSpeed<span class="tm">™</span></span>
-          <span class="brand-tagline">Data Driven</span>
+          <span class="brand-tagline">Post Your Ticket</span>
         </div>
       </a>
 

@@ -3842,7 +3842,6 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.route("/following")
-    @login_required
     def following():
         """Manage followed states and counties."""
         try:
@@ -3851,19 +3850,22 @@ GROUP BY UPPER(TRIM(stusps));
             pass
 
         # Get followed states
-        followed_state_rows = (
-            FollowedState.query
-            .filter(FollowedState.user_id == current_user.id)
-            .order_by(FollowedState.state_code.asc())
-            .all()
-        )
+        followed_state_rows = []
+        followed_county_rows = []
+        if current_user.is_authenticated:
+            followed_state_rows = (
+                FollowedState.query
+                .filter(FollowedState.user_id == current_user.id)
+                .order_by(FollowedState.state_code.asc())
+                .all()
+            )
 
-        # Get followed counties with labels
-        followed_county_rows = (
-            FollowedCounty.query
-            .filter(FollowedCounty.user_id == current_user.id)
-            .all()
-        )
+            # Get followed counties with labels
+            followed_county_rows = (
+                FollowedCounty.query
+                .filter(FollowedCounty.user_id == current_user.id)
+                .all()
+            )
 
         # Build unified list: each item is {state, label, type, id, geoid/state_code}
         items = []

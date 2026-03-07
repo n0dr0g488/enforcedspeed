@@ -27,6 +27,20 @@
   .following-empty{ padding:32px 16px; text-align:center; color:#6b7280; font-size:14px; }
   .following-empty-icon{ font-size:36px; margin-bottom:8px; opacity:0.3; }
 
+  .following-add-login-btn{
+    flex-shrink:0;
+    padding:8px 16px; background:#1877f2; color:#fff;
+    border:none; border-radius:8px; font-size:13px; font-weight:600;
+    text-decoration:none; white-space:nowrap;
+  }
+  .following-add-login-btn:hover{ background:#1565c0; }
+
+  .following-save-prompt{
+    margin-top:24px; padding:20px; text-align:center;
+    background:#fffbeb; border:1px solid #fde68a; border-radius:12px;
+  }
+  .following-save-prompt strong{ color:#92400e; }
+
   /* County autocomplete */
   .county-search-wrap{ position:relative; flex:1; }
   .county-search-wrap input{ width:100%; box-sizing:border-box; }
@@ -43,6 +57,7 @@
   {# Add state #}
   <div class="following-add">
     <div class="following-add-title">Follow a state</div>
+    {% if current_user.is_authenticated %}
     <form method="post" action="{{ url_for('following_add_state') }}">
       <div class="following-add-row">
         <select name="state_code" required>
@@ -54,11 +69,20 @@
         <button type="submit">Follow</button>
       </div>
     </form>
+    {% else %}
+      <div class="following-add-row">
+        <select disabled style="opacity:0.5;">
+          <option>Select a state</option>
+        </select>
+        <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
+      </div>
+    {% endif %}
   </div>
 
   {# Add county #}
   <div class="following-add">
     <div class="following-add-title">Follow a county</div>
+    {% if current_user.is_authenticated %}
     <form method="post" action="{{ url_for('following_add_county') }}" id="followCountyForm">
       <div class="following-add-row">
         <select id="followCountyState" style="flex:0.5;">
@@ -75,6 +99,13 @@
         <button type="submit">Follow</button>
       </div>
     </form>
+    {% else %}
+      <div class="following-add-row">
+        <select disabled style="flex:0.5; opacity:0.5;"><option>State</option></select>
+        <input type="text" disabled placeholder="Type county name" style="flex:1; opacity:0.5;">
+        <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
+      </div>
+    {% endif %}
   </div>
 
   {# Current following list #}
@@ -104,6 +135,16 @@
         You're not following any states or counties yet.<br>
         Add some above to populate your feed.
       </div>
+    </div>
+  {% endif %}
+
+  {% if not current_user.is_authenticated %}
+    <div class="following-save-prompt">
+      <strong>Want to save your following list?</strong><br>
+      <span style="font-size:13px; color:#6b7280;">
+        <a href="{{ url_for('register') }}" style="color:#1877f2; font-weight:600; text-decoration:none;">Create an account</a>
+        or <a href="{{ url_for('login') }}" style="color:#1877f2; font-weight:600; text-decoration:none;">log in</a> to save your followed states and counties.
+      </span>
     </div>
   {% endif %}
 </div>

@@ -261,15 +261,20 @@
 
       {# Feed starts immediately below. #}
 
-      {# Onboarding callout: show when logged in with no follows #}
-      {% if current_user.is_authenticated and not feed_is_following %}
+      {# Onboarding callout: show for logged-out users or logged-in with no follows #}
+      {% if not current_user.is_authenticated or (current_user.is_authenticated and not feed_is_following) %}
         <div class="onboarding-callout" id="onboardingCallout" style="display:none;">
           <div class="onboarding-callout-inner">
             <button type="button" class="onboarding-close" id="onboardingClose" aria-label="Dismiss">&times;</button>
             <div class="onboarding-icon">★</div>
             <div class="onboarding-text">
-              <strong>Welcome to EnforcedSpeed!</strong><br>
-              Follow a state or county to see speeding tickets in your feed.
+              {% if current_user.is_authenticated %}
+                <strong>Welcome to EnforcedSpeed!</strong><br>
+                Follow a state or county to see speeding tickets in your feed.
+              {% else %}
+                <strong>Welcome to EnforcedSpeed!</strong><br>
+                Follow states or counties to customize your feed. <a href="{{ url_for('register') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Create an account</a> to save your list.
+              {% endif %}
             </div>
             <a class="onboarding-btn" href="{{ url_for('following') }}">Set up following</a>
           </div>

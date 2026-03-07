@@ -281,6 +281,19 @@
         </div>
       {% endif %}
 
+      {# Post encouragement callout #}
+      <div class="onboarding-callout" id="postCallout" style="display:none;">
+        <div class="post-callout-inner">
+          <button type="button" class="onboarding-close" id="postCalloutClose" aria-label="Dismiss">&times;</button>
+          <div class="onboarding-icon">🚗</div>
+          <div class="onboarding-text" style="color:#78350f;">
+            <strong>Received a speeding ticket in the last year?</strong><br>
+            Help the community — post it anonymously or with your account.
+          </div>
+          <a class="post-callout-btn" href="{{ url_for('submit') }}">Post your ticket</a>
+        </div>
+      </div>
+
       {# Preserve active query params (used for infinite scroll + fallback pagination). #}
       {% set q = request.args.to_dict(flat=False) %}
       {% set _ = q.pop('page', None) %}
@@ -354,6 +367,27 @@
     color:#6b7280; cursor:pointer; padding:2px 6px;
   }
   .onboarding-close:hover{ color:#111; }
+
+  /* Post encouragement callout (yellow) */
+  .post-callout-inner{
+    position:relative;
+    background:linear-gradient(135deg, #fefce8 0%, #fffbeb 100%);
+    border:1px solid #fde68a;
+    border-radius:12px;
+    padding:20px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .post-callout-btn{
+    flex-shrink:0;
+    background:#d97706; color:#fff;
+    padding:8px 18px; border-radius:8px;
+    font-size:14px; font-weight:600;
+    text-decoration:none;
+    white-space:nowrap;
+  }
+  .post-callout-btn:hover{ background:#b45309; }
 
   /* Reuse the exact thank_you thermometer styling (scoped to this template). */
   .ticket-card{padding-top:18px;padding-bottom:18px;overflow:hidden}
@@ -841,6 +875,25 @@ document.addEventListener('DOMContentLoaded', function(){
           closeBtn.addEventListener('click', function(){
             callout.style.display = 'none';
             try{ localStorage.setItem('es_onboarding_dismissed', '1'); }catch(e){}
+          });
+        }
+      }
+    }catch(e){}
+
+    // Post encouragement callout
+    try{
+      var postCallout = document.getElementById('postCallout');
+      var postClose = document.getElementById('postCalloutClose');
+      if(postCallout){
+        var postDismissed = false;
+        try{ postDismissed = localStorage.getItem('es_post_callout_dismissed') === '1'; }catch(e){}
+        if(!postDismissed){
+          postCallout.style.display = 'block';
+        }
+        if(postClose){
+          postClose.addEventListener('click', function(){
+            postCallout.style.display = 'none';
+            try{ localStorage.setItem('es_post_callout_dismissed', '1'); }catch(e){}
           });
         }
       }

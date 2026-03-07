@@ -4,8 +4,7 @@
 {% block content %}
 <style>
   .following-page{ max-width:640px; margin:0 auto; padding:24px 16px 60px; }
-  .following-title{ font-size:24px; font-weight:400; color:#111827; margin:0 0 6px; letter-spacing:-0.2px; }
-  .following-subtitle{ font-size:14px; color:#6b7280; margin:0 0 24px; }
+  .following-header{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:24px; margin-bottom:24px; text-align:center; }
 
   .following-add{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:24px; }
   .following-add-title{ font-size:13px; font-weight:600; color:#374151; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.5px; }
@@ -51,8 +50,10 @@
 </style>
 
 <div class="following-page">
-  <div class="following-title">Following</div>
-  <div class="following-subtitle">Follow states or counties to see their speeding tickets in your feed.</div>
+  <div class="following-header">
+    <h1 style="margin:0;">Following</h1>
+    <div class="subtle" style="margin-top:6px; font-size:14px;">Follow states or counties to see their speeding tickets in your feed.</div>
+  </div>
 
   {# Add state #}
   <div class="following-add">

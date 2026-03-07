@@ -3,10 +3,9 @@
 
 {% block content %}
 <style>
-  .following-page{ max-width:640px; margin:0 auto; padding:24px 16px 60px; }
-  .following-header{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:24px; margin-bottom:24px; text-align:center; }
+  .following-page{ max-width:720px; margin:0 auto; padding:0 16px 60px; }
 
-  .following-add{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:24px; }
+  .following-section{ margin-bottom:18px; }
   .following-add-title{ font-size:13px; font-weight:600; color:#374151; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.5px; }
   .following-add-row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
   .following-add-row:last-child{ margin-bottom:0; }
@@ -15,15 +14,16 @@
   .following-add-row button{ padding:8px 16px; background:#1877f2; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
   .following-add-row button:hover{ background:#1565c0; }
 
-  .following-list{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; }
-  .following-item{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #f3f4f6; }
+  .following-divider{ border-top:1px solid #e5e7eb; margin:20px 0; }
+
+  .following-list-inline{ }
+  .following-item{ display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f3f4f6; }
   .following-item:last-child{ border-bottom:none; }
   .following-item-label{ font-size:14px; font-weight:500; color:#111827; }
-  .following-item-type{ font-size:11px; color:#9ca3af; margin-left:8px; }
   .following-item form button{ background:none; border:1px solid #d1d5db; border-radius:6px; padding:4px 10px; font-size:12px; color:#6b7280; cursor:pointer; }
   .following-item form button:hover{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
 
-  .following-empty{ padding:32px 16px; text-align:center; color:#6b7280; font-size:14px; }
+  .following-empty{ padding:24px 0; text-align:center; color:#6b7280; font-size:14px; }
   .following-empty-icon{ font-size:36px; margin-bottom:8px; opacity:0.3; }
 
   .following-add-login-btn{
@@ -35,8 +35,8 @@
   .following-add-login-btn:hover{ background:#1565c0; }
 
   .following-save-prompt{
-    margin-top:24px; padding:20px; text-align:center;
-    background:#fffbeb; border:1px solid #fde68a; border-radius:12px;
+    margin-top:20px; padding:16px; text-align:center;
+    background:#fffbeb; border:1px solid #fde68a; border-radius:8px;
   }
   .following-save-prompt strong{ color:#92400e; }
 
@@ -50,104 +50,109 @@
 </style>
 
 <div class="following-page">
-  <div class="following-header">
-    <h1 style="margin:0;">Following</h1>
-    <div class="subtle" style="margin-top:6px; font-size:14px;">Follow states or counties to see their speeding tickets in your feed.</div>
-  </div>
+  <div class="card" style="margin-top:14px;">
+    <div class="card-body">
 
-  {# Add state #}
-  <div class="following-add">
-    <div class="following-add-title">Follow a state</div>
-    {% if current_user.is_authenticated %}
-    <form method="post" action="{{ url_for('following_add_state') }}">
-      <div class="following-add-row">
-        <select name="state_code" required>
-          <option value="">Select a state</option>
-          {% for st in state_options %}
-            <option value="{{ st }}">{{ st }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit">Follow</button>
+      <div style="margin-bottom:14px; text-align:center;">
+        <h1 style="margin:0;">Following</h1>
+        <div class="subtle" style="margin-top:6px; font-size:14px;">Follow states or counties to see their speeding tickets in your feed.</div>
       </div>
-    </form>
-    {% else %}
-      <div class="following-add-row">
-        <select disabled style="opacity:0.5;">
-          <option>Select a state</option>
-        </select>
-        <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
-      </div>
-    {% endif %}
-  </div>
 
-  {# Add county #}
-  <div class="following-add">
-    <div class="following-add-title">Follow a county</div>
-    {% if current_user.is_authenticated %}
-    <form method="post" action="{{ url_for('following_add_county') }}" id="followCountyForm">
-      <div class="following-add-row">
-        <select id="followCountyState" style="flex:0.5;">
-          <option value="">State</option>
-          {% for st in state_options %}
-            <option value="{{ st }}">{{ st }}</option>
+      {# Add state #}
+      <div class="following-section">
+        <div class="following-add-title">Follow a state</div>
+        {% if current_user.is_authenticated %}
+        <form method="post" action="{{ url_for('following_add_state') }}">
+          <div class="following-add-row">
+            <select name="state_code" required>
+              <option value="">Select a state</option>
+              {% for st in state_options %}
+                <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Follow</button>
+          </div>
+        </form>
+        {% else %}
+          <div class="following-add-row">
+            <select disabled style="opacity:0.5;">
+              <option>Select a state</option>
+            </select>
+            <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
+          </div>
+        {% endif %}
+      </div>
+
+      {# Add county #}
+      <div class="following-section">
+        <div class="following-add-title">Follow a county</div>
+        {% if current_user.is_authenticated %}
+        <form method="post" action="{{ url_for('following_add_county') }}" id="followCountyForm">
+          <div class="following-add-row">
+            <select id="followCountyState" style="flex:0.5;">
+              <option value="">State</option>
+              {% for st in state_options %}
+                <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+            <div class="county-search-wrap">
+              <input type="text" id="followCountyInput" placeholder="Type county name" autocomplete="off">
+              <input type="hidden" name="county_geoid" id="followCountyGeoid">
+              <div class="county-suggestions" id="followCountySuggestions"></div>
+            </div>
+            <button type="submit">Follow</button>
+          </div>
+        </form>
+        {% else %}
+          <div class="following-add-row">
+            <select disabled style="flex:0.5; opacity:0.5;"><option>State</option></select>
+            <input type="text" disabled placeholder="Type county name" style="flex:1; opacity:0.5;">
+            <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="following-divider"></div>
+
+      {# Current following list #}
+      <div class="following-add-title">Your list</div>
+      {% if items %}
+        <div class="following-list-inline">
+          {% for item in items %}
+            <div class="following-item">
+              <span class="following-item-label">{{ item.display }}</span>
+              {% if item.type == 'state' %}
+                <form method="post" action="{{ url_for('unfollow_state', follow_id=item.id) }}">
+                  <button type="submit">Unfollow</button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ url_for('unfollow_county', follow_id=item.id) }}">
+                  <button type="submit">Unfollow</button>
+                </form>
+              {% endif %}
+            </div>
           {% endfor %}
-        </select>
-        <div class="county-search-wrap">
-          <input type="text" id="followCountyInput" placeholder="Type county name" autocomplete="off">
-          <input type="hidden" name="county_geoid" id="followCountyGeoid">
-          <div class="county-suggestions" id="followCountySuggestions"></div>
         </div>
-        <button type="submit">Follow</button>
-      </div>
-    </form>
-    {% else %}
-      <div class="following-add-row">
-        <select disabled style="flex:0.5; opacity:0.5;"><option>State</option></select>
-        <input type="text" disabled placeholder="Type county name" style="flex:1; opacity:0.5;">
-        <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
-      </div>
-    {% endif %}
-  </div>
+      {% else %}
+        <div class="following-empty">
+          <div class="following-empty-icon">★</div>
+          You're not following any states or counties yet.<br>
+          Add some above to populate your feed.
+        </div>
+      {% endif %}
 
-  {# Current following list #}
-  {% if items %}
-    <div class="following-list">
-      {% for item in items %}
-        <div class="following-item">
-          <span>
-            <span class="following-item-label">{{ item.display }}</span>
+      {% if not current_user.is_authenticated %}
+        <div class="following-save-prompt">
+          <strong>Want to save your following list?</strong><br>
+          <span style="font-size:13px; color:#6b7280;">
+            <a href="{{ url_for('register') }}" style="color:#1877f2; font-weight:600; text-decoration:none;">Create an account</a>
+            or <a href="{{ url_for('login') }}" style="color:#1877f2; font-weight:600; text-decoration:none;">log in</a> to save your followed states and counties.
           </span>
-          {% if item.type == 'state' %}
-            <form method="post" action="{{ url_for('unfollow_state', follow_id=item.id) }}">
-              <button type="submit">Unfollow</button>
-            </form>
-          {% else %}
-            <form method="post" action="{{ url_for('unfollow_county', follow_id=item.id) }}">
-              <button type="submit">Unfollow</button>
-            </form>
-          {% endif %}
         </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="following-list">
-      <div class="following-empty">
-        <div class="following-empty-icon">★</div>
-        You're not following any states or counties yet.<br>
-        Add some above to populate your feed.
-      </div>
-    </div>
-  {% endif %}
+      {% endif %}
 
-  {% if not current_user.is_authenticated %}
-    <div class="following-save-prompt">
-      <strong>Want to save your following list?</strong><br>
-      <span style="font-size:13px; color:#6b7280;">
-        <a href="{{ url_for('register') }}" style="color:#1877f2; font-weight:600; text-decoration:none;">Create an account</a>
-        or <a href="{{ url_for('login') }}" style="color:#1877f2; font-weight:600; text-decoration:none;">log in</a> to save your followed states and counties.
-      </span>
     </div>
-  {% endif %}
+  </div>
 </div>
 
 <script>

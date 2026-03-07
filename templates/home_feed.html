@@ -284,11 +284,15 @@
       {# Post encouragement callout #}
       <div class="onboarding-callout" id="postCallout" style="display:none;">
         <div class="post-callout-inner">
-          <button type="button" class="onboarding-close" id="postCalloutClose" aria-label="Dismiss">&times;</button>
+          <button type="button" class="onboarding-close post-callout-close" id="postCalloutClose" aria-label="Dismiss">&times;</button>
           <div class="onboarding-icon">🚗</div>
           <div class="onboarding-text" style="color:#78350f;">
             <strong>Received a speeding ticket in the last year?</strong><br>
-            Help the community — post it anonymously or with your account.
+            {% if current_user.is_authenticated %}
+              Post it to help the community see enforcement trends.
+            {% else %}
+              <a href="{{ url_for('register') }}" style="color:#92400e; font-weight:600; text-decoration:underline;">Create an account</a> to post and track enforcement trends.
+            {% endif %}
           </div>
           <a class="post-callout-btn" href="{{ url_for('submit') }}">Post your ticket</a>
         </div>
@@ -374,10 +378,11 @@
     background:linear-gradient(135deg, #fefce8 0%, #fffbeb 100%);
     border:1px solid #fde68a;
     border-radius:12px;
-    padding:20px;
+    padding:20px 20px 20px 20px;
     display:flex;
     align-items:center;
     gap:14px;
+    padding-right:40px;
   }
   .post-callout-btn{
     flex-shrink:0;
@@ -388,6 +393,7 @@
     white-space:nowrap;
   }
   .post-callout-btn:hover{ background:#b45309; }
+  .post-callout-close{ top:6px; right:8px; }
 
   /* Reuse the exact thank_you thermometer styling (scoped to this template). */
   .ticket-card{padding-top:18px;padding-bottom:18px;overflow:hidden}

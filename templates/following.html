@@ -58,31 +58,6 @@
         <div class="subtle" style="margin-top:6px; font-size:14px;">Follow states or counties to see their speeding tickets in your feed.</div>
       </div>
 
-      {# Add state #}
-      <div class="following-section">
-        <div class="following-add-title">Follow a state</div>
-        {% if current_user.is_authenticated %}
-        <form method="post" action="{{ url_for('following_add_state') }}">
-          <div class="following-add-row">
-            <select name="state_code" required>
-              <option value="">Select a state</option>
-              {% for st in state_options %}
-                <option value="{{ st }}">{{ st }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit">Follow</button>
-          </div>
-        </form>
-        {% else %}
-          <div class="following-add-row">
-            <select disabled style="opacity:0.5;">
-              <option>Select a state</option>
-            </select>
-            <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
-          </div>
-        {% endif %}
-      </div>
-
       {# Add county #}
       <div class="following-section">
         <div class="following-add-title">Follow a county</div>
@@ -107,6 +82,31 @@
           <div class="following-add-row">
             <select disabled style="flex:0.5; opacity:0.5;"><option>State</option></select>
             <input type="text" disabled placeholder="Type county name" style="flex:1; opacity:0.5;">
+            <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
+          </div>
+        {% endif %}
+      </div>
+
+      {# Add all counties in a state #}
+      <div class="following-section">
+        <div class="following-add-title">Follow all counties in a state</div>
+        {% if current_user.is_authenticated %}
+        <form method="post" action="{{ url_for('following_add_state') }}">
+          <div class="following-add-row">
+            <select name="state_code" required>
+              <option value="">Select a state</option>
+              {% for st in state_options %}
+                <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">Follow</button>
+          </div>
+        </form>
+        {% else %}
+          <div class="following-add-row">
+            <select disabled style="opacity:0.5;">
+              <option>Select a state</option>
+            </select>
             <a href="{{ url_for('register') }}" class="following-add-login-btn">Sign up to follow</a>
           </div>
         {% endif %}

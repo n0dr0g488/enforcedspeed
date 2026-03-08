@@ -22,7 +22,7 @@
 
   /* Avatar: left (preview+upload) / right (grid+save/cancel) */
   .avatar-layout{ display:flex; align-items:flex-start; gap:24px; }
-  .avatar-left{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:120px; }
+  .avatar-left{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:100px; }
   .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; }
   .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
   .avatar-overlay{
@@ -33,16 +33,16 @@
   }
   .avatar-wrap:hover .avatar-overlay{ opacity:1; }
   .avatar-overlay svg{ width:22px; height:22px; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
-  .avatar-label{ font-size:11px; margin-bottom:8px; text-align:center; }
+  .avatar-label{ font-size:11px; text-align:center; }
 
-  .avatar-right{ flex:1; min-width:0; }
+  .avatar-right{ flex:1; min-width:0; display:flex; align-items:center; }
   .avatar-grid-compact{
     display:grid;
     grid-template-columns:repeat(5, 44px);
     grid-template-rows:repeat(2, 44px);
     gap:6px;
   }
-  .avatar-grid-actions{ display:flex; gap:6px; margin-top:10px; }
+  .avatar-btn-row{ display:flex; gap:6px; align-items:center; margin-top:12px; }
   .es-avatar-choice{
     padding:0; border:2px solid transparent; border-radius:999px;
     background:transparent; cursor:pointer;
@@ -133,7 +133,7 @@
         </form>
 
         <div class="avatar-layout">
-          {# Left: current/preview + upload #}
+          {# Left: current/preview #}
           <div class="avatar-left">
             <div class="avatar-wrap">
               <img id="avatarPreviewLarge"
@@ -147,14 +147,9 @@
               {% endif %}
             </div>
             <div class="subtle avatar-label" id="avatarLabel">Current avatar</div>
-            <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">
-              {% if user_avatar_is_photo(profile_user) %}Upload new photo{% else %}Upload photo{% endif %}
-            </label>
-            <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
-            <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
           </div>
 
-          {# Right: 10 default avatars + save/cancel below #}
+          {# Right: 10 default avatars #}
           <div class="avatar-right">
             <div id="esAvatarGrid" class="avatar-grid-compact">
               {% for a in system_avatars[:10] %}
@@ -168,12 +163,17 @@
                 </button>
               {% endfor %}
             </div>
-            <div class="avatar-grid-actions">
-              <button type="button" class="prof-btn prof-btn-primary" id="avatarSaveBtn" style="display:none;">Save</button>
-              <button type="button" class="prof-btn" id="avatarCancelBtn" style="display:none;">Cancel</button>
-            </div>
           </div>
         </div>
+
+        {# Button row: all buttons inline #}
+        <div class="avatar-btn-row">
+          <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
+          <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
+          <button type="button" class="prof-btn prof-btn-primary" id="avatarSaveBtn" style="display:none;">Save</button>
+          <button type="button" class="prof-btn" id="avatarCancelBtn" style="display:none;">Cancel</button>
+        </div>
+        <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
       </div>
       {% endif %}
 
@@ -350,70 +350,96 @@
     });
   }
 
+  // Photo upload: preview locally first, upload on Save
+  var photoInput = document.getElementById('esPhotoInput');
+  var photoMsg = document.getElementById('esPhotoMsg');
+  var removeBtn = document.getElementById('esPhotoRemoveBtn');
+  var pendingPhotoFile = null;
+  function setMsg(t){ if(photoMsg) photoMsg.textContent = t || ''; }
+
+  if(photoInput){
+    photoInput.addEventListener('change', function(){
+      if(!photoInput.files || photoInput.files.length < 1) return;
+      var file = photoInput.files[0];
+
+      // Show local preview
+      var url = URL.createObjectURL(file);
+      if(previewImg) previewImg.src = url;
+      if(avatarLabel) avatarLabel.textContent = 'Avatar preview';
+      showSaveCancel(true);
+
+      // Store file for upload on Save, clear any pending avatar key
+      pendingPhotoFile = file;
+      pendingAvatarKey = null;
+
+      // Deselect grid avatars
+      if(grid) grid.querySelectorAll('.es-avatar-choice').forEach(function(b){ b.classList.remove('is-selected'); });
+    });
+  }
+
+  // Update Save to handle both avatar key and photo upload
   if(saveBtn){
     saveBtn.addEventListener('click', async function(){
-      if(!pendingAvatarKey) return;
       saveBtn.textContent = 'Saving…';
       saveBtn.disabled = true;
       try{
-        var body = new URLSearchParams();
-        body.set('csrf_token', _get('csrf_token'));
-        body.set('avatar_key', pendingAvatarKey);
-        var resp = await fetch('{{ url_for("api_profile_avatar") }}', {
-          method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, credentials:'same-origin', body:body.toString()
-        });
-        var data = await resp.json().catch(function(){return null;});
-        if(data && data.ok && data.avatar_url){
-          var cb = '?v=' + Date.now();
-          var newUrl = data.avatar_url + cb;
-          if(previewImg) previewImg.src = newUrl;
-          // Update original so cancel goes to new saved avatar
-          originalSrc = newUrl;
-          if(previewImg) previewImg.setAttribute('data-original-src', newUrl);
-          var headerImg = document.getElementById('profileAvatarImg');
-          if(headerImg) headerImg.src = newUrl;
-          pendingAvatarKey = null;
-          showSaveCancel(false);
-          saveBtn.textContent = 'Save';
-        } else {
-          saveBtn.textContent = 'Save';
+        if(pendingPhotoFile){
+          // Upload photo
+          var fd = new FormData();
+          fd.append('csrf_token', _get('csrf_token'));
+          fd.append('photo', pendingPhotoFile);
+          var resp = await fetch('{{ url_for("api_profile_photo_upload") }}', { method:'POST', credentials:'same-origin', body:fd });
+          var data = await resp.json().catch(function(){return null;});
+          if(!data || !data.ok){
+            setMsg((data&&data.message)||'Upload failed.');
+            saveBtn.textContent = 'Save';
+            saveBtn.disabled = false;
+            return;
+          }
+          setMsg('Saved.');
+          pendingPhotoFile = null;
+          setTimeout(function(){ window.location.reload(); }, 400);
+        } else if(pendingAvatarKey){
+          // Save avatar key
+          var body = new URLSearchParams();
+          body.set('csrf_token', _get('csrf_token'));
+          body.set('avatar_key', pendingAvatarKey);
+          var resp = await fetch('{{ url_for("api_profile_avatar") }}', {
+            method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, credentials:'same-origin', body:body.toString()
+          });
+          var data = await resp.json().catch(function(){return null;});
+          if(data && data.ok && data.avatar_url){
+            var cb = '?v=' + Date.now();
+            var newUrl = data.avatar_url + cb;
+            if(previewImg) previewImg.src = newUrl;
+            originalSrc = newUrl;
+            if(previewImg) previewImg.setAttribute('data-original-src', newUrl);
+            var headerImg = document.getElementById('profileAvatarImg');
+            if(headerImg) headerImg.src = newUrl;
+            pendingAvatarKey = null;
+            showSaveCancel(false);
+            setMsg('Saved.');
+          } else {
+            setMsg('Failed.');
+          }
         }
-      }catch(err){ saveBtn.textContent = 'Save'; }
+        saveBtn.textContent = 'Save';
+      }catch(err){ setMsg('Failed.'); saveBtn.textContent = 'Save'; }
       finally{ saveBtn.disabled = false; }
     });
   }
 
+  // Cancel: also clear pending photo
   if(cancelBtn){
     cancelBtn.addEventListener('click', function(){
-      // Revert preview to original
       if(previewImg && originalSrc) previewImg.src = originalSrc;
       pendingAvatarKey = null;
-      // Deselect all grid avatars
+      pendingPhotoFile = null;
       if(grid) grid.querySelectorAll('.es-avatar-choice').forEach(function(b){ b.classList.remove('is-selected'); });
       showSaveCancel(false);
-    });
-  }
-
-  // Photo upload
-  var photoInput = document.getElementById('esPhotoInput');
-  var photoMsg = document.getElementById('esPhotoMsg');
-  var removeBtn = document.getElementById('esPhotoRemoveBtn');
-  function setMsg(t){ if(photoMsg) photoMsg.textContent = t || ''; }
-
-  if(photoInput){
-    photoInput.addEventListener('change', async function(){
-      if(!photoInput.files || photoInput.files.length < 1) return;
-      setMsg('Uploading…');
-      try{
-        var fd = new FormData();
-        fd.append('csrf_token', _get('csrf_token'));
-        fd.append('photo', photoInput.files[0]);
-        var resp = await fetch('{{ url_for("api_profile_photo_upload") }}', { method:'POST', credentials:'same-origin', body:fd });
-        var data = await resp.json().catch(function(){return null;});
-        if(!data || !data.ok){ setMsg((data&&data.message)||'Upload failed.'); return; }
-        setMsg('Saved.');
-        setTimeout(function(){ window.location.reload(); }, 400);
-      }catch(err){ setMsg('Upload failed.'); }
+      setMsg('');
+      // Reset file input
+      if(photoInput) photoInput.value = '';
     });
   }
 

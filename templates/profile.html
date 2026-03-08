@@ -17,25 +17,27 @@
   .prof-btn:hover{ background:#f9fafb; }
   .prof-btn-primary{ background:#1877f2; color:#fff; border-color:#1877f2; }
   .prof-btn-primary:hover{ background:#1565c0; }
+  .prof-link{ font-size:13px; color:#6b7280; cursor:pointer; text-decoration:none; }
+  .prof-link:hover{ color:#1877f2; text-decoration:underline; }
 
-  .remove-x{
-    position:absolute; top:4px; right:4px;
-    background:rgba(220,38,38,0.85); color:#fff;
-    border:none; border-radius:50%; width:22px; height:22px;
-    font-size:13px; font-weight:700; cursor:pointer;
-    display:flex; align-items:center; justify-content:center;
-    line-height:1; transition:background 0.1s;
-  }
-  .remove-x:hover{ background:rgba(185,28,28,0.95); }
-
+  /* Avatar hover overlay */
   .avatar-wrap{ position:relative; display:inline-block; margin-bottom:10px; }
   .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
+  .avatar-overlay{
+    position:absolute; inset:0; border-radius:999px;
+    background:rgba(0,0,0,0.45);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity 0.15s; cursor:pointer;
+  }
+  .avatar-wrap:hover .avatar-overlay{ opacity:1; }
+  .avatar-overlay svg{ width:24px; height:24px; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
   .avatar-actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
 
   .avatar-grid-wrap{ display:none; margin-top:10px; }
   .avatar-grid-wrap.open{ display:block; }
   .avatar-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(48px, 1fr)); gap:6px; max-width:480px; }
 
+  /* Car photo slots */
   .car-photos{ display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; }
   .car-photo-slot{
     position:relative; width:180px; height:135px;
@@ -49,17 +51,22 @@
   .car-photo-slot img{ width:100%; height:100%; object-fit:cover; display:block; }
   .car-photo-plus{ font-size:28px; color:#9ca3af; pointer-events:none; }
   .car-photo-input{ display:none; }
-
-  .car-info-saved{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-  .car-info-saved span{ font-size:14px; color:#111827; }
-  .car-info-clear{
-    background:rgba(220,38,38,0.85); color:#fff;
-    border:none; border-radius:50%; width:20px; height:20px;
-    font-size:12px; font-weight:700; cursor:pointer;
-    display:inline-flex; align-items:center; justify-content:center;
-    line-height:1;
+  /* Car photo remove: subtle, appears on hover */
+  .car-photo-x{
+    position:absolute; top:6px; right:6px;
+    background:rgba(0,0,0,0.5); color:#fff;
+    border:none; border-radius:6px; width:26px; height:26px;
+    font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:opacity 0.15s;
+    backdrop-filter:blur(4px);
   }
-  .car-info-clear:hover{ background:rgba(185,28,28,0.95); }
+  .car-photo-slot:hover .car-photo-x{ opacity:1; }
+  .car-photo-x:hover{ background:rgba(220,38,38,0.8); }
+
+  /* Vehicle info */
+  .car-info-saved{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .car-info-saved span{ font-size:14px; color:#111827; }
 
   .car-fields{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
   .car-fields .field{ flex:1; min-width:120px; }
@@ -100,7 +107,9 @@
         <div class="avatar-wrap">
           <img id="avatarPreviewLarge" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="Current avatar">
           {% if user_avatar_is_photo(profile_user) %}
-            <button type="button" class="remove-x" id="esPhotoRemoveBtn" title="Remove photo">&times;</button>
+            <div class="avatar-overlay" id="esPhotoRemoveBtn" title="Remove photo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </div>
           {% endif %}
         </div>
 
@@ -145,7 +154,8 @@
                 {% if profile_user.car_year %}{{ profile_user.car_year }}{% endif %}{% if profile_user.car_make %} {{ profile_user.car_make }}{% endif %}{% if profile_user.car_model %} {{ profile_user.car_model }}{% endif %}
               {% endif %}
             </span>
-            <button type="button" class="car-info-clear" id="carInfoClear" title="Remove vehicle info">&times;</button>
+            <a class="prof-link" id="carInfoEdit">Edit</a>
+            <a class="prof-link" id="carInfoClear" style="color:#dc2626;">Remove</a>
           </div>
         </div>
 
@@ -179,7 +189,7 @@
             <div class="car-photo-slot{% if photo_url %} has-photo{% endif %}" data-slot="{{ i }}" id="carSlot{{ i }}">
               {% if photo_url %}
                 <img src="{{ photo_url }}" alt="Car photo {{ i }}" id="carImg{{ i }}">
-                <button type="button" class="remove-x car-photo-remove-btn" data-slot="{{ i }}" aria-label="Remove photo" style="top:6px; right:6px;">&times;</button>
+                <button type="button" class="car-photo-x car-photo-remove-btn" data-slot="{{ i }}" aria-label="Remove photo">&times;</button>
               {% else %}
                 <div class="car-photo-plus">+</div>
               {% endif %}
@@ -343,10 +353,19 @@
     });
   }
 
-  // Car info clear
+  // Car info edit/clear
   var carClearBtn = document.getElementById('carInfoClear');
+  var carEditBtn = document.getElementById('carInfoEdit');
   var carInfoDisplay = document.getElementById('carInfoDisplay');
   var carInfoForm = document.getElementById('carInfoForm');
+
+  if(carEditBtn && carInfoDisplay && carInfoForm){
+    carEditBtn.addEventListener('click', function(){
+      carInfoDisplay.style.display = 'none';
+      carInfoForm.style.display = 'block';
+    });
+  }
+
   if(carClearBtn){
     carClearBtn.addEventListener('click', async function(){
       try{
@@ -365,7 +384,7 @@
     var input = document.getElementById('carInput' + slotNum);
     if(!input) return;
     slot.addEventListener('click', function(e){
-      if(e.target.closest('.remove-x')) return;
+      if(e.target.closest('.car-photo-x')) return;
       if(slot.classList.contains('has-photo')) return;
       input.click();
     });

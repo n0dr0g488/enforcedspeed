@@ -6,12 +6,14 @@
   .profile-section-title{ font-size:13px; font-weight:600; color:#374151; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 12px; }
 
   /* Avatar */
-  .avatar-preview{ display:flex; align-items:center; gap:16px; margin-bottom:14px; }
-  .avatar-preview img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; }
-  .avatar-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .avatar-preview{ margin-bottom:12px; }
+  .avatar-preview img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; margin-bottom:10px; }
+  .avatar-actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .avatar-actions .es-btn{ height:36px; padding:0 14px; font-size:13px; font-weight:500; cursor:pointer; border-radius:8px; }
   .avatar-actions .es-btn-outline{ background:#fff; border:1px solid #d1d5db; color:#111827; }
   .avatar-actions .es-btn-outline:hover{ background:#f9fafb; }
+  .avatar-actions .es-btn-danger{ background:#fff; border:1px solid #fca5a5; color:#dc2626; }
+  .avatar-actions .es-btn-danger:hover{ background:#fef2f2; }
 
   .avatar-grid-wrap{ display:none; margin-top:12px; }
   .avatar-grid-wrap.open{ display:block; }
@@ -61,23 +63,14 @@
         </div>
       </div>
 
+      {% if current_user.is_authenticated and current_user.id == profile_user.id %}
       <div class="subtle" style="margin-top:10px;">
-        <a href="{{ url_for('home') }}">Home</a>
-        {% if current_user.is_authenticated and current_user.id == profile_user.id %}
-          · <a href="{{ url_for('change_password') }}">Change password</a>
-          · <a href="{{ url_for('logout') }}">Log out</a>
-        {% endif %}
+        <a href="{{ url_for('change_password') }}">Change password</a>
       </div>
+      {% endif %}
 
       <div style="margin-top:10px;">
         <span class="pill">Tickets posted: {{ ticket_count }}</span>
-        {% if profile_user.car_make or profile_user.car_model or profile_user.car_year %}
-          <span class="pill">
-            {% if profile_user.car_year %}{{ profile_user.car_year }}{% endif %}
-            {% if profile_user.car_make %} {{ profile_user.car_make }}{% endif %}
-            {% if profile_user.car_model %} {{ profile_user.car_model }}{% endif %}
-          </span>
-        {% endif %}
       </div>
 
       {# ── Avatar Section (owner only) ── #}
@@ -93,17 +86,15 @@
 
         <div class="avatar-preview">
           <img id="avatarPreviewLarge" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="Current avatar">
-          <div>
-            <div class="avatar-actions">
-              <label class="es-btn es-btn-outline" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
-              <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
-              <button type="button" class="es-btn es-btn-outline" id="toggleAvatarGrid">Choose avatar</button>
-              {% if user_avatar_is_photo(profile_user) %}
-                <button id="esPhotoRemoveBtn" type="button" class="es-btn es-btn-outline" style="color:#dc2626; border-color:#fca5a5;">Remove photo</button>
-              {% endif %}
-            </div>
-            <div id="esPhotoMsg" class="subtle" style="margin-top:6px;"></div>
+          <div class="avatar-actions">
+            <label class="es-btn es-btn-outline" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
+            <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
+            <button type="button" class="es-btn es-btn-outline" id="toggleAvatarGrid">Choose avatar</button>
+            {% if user_avatar_is_photo(profile_user) %}
+              <button id="esPhotoRemoveBtn" type="button" class="es-btn es-btn-danger">Remove photo</button>
+            {% endif %}
           </div>
+          <div id="esPhotoMsg" class="subtle" style="margin-top:6px;"></div>
         </div>
 
         <div class="avatar-grid-wrap" id="avatarGridWrap">
@@ -130,6 +121,13 @@
       {% if current_user.is_authenticated and current_user.id == profile_user.id %}
       <div class="profile-section">
         <div class="profile-section-title">Vehicle</div>
+        {% if profile_user.car_make or profile_user.car_model or profile_user.car_year %}
+          <div style="font-size:14px; color:#374151; margin-bottom:12px;">
+            {% if profile_user.car_year %}{{ profile_user.car_year }}{% endif %}
+            {% if profile_user.car_make %} {{ profile_user.car_make }}{% endif %}
+            {% if profile_user.car_model %} {{ profile_user.car_model }}{% endif %}
+          </div>
+        {% endif %}
 
         <div class="car-photos">
           {% for i in [1, 2, 3] %}
@@ -188,8 +186,16 @@
 
       {# ── Tickets ── #}
       <div class="profile-section">
-        <div class="profile-section-title">Tickets</div>
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div class="profile-section-title" style="margin-bottom:0;">Tickets</div>
+          {% if reports %}
+            <button type="button" class="es-btn es-btn-outline" id="toggleTickets" style="height:32px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; background:#fff; border:1px solid #d1d5db; color:#374151; cursor:pointer;">
+              View all tickets ({{ reports|length }})
+            </button>
+          {% endif %}
+        </div>
 
+        <div id="ticketsList" style="display:none;">
         {% if reports %}
           {% for r in reports %}
             <div class="item">
@@ -211,8 +217,9 @@
             </div>
           {% endfor %}
         {% else %}
-          <div class="subtle">No tickets posted yet.</div>
+          <div class="subtle" style="margin-top:10px;">No tickets posted yet.</div>
         {% endif %}
+        </div>
       </div>
 
     </div>
@@ -398,6 +405,17 @@
       }catch(err){}
     });
   });
+  // Toggle tickets list
+  var ticketsBtn = document.getElementById('toggleTickets');
+  var ticketsList = document.getElementById('ticketsList');
+  if(ticketsBtn && ticketsList){
+    var origText = ticketsBtn.textContent;
+    ticketsBtn.addEventListener('click', function(){
+      var showing = ticketsList.style.display !== 'none';
+      ticketsList.style.display = showing ? 'none' : 'block';
+      ticketsBtn.textContent = showing ? origText : origText.replace('View all', 'Hide');
+    });
+  }
 })();
 </script>
 

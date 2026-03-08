@@ -291,7 +291,7 @@
             {% if current_user.is_authenticated %}
               Post it to help the community see enforcement trends.
             {% else %}
-              <a href="{{ url_for('register') }}" style="color:#92400e; font-weight:600; text-decoration:underline;">Create an account</a> to post and track enforcement trends.
+              <a href="{{ url_for('register') }}" style="color:#92400e; font-weight:600; text-decoration:underline;">Create an account</a> to post and share your ticket.
             {% endif %}
           </div>
           <a class="post-callout-btn" href="{{ url_for('submit') }}">Post your ticket</a>

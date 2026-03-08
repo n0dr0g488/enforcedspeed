@@ -20,9 +20,10 @@
   .prof-link{ font-size:13px; color:#6b7280; cursor:pointer; text-decoration:none; }
   .prof-link:hover{ color:#1877f2; text-decoration:underline; }
 
-  /* Avatar: preview on top, grid below, OR, upload */
-  .avatar-preview-block{ margin-bottom:12px; }
-  .avatar-wrap{ position:relative; display:inline-block; }
+  /* Avatar: left (preview+buttons) / right (grid) */
+  .avatar-layout{ display:flex; align-items:flex-start; gap:24px; }
+  .avatar-left{ display:flex; flex-direction:column; align-items:flex-start; flex-shrink:0; }
+  .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; }
   .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
   .avatar-overlay{
     position:absolute; inset:0; border-radius:999px;
@@ -32,8 +33,16 @@
   }
   .avatar-wrap:hover .avatar-overlay{ opacity:1; }
   .avatar-overlay svg{ width:22px; height:22px; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+  .avatar-label{ font-size:11px; margin-bottom:8px; }
+  .avatar-btn-row{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
 
-  .avatar-grid-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+  .avatar-right{ flex:1; min-width:0; display:flex; align-items:center; }
+  .avatar-grid-compact{
+    display:grid;
+    grid-template-columns:repeat(5, 44px);
+    grid-template-rows:repeat(2, 44px);
+    gap:6px;
+  }
   .es-avatar-choice{
     padding:0; border:2px solid transparent; border-radius:999px;
     background:transparent; cursor:pointer;
@@ -48,16 +57,12 @@
     object-fit:cover; background:#e5e7eb; display:block;
   }
 
-  .avatar-or-line{
-    display:flex; align-items:center; gap:10px;
-    margin:10px 0;
+  @media(max-width:520px){
+    .avatar-layout{ flex-direction:column; gap:14px; }
+    .avatar-grid-compact{ grid-template-columns:repeat(5, 40px); grid-template-rows:repeat(2, 40px); }
+    .es-avatar-choice{ width:40px; height:40px; }
+    .es-avatar-choice img{ width:36px; height:36px; }
   }
-  .avatar-or-line::before, .avatar-or-line::after{
-    content:''; flex:1; height:1px; background:#e5e7eb;
-  }
-  .avatar-or-line span{ font-size:12px; color:#9ca3af; white-space:nowrap; }
-
-  .avatar-save-btn{ transition:opacity 0.15s; }
 
   /* Car photo slots */
   .car-photos{ display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; }
@@ -126,45 +131,49 @@
           {{ avatar_form.avatar_key(id="esAvatarKey") }}
         </form>
 
-        {# Large preview #}
-        <div class="avatar-preview-block">
-          <div class="avatar-wrap">
-            <img id="avatarPreviewLarge" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="Current avatar">
-            {% if user_avatar_is_photo(profile_user) %}
-              <div class="avatar-overlay" id="esPhotoRemoveBtn" title="Remove photo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </div>
-            {% endif %}
+        <div class="avatar-layout">
+          {# Left: current/preview + buttons #}
+          <div class="avatar-left">
+            <div class="avatar-wrap">
+              <img id="avatarPreviewLarge"
+                   src="{{ user_avatar_url(profile_user, 'lg') }}"
+                   data-original-src="{{ user_avatar_url(profile_user, 'lg') }}"
+                   alt="Current avatar">
+              {% if user_avatar_is_photo(profile_user) %}
+                <div class="avatar-overlay" id="esPhotoRemoveBtn" title="Remove photo">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </div>
+              {% endif %}
+            </div>
+            <div class="subtle avatar-label" id="avatarLabel">Current avatar</div>
+
+            <div class="avatar-btn-row">
+              <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">
+                {% if user_avatar_is_photo(profile_user) %}Upload new photo{% else %}Upload photo{% endif %}
+              </label>
+              <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
+              <button type="button" class="prof-btn prof-btn-primary" id="avatarSaveBtn" style="display:none;">Save</button>
+              <button type="button" class="prof-btn" id="avatarCancelBtn" style="display:none;">Cancel</button>
+            </div>
+            <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
+          </div>
+
+          {# Right: 10 default avatars in 2 rows of 5 #}
+          <div class="avatar-right">
+            <div id="esAvatarGrid" class="avatar-grid-compact">
+              {% for a in system_avatars[:10] %}
+                {% set k = a.key %}
+                {% set f = a.file %}
+                <button type="button"
+                        class="es-avatar-choice{% if k == selected_avatar_key and not user_avatar_is_photo(profile_user) %} is-selected{% endif %}"
+                        data-key="{{ k }}"
+                        data-src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}">
+                  <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}" alt="{{ a.label }}">
+                </button>
+              {% endfor %}
+            </div>
           </div>
         </div>
-
-        {# Avatar grid (10 avatars) #}
-        <div id="esAvatarGrid" class="avatar-grid-row">
-          {% for a in system_avatars[:10] %}
-            {% set k = a.key %}
-            {% set f = a.file %}
-            <button type="button"
-                    class="es-avatar-choice{% if k == selected_avatar_key %} is-selected{% endif %}"
-                    data-key="{{ k }}"
-                    data-src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}">
-              <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}"
-                   alt="{{ a.label }}">
-            </button>
-          {% endfor %}
-        </div>
-
-        {# OR divider + upload #}
-        <div class="avatar-or-line">
-          <span>or upload your own</span>
-        </div>
-        <div>
-          <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
-          <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
-        </div>
-        <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
-
-        {# Save button (hidden until change) #}
-        <button type="button" class="prof-btn prof-btn-primary avatar-save-btn" id="avatarSaveBtn" style="display:none; margin-top:10px;">Save avatar</button>
       </div>
       {% endif %}
 
@@ -303,14 +312,23 @@
     return el ? (el.value || '') : '';
   }
 
-  // Avatar grid: click to preview, Save button to commit
+  // Avatar: preview on click, save to commit, cancel to revert
   var grid = document.getElementById('esAvatarGrid');
   var keyInput = document.getElementById('esAvatarKey');
   var saveBtn = document.getElementById('avatarSaveBtn');
+  var cancelBtn = document.getElementById('avatarCancelBtn');
   var previewImg = document.getElementById('avatarPreviewLarge');
+  var avatarLabel = document.getElementById('avatarLabel');
+  var originalSrc = previewImg ? previewImg.getAttribute('data-original-src') : '';
   var pendingAvatarKey = null;
 
-  if(grid && keyInput && form){
+  function showSaveCancel(show){
+    if(saveBtn) saveBtn.style.display = show ? 'inline-flex' : 'none';
+    if(cancelBtn) cancelBtn.style.display = show ? 'inline-flex' : 'none';
+    if(avatarLabel) avatarLabel.textContent = show ? 'Avatar preview' : 'Current avatar';
+  }
+
+  if(grid && keyInput){
     grid.addEventListener('click', function(e){
       var btn = e.target && e.target.closest ? e.target.closest('.es-avatar-choice') : null;
       if(!btn) return;
@@ -322,14 +340,13 @@
         b.classList.toggle('is-selected', b.getAttribute('data-key') === key);
       });
 
-      // Update preview image
+      // Update preview (don't save yet)
       var src = btn.getAttribute('data-src');
       if(previewImg && src) previewImg.src = src;
 
-      // Store pending key and show Save
       pendingAvatarKey = key;
       keyInput.value = key;
-      if(saveBtn) saveBtn.style.display = 'inline-flex';
+      showSaveCancel(true);
     });
   }
 
@@ -348,15 +365,32 @@
         var data = await resp.json().catch(function(){return null;});
         if(data && data.ok && data.avatar_url){
           var cb = '?v=' + Date.now();
-          [document.getElementById('profileAvatarImg'), previewImg].forEach(function(img){ if(img) img.src = data.avatar_url + cb; });
-          saveBtn.textContent = 'Saved!';
+          var newUrl = data.avatar_url + cb;
+          if(previewImg) previewImg.src = newUrl;
+          // Update original so cancel goes to new saved avatar
+          originalSrc = newUrl;
+          if(previewImg) previewImg.setAttribute('data-original-src', newUrl);
+          var headerImg = document.getElementById('profileAvatarImg');
+          if(headerImg) headerImg.src = newUrl;
           pendingAvatarKey = null;
-          setTimeout(function(){ saveBtn.style.display = 'none'; saveBtn.textContent = 'Save avatar'; }, 1500);
+          showSaveCancel(false);
+          saveBtn.textContent = 'Save';
         } else {
-          saveBtn.textContent = 'Save avatar';
+          saveBtn.textContent = 'Save';
         }
-      }catch(err){ saveBtn.textContent = 'Save avatar'; }
+      }catch(err){ saveBtn.textContent = 'Save'; }
       finally{ saveBtn.disabled = false; }
+    });
+  }
+
+  if(cancelBtn){
+    cancelBtn.addEventListener('click', function(){
+      // Revert preview to original
+      if(previewImg && originalSrc) previewImg.src = originalSrc;
+      pendingAvatarKey = null;
+      // Deselect all grid avatars
+      if(grid) grid.querySelectorAll('.es-avatar-choice').forEach(function(b){ b.classList.remove('is-selected'); });
+      showSaveCancel(false);
     });
   }
 

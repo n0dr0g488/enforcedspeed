@@ -2249,6 +2249,13 @@ GROUP BY UPPER(TRIM(stusps));
                     flash("Profile updated.", "success")
                     return redirect(url_for("profile", username=u.username))
 
+            elif form_name == "car_clear":
+                u.car_make = None
+                u.car_model = None
+                u.car_year = None
+                db.session.commit()
+                return redirect(url_for("profile", username=u.username))
+
             elif form_name == "avatar":
                 if avatar_form.validate_on_submit():
                     key = normalize_avatar_key(avatar_form.avatar_key.data)

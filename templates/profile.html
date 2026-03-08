@@ -20,9 +20,11 @@
   .prof-link{ font-size:13px; color:#6b7280; cursor:pointer; text-decoration:none; }
   .prof-link:hover{ color:#1877f2; text-decoration:underline; }
 
-  /* Avatar hover overlay */
-  .avatar-wrap{ position:relative; display:inline-block; margin-bottom:10px; }
-  .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
+  /* Avatar picker: upload left | OR | avatars right */
+  .avatar-picker{ display:flex; align-items:flex-start; gap:0; }
+  .avatar-upload-side{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:100px; }
+  .avatar-wrap{ position:relative; display:inline-block; margin-bottom:8px; }
+  .avatar-wrap img{ width:72px; height:72px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
   .avatar-overlay{
     position:absolute; inset:0; border-radius:999px;
     background:rgba(0,0,0,0.45);
@@ -30,12 +32,27 @@
     opacity:0; transition:opacity 0.15s; cursor:pointer;
   }
   .avatar-wrap:hover .avatar-overlay{ opacity:1; }
-  .avatar-overlay svg{ width:24px; height:24px; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
-  .avatar-actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  .avatar-overlay svg{ width:22px; height:22px; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
 
-  .avatar-grid-wrap{ display:none; margin-top:10px; }
-  .avatar-grid-wrap.open{ display:block; }
-  .avatar-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(48px, 1fr)); gap:6px; max-width:480px; }
+  .avatar-or{
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; width:50px;
+    padding-top:20px;
+  }
+  .avatar-or span{
+    font-size:12px; font-weight:600; color:#9ca3af;
+    text-transform:uppercase; letter-spacing:0.5px;
+  }
+
+  .avatar-grid-side{ flex:1; min-width:0; }
+  .avatar-grid-inline{
+    display:flex; flex-wrap:wrap; gap:5px;
+  }
+
+  @media(max-width:520px){
+    .avatar-picker{ flex-direction:column; align-items:flex-start; }
+    .avatar-or{ width:auto; padding:8px 0; flex-direction:row; }
+  }
 
   /* Car photo slots */
   .car-photos{ display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; }
@@ -104,38 +121,44 @@
           {{ avatar_form.avatar_key(id="esAvatarKey") }}
         </form>
 
-        <div class="avatar-wrap">
-          <img id="avatarPreviewLarge" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="Current avatar">
-          {% if user_avatar_is_photo(profile_user) %}
-            <div class="avatar-overlay" id="esPhotoRemoveBtn" title="Remove photo">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <div class="avatar-picker">
+          {# Left: upload your own #}
+          <div class="avatar-upload-side">
+            <div class="avatar-wrap">
+              <img id="avatarPreviewLarge" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="Current avatar">
+              {% if user_avatar_is_photo(profile_user) %}
+                <div class="avatar-overlay" id="esPhotoRemoveBtn" title="Remove photo">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </div>
+              {% endif %}
             </div>
-          {% endif %}
-        </div>
-
-        <div class="avatar-actions">
-          <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
-          <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
-          <button type="button" class="prof-btn" id="toggleAvatarGrid">Choose avatar</button>
-        </div>
-        <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
-
-        <div class="avatar-grid-wrap" id="avatarGridWrap">
-          <div id="esAvatarGrid" class="avatar-grid"{% if user_avatar_is_photo(profile_user) %} style="opacity:.5; pointer-events:none;"{% endif %}>
-            {% for a in system_avatars %}
-              {% set k = a.key %}
-              {% set f = a.file %}
-              <button type="button"
-                      class="es-avatar-choice{% if k == selected_avatar_key %} is-selected{% endif %}"
-                      data-key="{{ k }}"
-                      style="padding:0; border:2px solid {% if k == selected_avatar_key %}#111827{% else %}transparent{% endif %}; border-radius:999px; background:transparent; cursor:pointer; width:48px; height:48px; display:flex; align-items:center; justify-content:center;">
-                <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}"
-                     alt="{{ a.label }}"
-                     style="width:44px;height:44px;border-radius:999px;object-fit:cover;background:#e5e7eb;display:block;">
-              </button>
-            {% endfor %}
+            <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
+            <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
+            <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
           </div>
-          <div class="subtle" style="margin-top:6px; font-size:12px;">Click an avatar to save instantly.</div>
+
+          {# Divider #}
+          <div class="avatar-or">
+            <span>OR</span>
+          </div>
+
+          {# Right: pick an ES avatar #}
+          <div class="avatar-grid-side">
+            <div id="esAvatarGrid" class="avatar-grid-inline"{% if user_avatar_is_photo(profile_user) %} style="opacity:.5; pointer-events:none;"{% endif %}>
+              {% for a in system_avatars %}
+                {% set k = a.key %}
+                {% set f = a.file %}
+                <button type="button"
+                        class="es-avatar-choice{% if k == selected_avatar_key %} is-selected{% endif %}"
+                        data-key="{{ k }}"
+                        style="padding:0; border:2px solid {% if k == selected_avatar_key %}#111827{% else %}transparent{% endif %}; border-radius:999px; background:transparent; cursor:pointer; width:36px; height:36px; display:flex; align-items:center; justify-content:center;">
+                  <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}"
+                       alt="{{ a.label }}"
+                       style="width:32px;height:32px;border-radius:999px;object-fit:cover;background:#e5e7eb;display:block;">
+                </button>
+              {% endfor %}
+            </div>
+          </div>
         </div>
       </div>
       {% endif %}
@@ -273,16 +296,6 @@
     if(!form) return '';
     var el = form.querySelector('input[name="' + name + '"]');
     return el ? (el.value || '') : '';
-  }
-
-  // Toggle avatar grid
-  var toggleBtn = document.getElementById('toggleAvatarGrid');
-  var gridWrap = document.getElementById('avatarGridWrap');
-  if(toggleBtn && gridWrap){
-    toggleBtn.addEventListener('click', function(){
-      gridWrap.classList.toggle('open');
-      toggleBtn.textContent = gridWrap.classList.contains('open') ? 'Hide avatars' : 'Choose avatar';
-    });
   }
 
   // Avatar grid click

@@ -20,9 +20,9 @@
   .prof-link{ font-size:13px; color:#6b7280; cursor:pointer; text-decoration:none; }
   .prof-link:hover{ color:#1877f2; text-decoration:underline; }
 
-  /* Avatar: left (preview+buttons) / right (grid) */
+  /* Avatar: left (preview+upload) / right (grid+save/cancel) */
   .avatar-layout{ display:flex; align-items:flex-start; gap:24px; }
-  .avatar-left{ display:flex; flex-direction:column; align-items:flex-start; flex-shrink:0; }
+  .avatar-left{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:120px; }
   .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; }
   .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
   .avatar-overlay{
@@ -33,16 +33,16 @@
   }
   .avatar-wrap:hover .avatar-overlay{ opacity:1; }
   .avatar-overlay svg{ width:22px; height:22px; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
-  .avatar-label{ font-size:11px; margin-bottom:8px; }
-  .avatar-btn-row{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .avatar-label{ font-size:11px; margin-bottom:8px; text-align:center; }
 
-  .avatar-right{ flex:1; min-width:0; display:flex; align-items:center; }
+  .avatar-right{ flex:1; min-width:0; }
   .avatar-grid-compact{
     display:grid;
     grid-template-columns:repeat(5, 44px);
     grid-template-rows:repeat(2, 44px);
     gap:6px;
   }
+  .avatar-grid-actions{ display:flex; gap:6px; margin-top:10px; }
   .es-avatar-choice{
     padding:0; border:2px solid transparent; border-radius:999px;
     background:transparent; cursor:pointer;
@@ -58,7 +58,8 @@
   }
 
   @media(max-width:520px){
-    .avatar-layout{ flex-direction:column; gap:14px; }
+    .avatar-layout{ flex-direction:column; align-items:flex-start; gap:14px; }
+    .avatar-left{ width:auto; }
     .avatar-grid-compact{ grid-template-columns:repeat(5, 40px); grid-template-rows:repeat(2, 40px); }
     .es-avatar-choice{ width:40px; height:40px; }
     .es-avatar-choice img{ width:36px; height:36px; }
@@ -132,7 +133,7 @@
         </form>
 
         <div class="avatar-layout">
-          {# Left: current/preview + buttons #}
+          {# Left: current/preview + upload #}
           <div class="avatar-left">
             <div class="avatar-wrap">
               <img id="avatarPreviewLarge"
@@ -146,19 +147,14 @@
               {% endif %}
             </div>
             <div class="subtle avatar-label" id="avatarLabel">Current avatar</div>
-
-            <div class="avatar-btn-row">
-              <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">
-                {% if user_avatar_is_photo(profile_user) %}Upload new photo{% else %}Upload photo{% endif %}
-              </label>
-              <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
-              <button type="button" class="prof-btn prof-btn-primary" id="avatarSaveBtn" style="display:none;">Save</button>
-              <button type="button" class="prof-btn" id="avatarCancelBtn" style="display:none;">Cancel</button>
-            </div>
+            <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">
+              {% if user_avatar_is_photo(profile_user) %}Upload new photo{% else %}Upload photo{% endif %}
+            </label>
+            <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
             <div id="esPhotoMsg" class="subtle" style="margin-top:4px; font-size:12px;"></div>
           </div>
 
-          {# Right: 10 default avatars in 2 rows of 5 #}
+          {# Right: 10 default avatars + save/cancel below #}
           <div class="avatar-right">
             <div id="esAvatarGrid" class="avatar-grid-compact">
               {% for a in system_avatars[:10] %}
@@ -171,6 +167,10 @@
                   <img src="{{ url_for('static', filename='img/avatars/' ~ f) }}?v={{ asset_v }}" alt="{{ a.label }}">
                 </button>
               {% endfor %}
+            </div>
+            <div class="avatar-grid-actions">
+              <button type="button" class="prof-btn prof-btn-primary" id="avatarSaveBtn" style="display:none;">Save</button>
+              <button type="button" class="prof-btn" id="avatarCancelBtn" style="display:none;">Cancel</button>
             </div>
           </div>
         </div>

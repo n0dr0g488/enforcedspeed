@@ -49,7 +49,7 @@
 
     {# Left sidebar: Following panel (desktop). #}
     <aside class="home-left" id="homeFiltersSidebar">
-      <div class="filters-rail">
+      <div class="filters-rail" style="padding:0;">
         <div class="filters-scroll" style="padding-right:0;">
 
           <div class="rail-section" style="border-top:0;">
@@ -119,7 +119,7 @@
 
         </div>
 
-        <div class="filters-footer">
+        <div class="filters-footer" style="padding:0 14px 12px;">
           <div class="filters-footer-links">
             <a href="{{ url_for('privacy') }}">Privacy</a>
             <span class="dot">·</span>
@@ -227,9 +227,6 @@
             <div class="onboarding-text">
               <strong>Welcome to EnforcedSpeed!</strong><br>
               Follow states or counties to see speeding tickets in your feed.
-              {% if not current_user.is_authenticated %}
-                <a href="{{ url_for('register') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Create an account</a> to save your list permanently.
-              {% endif %}
             </div>
             <a class="onboarding-btn" href="{{ url_for('following') }}">Set up following</a>
           </div>

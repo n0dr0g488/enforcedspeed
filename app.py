@@ -4088,10 +4088,53 @@ GROUP BY UPPER(TRIM(stusps));
         return redirect(url_for("following"))
 
 
+    def _geolocate_state_from_ip() -> str:
+        """Try to determine the user's US state from their IP address.
+        Returns a 2-letter state code (e.g. 'VA') or empty string on failure.
+        Uses ip-api.com (free, no key, 45 req/min)."""
+        try:
+            # Get client IP (respect proxy headers)
+            ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
+            if not ip or ip.startswith("127.") or ip.startswith("10.") or ip.startswith("192.168."):
+                return ""
+
+            url = f"http://ip-api.com/json/{ip}?fields=status,countryCode,region"
+            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+
+            if data.get("status") != "success":
+                return ""
+            if data.get("countryCode") != "US":
+                return ""
+            region = (data.get("region") or "").strip().upper()
+            if region and len(region) == 2 and region.isalpha():
+                return region
+            return ""
+        except Exception:
+            return ""
+
     @app.get("/map")
     def map_view():
         """Map view of tickets that have lat/lng."""
         filter_county_geoid, filter_county_label = _get_county_filter_from_request()
+        filter_state = (request.args.get("state") or "").strip().upper()
+        focus_state = (request.args.get("focus_state") or "").strip().upper()
+
+        # Auto-detect state from IP when no state/county is selected
+        if not filter_state and not focus_state and not filter_county_geoid:
+            # Check session cache first (None = not tried yet, "" = tried but failed)
+            cached = session.get("_geo_state")
+            if cached is None:
+                detected = _geolocate_state_from_ip()
+                session["_geo_state"] = detected or ""
+            else:
+                detected = cached
+            if detected:
+                args = request.args.to_dict()
+                args["state"] = detected
+                return redirect(url_for("map_view", **args))
+
         hide_anon_requested = (request.args.get("hide_anon") == "1")
         if hide_anon_requested and not current_user.is_authenticated:
             flash("You must be logged in to hide anonymous posts.", "info")
@@ -4108,12 +4151,10 @@ GROUP BY UPPER(TRIM(stusps));
         deleted_only = bool(is_admin and deleted_mode == "only")
 
         # --- Filter parsing matches /home (so links are interchangeable) ---
-        filter_state = (request.args.get("state") or "").strip().upper()
         filter_road = (request.args.get("road") or "").strip()
 
         # If we arrived via a focus link (e.g., clicking a state from Home),
         # treat focus_state as an implicit state filter so pins + stats match.
-        focus_state = (request.args.get("focus_state") or "").strip().upper()
         if (not filter_state) and focus_state and re.fullmatch(r"[A-Z]{2}", focus_state or ""):
             filter_state = focus_state
 
@@ -4389,6 +4430,18 @@ GROUP BY UPPER(TRIM(stusps));
                 map_following_items.sort(key=lambda x: x["label"].lower())
             except Exception:
                 pass
+        else:
+            # Anonymous: read from session
+            for sc in session.get("followed_states", []):
+                map_following_items.append({"type": "state", "code": sc, "label": f"{sc}, all counties", "url": url_for("map_view", state=sc)})
+            for geoid in session.get("followed_counties", []):
+                try:
+                    row = db.session.execute(text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"), {"g": geoid}).mappings().first()
+                    label = f"{row['stusps']}, {row['namelsad']}" if row else geoid
+                except Exception:
+                    label = geoid
+                map_following_items.append({"type": "county", "code": geoid, "label": label, "url": url_for("map_view", county=geoid)})
+            map_following_items.sort(key=lambda x: x["label"].lower())
 
         return render_template(
             "map_page.html",

@@ -3817,12 +3817,27 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             clickwrap_server_accepted = False
 
-        # Build following panel items for left rail
+        # Build following panel items for left rail (with stats matching right panel)
         following_panel_items = []
         try:
+            now = datetime.utcnow()
+            d7 = now - timedelta(days=7)
+            d30 = now - timedelta(days=30)
+            d365 = now - timedelta(days=365)
+
             for sc in sorted(followed_state_codes):
-                following_panel_items.append({"type": "state", "state": sc, "label": f"All Counties, {sc}", "url": url_for("map_view", state=sc)})
-            # Only show individual counties if their state is NOT fully followed
+                try:
+                    base = SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).filter(SpeedReport.state.ilike(f"{sc}%"))
+                    c7 = base.filter(SpeedReport.created_at >= d7).count()
+                    c30 = base.filter(SpeedReport.created_at >= d30).count()
+                    c365 = base.filter(SpeedReport.created_at >= d365).count()
+                    ovrs = [r.ticketed_speed - r.posted_speed for r in base.filter(SpeedReport.created_at >= d365).all() if r.ticketed_speed and r.posted_speed]
+                    ovr = f"+{int(median(ovrs))}mph" if ovrs else "—"
+                except Exception:
+                    c7 = c30 = c365 = 0
+                    ovr = "—"
+                following_panel_items.append({"type": "state", "state": sc, "label": f"All Counties, {sc}", "url": url_for("map_view", state=sc), "c7": c7, "c30": c30, "c365": c365, "ovr": ovr})
+
             for geoid in sorted(followed_county_geoids):
                 try:
                     row = db.session.execute(
@@ -3832,11 +3847,38 @@ GROUP BY UPPER(TRIM(stusps));
                     if row:
                         st = (row.get("stusps") or "").strip()
                         if st in followed_state_codes:
-                            continue  # Skip: state is already fully followed
+                            continue
                         label = row.get("namelsad") or geoid
-                        following_panel_items.append({"type": "county", "state": st, "label": f"{label}, {st}", "url": url_for("map_view", county=geoid)})
+                        base = SpeedReport.query.filter(SpeedReport.is_deleted.is_(False)).filter(SpeedReport.county_geoid == geoid)
+                        c7 = base.filter(SpeedReport.created_at >= d7).count()
+                        c30 = base.filter(SpeedReport.created_at >= d30).count()
+                        c365 = base.filter(SpeedReport.created_at >= d365).count()
+                        ovrs = [r.ticketed_speed - r.posted_speed for r in base.filter(SpeedReport.created_at >= d365).all() if r.ticketed_speed and r.posted_speed]
+                        ovr = f"+{int(median(ovrs))}mph" if ovrs else "—"
+                        following_panel_items.append({"type": "county", "state": st, "label": f"{label}, {st}", "url": url_for("map_view", county=geoid), "c7": c7, "c30": c30, "c365": c365, "ovr": ovr})
                 except Exception:
                     pass
+        except Exception:
+            pass
+
+        # Recent users: last 5 unique users who posted in the feed
+        recent_users = []
+        try:
+            seen_uids = set()
+            for r in reports:
+                if len(recent_users) >= 5:
+                    break
+                uid = getattr(r, "user_id", None)
+                if not uid or uid in seen_uids:
+                    continue
+                seen_uids.add(uid)
+                u = db.session.get(User, uid)
+                if not u:
+                    continue
+                car = ""
+                parts = [str(u.car_year) if u.car_year else "", u.car_make or "", u.car_model or ""]
+                car = " ".join(p for p in parts if p).strip()
+                recent_users.append({"username": u.username, "car": car, "user": u})
         except Exception:
             pass
 
@@ -3888,6 +3930,7 @@ GROUP BY UPPER(TRIM(stusps));
             feed_is_following=feed_is_following,
             has_follows=bool(followed_state_codes or followed_county_geoids),
             following_panel_items=following_panel_items,
+            recent_users=recent_users,
             is_admin=is_admin,
             show_deleted=show_deleted,
             deleted_mode=deleted_mode,

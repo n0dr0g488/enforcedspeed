@@ -174,7 +174,7 @@ from state_bounds import get_bounds_for_state
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
 
-from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, Response, session
 from werkzeug.exceptions import RequestEntityTooLarge
 from flask_login import LoginManager, login_user, logout_user, current_user, login_required
 from sqlalchemy import text, func, case, tuple_, or_, and_, bindparam
@@ -3125,34 +3125,43 @@ GROUP BY UPPER(TRIM(stusps));
         if filter_county_geoid:
             q = q.filter(SpeedReport.county_geoid == filter_county_geoid)
 
-        # Following filter: when logged in with follows and no explicit state/county filter,
-        # restrict feed to followed states and counties. If user follows nothing, show everything.
-        feed_is_following = False
+        # Following filter: restrict feed to followed states/counties.
+        # Logged-in: read from DB. Anonymous: read from session.
+        # If no follows, show empty feed (callout guides them to follow).
+        feed_is_following = True
         followed_state_codes = set()
         followed_county_geoids = set()
-        if current_user.is_authenticated and not filter_state and not filter_county_geoid:
-            try:
-                FollowedState.__table__.create(db.engine, checkfirst=True)
-                fs_rows = db.session.query(FollowedState.state_code).filter(
-                    FollowedState.user_id == current_user.id
-                ).all()
-                followed_state_codes = {r[0] for r in fs_rows if r[0]}
 
-                fc_rows = db.session.query(FollowedCounty.county_geoid).filter(
-                    FollowedCounty.user_id == current_user.id
-                ).all()
-                followed_county_geoids = {r[0] for r in fc_rows if r[0]}
-            except Exception:
-                pass
+        if not filter_state and not filter_county_geoid:
+            if current_user.is_authenticated:
+                try:
+                    FollowedState.__table__.create(db.engine, checkfirst=True)
+                    fs_rows = db.session.query(FollowedState.state_code).filter(
+                        FollowedState.user_id == current_user.id
+                    ).all()
+                    followed_state_codes = {r[0] for r in fs_rows if r[0]}
+
+                    fc_rows = db.session.query(FollowedCounty.county_geoid).filter(
+                        FollowedCounty.user_id == current_user.id
+                    ).all()
+                    followed_county_geoids = {r[0] for r in fc_rows if r[0]}
+                except Exception:
+                    pass
+            else:
+                # Anonymous: read from session
+                followed_state_codes = set(session.get("followed_states", []))
+                followed_county_geoids = set(session.get("followed_counties", []))
 
             if followed_state_codes or followed_county_geoids:
-                feed_is_following = True
                 follow_conds = []
                 for sc in followed_state_codes:
                     follow_conds.append(SpeedReport.state.ilike(f"{sc}%"))
                 for cg in followed_county_geoids:
                     follow_conds.append(SpeedReport.county_geoid == cg)
                 q = q.filter(or_(*follow_conds))
+            else:
+                # No follows: return empty feed
+                q = q.filter(db.literal(False))
 
         # Viewport filter
 
@@ -3854,6 +3863,7 @@ GROUP BY UPPER(TRIM(stusps));
             followed_counties=followed_counties,
             followed_geoids=followed_geoids,
             feed_is_following=feed_is_following,
+            has_follows=bool(followed_state_codes or followed_county_geoids),
             is_admin=is_admin,
             show_deleted=show_deleted,
             deleted_mode=deleted_mode,
@@ -3871,7 +3881,7 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             pass
 
-        # Get followed states
+        # Get followed states and counties
         followed_state_rows = []
         followed_county_rows = []
         if current_user.is_authenticated:
@@ -3889,40 +3899,72 @@ GROUP BY UPPER(TRIM(stusps));
                 .all()
             )
 
-        # Build unified list: each item is {state, label, type, id, geoid/state_code}
+        # Build unified list: each item is {display, type, state_code/county_geoid}
         items = []
 
-        for fs in followed_state_rows:
-            items.append({
-                "display": f"{fs.state_code}, all counties",
-                "state_sort": fs.state_code,
-                "label_sort": "",
-                "type": "state",
-                "state_code": fs.state_code,
-                "id": fs.id,
-            })
+        if current_user.is_authenticated:
+            for fs in followed_state_rows:
+                items.append({
+                    "display": f"{fs.state_code}, all counties",
+                    "state_sort": fs.state_code,
+                    "label_sort": "",
+                    "type": "state",
+                    "state_code": fs.state_code,
+                    "id": fs.id,
+                })
 
-        for fc in followed_county_rows:
-            label = fc.county_geoid
-            st = ""
-            try:
-                row = db.session.execute(
-                    text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
-                    {"g": fc.county_geoid},
-                ).mappings().first()
-                if row:
-                    label = row.get("namelsad") or label
-                    st = row.get("stusps") or ""
-            except Exception:
-                pass
-            items.append({
-                "display": f"{st}, {label}" if st else label,
-                "state_sort": st,
-                "label_sort": label,
-                "type": "county",
-                "county_geoid": fc.county_geoid,
-                "id": fc.id,
-            })
+            for fc in followed_county_rows:
+                label = fc.county_geoid
+                st = ""
+                try:
+                    row = db.session.execute(
+                        text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                        {"g": fc.county_geoid},
+                    ).mappings().first()
+                    if row:
+                        label = row.get("namelsad") or label
+                        st = row.get("stusps") or ""
+                except Exception:
+                    pass
+                items.append({
+                    "display": f"{st}, {label}" if st else label,
+                    "state_sort": st,
+                    "label_sort": label,
+                    "type": "county",
+                    "county_geoid": fc.county_geoid,
+                    "id": fc.id,
+                })
+        else:
+            # Anonymous: read from session
+            for sc in session.get("followed_states", []):
+                items.append({
+                    "display": f"{sc}, all counties",
+                    "state_sort": sc,
+                    "label_sort": "",
+                    "type": "state",
+                    "state_code": sc,
+                })
+
+            for geoid in session.get("followed_counties", []):
+                label = geoid
+                st = ""
+                try:
+                    row = db.session.execute(
+                        text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                        {"g": geoid},
+                    ).mappings().first()
+                    if row:
+                        label = row.get("namelsad") or label
+                        st = row.get("stusps") or ""
+                except Exception:
+                    pass
+                items.append({
+                    "display": f"{st}, {label}" if st else label,
+                    "state_sort": st,
+                    "label_sort": label,
+                    "type": "county",
+                    "county_geoid": geoid,
+                })
 
         # Sort alphabetically: state first, then label within state
         items.sort(key=lambda x: (x["state_sort"].lower(), x["label_sort"].lower()))
@@ -3944,79 +3986,105 @@ GROUP BY UPPER(TRIM(stusps));
         )
 
     @app.route("/following/add_state", methods=["POST"])
-    @login_required
     def following_add_state():
-        """Follow a state."""
+        """Follow a state (DB for logged-in, session for anonymous)."""
         state_code = (request.form.get("state_code") or "").strip().upper()
         if not state_code or len(state_code) != 2:
             flash("Invalid state.", "error")
             return redirect(url_for("following"))
 
-        try:
-            FollowedState.__table__.create(db.engine, checkfirst=True)
-            existing = (
-                FollowedState.query
-                .filter(FollowedState.user_id == current_user.id)
-                .filter(FollowedState.state_code == state_code)
-                .first()
-            )
-            if not existing:
-                db.session.add(FollowedState(user_id=current_user.id, state_code=state_code))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
+        if current_user.is_authenticated:
+            try:
+                FollowedState.__table__.create(db.engine, checkfirst=True)
+                existing = (
+                    FollowedState.query
+                    .filter(FollowedState.user_id == current_user.id)
+                    .filter(FollowedState.state_code == state_code)
+                    .first()
+                )
+                if not existing:
+                    db.session.add(FollowedState(user_id=current_user.id, state_code=state_code))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+        else:
+            states = session.get("followed_states", [])
+            if state_code not in states:
+                states.append(state_code)
+                session["followed_states"] = states
 
         return redirect(url_for("following"))
 
     @app.route("/following/add_county", methods=["POST"])
-    @login_required
     def following_add_county():
-        """Follow a county."""
+        """Follow a county (DB for logged-in, session for anonymous)."""
         geoid = (request.form.get("county_geoid") or "").strip()
         if not geoid:
             flash("Invalid county.", "error")
             return redirect(url_for("following"))
 
-        try:
-            FollowedCounty.__table__.create(db.engine, checkfirst=True)
-            existing = (
-                FollowedCounty.query
-                .filter(FollowedCounty.user_id == current_user.id)
-                .filter(FollowedCounty.county_geoid == geoid)
-                .first()
-            )
-            if not existing:
-                db.session.add(FollowedCounty(user_id=current_user.id, county_geoid=geoid))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
+        if current_user.is_authenticated:
+            try:
+                FollowedCounty.__table__.create(db.engine, checkfirst=True)
+                existing = (
+                    FollowedCounty.query
+                    .filter(FollowedCounty.user_id == current_user.id)
+                    .filter(FollowedCounty.county_geoid == geoid)
+                    .first()
+                )
+                if not existing:
+                    db.session.add(FollowedCounty(user_id=current_user.id, county_geoid=geoid))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+        else:
+            counties = session.get("followed_counties", [])
+            if geoid not in counties:
+                counties.append(geoid)
+                session["followed_counties"] = counties
 
         return redirect(url_for("following"))
 
-    @app.route("/following/unfollow_state/<int:follow_id>", methods=["POST"])
-    @login_required
-    def unfollow_state(follow_id):
+    @app.route("/following/unfollow_state/<state_code>", methods=["POST"])
+    def unfollow_state(state_code):
         """Unfollow a state."""
-        try:
-            fs = FollowedState.query.filter(FollowedState.id == follow_id, FollowedState.user_id == current_user.id).first()
-            if fs:
-                db.session.delete(fs)
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
+        if current_user.is_authenticated:
+            try:
+                fs = FollowedState.query.filter(
+                    FollowedState.state_code == state_code,
+                    FollowedState.user_id == current_user.id
+                ).first()
+                if fs:
+                    db.session.delete(fs)
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+        else:
+            states = session.get("followed_states", [])
+            if state_code in states:
+                states.remove(state_code)
+                session["followed_states"] = states
         return redirect(url_for("following"))
 
-    @app.route("/following/unfollow_county/<int:follow_id>", methods=["POST"])
-    @login_required
-    def unfollow_county(follow_id):
+    @app.route("/following/unfollow_county/<county_geoid>", methods=["POST"])
+    def unfollow_county(county_geoid):
         """Unfollow a county."""
-        try:
-            fc = FollowedCounty.query.filter(FollowedCounty.id == follow_id, FollowedCounty.user_id == current_user.id).first()
-            if fc:
-                db.session.delete(fc)
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
+        if current_user.is_authenticated:
+            try:
+                fc = FollowedCounty.query.filter(
+                    FollowedCounty.county_geoid == county_geoid,
+                    FollowedCounty.user_id == current_user.id
+                ).first()
+                if fc:
+                    db.session.delete(fc)
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+        else:
+            counties = session.get("followed_counties", [])
+            if county_geoid in counties:
+                counties.remove(county_geoid)
+                session["followed_counties"] = counties
         return redirect(url_for("following"))
 
 

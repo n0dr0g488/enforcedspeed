@@ -48,7 +48,7 @@
 <div class="home-shell">
 
     {# Left sidebar: sticky filters (desktop). Collapses behind button on mobile. #}
-    <aside class="home-left" id="homeFiltersSidebar">
+    <aside class="home-left" id="homeFiltersSidebar" style="display:none !important;">
       <div class="filters-rail">
         <div class="filters-scroll">
         <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
@@ -257,7 +257,7 @@
       </button>
 
       {# Mobile-only toggle button for the filter sidebar #}
-      <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Filters</button>
+      <button type="button" class="home-filters-toggle" id="homeFiltersToggle" style="display:none !important;">Filters</button>
 
       {# Feed starts immediately below. #}
 

@@ -4122,8 +4122,20 @@ GROUP BY UPPER(TRIM(stusps));
         focus_state = (request.args.get("focus_state") or "").strip().upper()
 
         # Auto-detect state from IP when no state/county is selected
+        # Priority: 1) last map view (session), 2) IP geolocation, 3) show overlay
         if not filter_state and not focus_state and not filter_county_geoid:
-            # Check session cache first (None = not tried yet, "" = tried but failed)
+            # Check if user has a remembered map view
+            last_map = session.get("_map_last")
+            if last_map:
+                args = request.args.to_dict()
+                if last_map.get("county"):
+                    args["county"] = last_map["county"]
+                elif last_map.get("state"):
+                    args["state"] = last_map["state"]
+                if "county" in args or "state" in args:
+                    return redirect(url_for("map_view", **args))
+
+            # Fall back to IP geolocation
             cached = session.get("_geo_state")
             if cached is None:
                 detected = _geolocate_state_from_ip()
@@ -4134,6 +4146,14 @@ GROUP BY UPPER(TRIM(stusps));
                 args = request.args.to_dict()
                 args["state"] = detected
                 return redirect(url_for("map_view", **args))
+
+        # Remember this map view for next time
+        if filter_county_geoid:
+            session["_map_last"] = {"county": filter_county_geoid}
+        elif filter_state:
+            session["_map_last"] = {"state": filter_state}
+        elif focus_state:
+            session["_map_last"] = {"state": focus_state}
 
         hide_anon_requested = (request.args.get("hide_anon") == "1")
         if hide_anon_requested and not current_user.is_authenticated:

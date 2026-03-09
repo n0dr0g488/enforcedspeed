@@ -33,8 +33,10 @@
          This intentionally allows "empty" background space between the left rail and the centered feed on wide screens. */
       .home-shell{
         position:relative;
-        padding: 20px 20px;
+        padding: 0 20px 20px;
       }
+      /* First card in feed: no extra gap since shell has no top padding */
+      .home-center > .onboarding-callout:first-child{ margin-top:16px; }
 
       /* Keep the feed/cards in a constrained, centered column. */
       .home-center{
@@ -245,7 +247,7 @@
 
       /* When the viewport is too narrow for a pinned rail + centered feed, collapse the rail into the mobile toggle. */
       @media (max-width: 1100px){
-        .home-shell{ padding: 16px 16px; }
+        .home-shell{ padding: 0 16px 16px; }
         .home-left{ position: static; width: auto; max-height: none; overflow: visible; bottom: auto; }
         .filters-rail{ height:auto; overflow:visible; }
         .filters-scroll{ overflow:visible; padding-right:0; }

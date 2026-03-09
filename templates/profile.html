@@ -43,6 +43,12 @@
     gap:6px;
   }
   .avatar-btn-row{ display:flex; gap:6px; align-items:center; margin-top:12px; }
+  .avatar-btn-row .prof-btn{
+    height:34px; line-height:34px; padding:0 14px;
+    box-sizing:border-box; vertical-align:middle;
+    display:inline-flex; align-items:center; justify-content:center;
+    margin:0;
+  }
   .es-avatar-choice{
     padding:0; border:2px solid transparent; border-radius:999px;
     background:transparent; cursor:pointer;
@@ -168,7 +174,7 @@
 
         {# Button row: all buttons inline #}
         <div class="avatar-btn-row">
-          <label class="prof-btn" for="esPhotoInput" style="cursor:pointer;">Upload photo</label>
+          <button type="button" class="prof-btn" id="uploadPhotoBtn">Upload photo</button>
           <input id="esPhotoInput" type="file" accept="image/*" style="display:none;">
           <button type="button" class="prof-btn prof-btn-primary" id="avatarSaveBtn" style="display:none;">Save</button>
           <button type="button" class="prof-btn" id="avatarCancelBtn" style="display:none;">Cancel</button>
@@ -352,10 +358,15 @@
 
   // Photo upload: preview locally first, upload on Save
   var photoInput = document.getElementById('esPhotoInput');
+  var uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
   var photoMsg = document.getElementById('esPhotoMsg');
   var removeBtn = document.getElementById('esPhotoRemoveBtn');
   var pendingPhotoFile = null;
   function setMsg(t){ if(photoMsg) photoMsg.textContent = t || ''; }
+
+  if(uploadPhotoBtn && photoInput){
+    uploadPhotoBtn.addEventListener('click', function(){ photoInput.click(); });
+  }
 
   if(photoInput){
     photoInput.addEventListener('change', function(){

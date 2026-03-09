@@ -3,7 +3,7 @@
 
 {% block content %}
 <style>
-  .following-page{ max-width:720px; margin:0 auto; padding:8px 16px 60px; }
+  .following-page{ max-width:720px; margin:0 auto; padding:12px 16px 60px; }
 
   .following-section{ margin-bottom:18px; }
   .following-add-title{ font-size:13px; font-weight:600; color:#374151; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.5px; }
@@ -77,6 +77,19 @@
             <button type="submit">Follow</button>
           </div>
         </form>
+        {% set county_items = items | selectattr('type', 'equalto', 'county') | list %}
+        {% if county_items %}
+          <div class="following-list-inline" style="margin-top:10px;">
+            {% for item in county_items %}
+              <div class="following-item">
+                <span class="following-item-label">{{ item.display }}</span>
+                <form method="post" action="{{ url_for('unfollow_county', county_geoid=item.county_geoid) }}">
+                  <button type="submit">Unfollow</button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
       </div>
 
       {# Add all counties in a state #}
@@ -93,36 +106,20 @@
             <button type="submit">Follow</button>
           </div>
         </form>
-      </div>
-
-      <div class="following-divider"></div>
-
-      {# Current following list #}
-      <div class="following-add-title">Your list</div>
-      {% if items %}
-        <div class="following-list-inline">
-          {% for item in items %}
-            <div class="following-item">
-              <span class="following-item-label">{{ item.display }}</span>
-              {% if item.type == 'state' %}
+        {% set state_items = items | selectattr('type', 'equalto', 'state') | list %}
+        {% if state_items %}
+          <div class="following-list-inline" style="margin-top:10px;">
+            {% for item in state_items %}
+              <div class="following-item">
+                <span class="following-item-label">{{ item.display }}</span>
                 <form method="post" action="{{ url_for('unfollow_state', state_code=item.state_code) }}">
                   <button type="submit">Unfollow</button>
                 </form>
-              {% else %}
-                <form method="post" action="{{ url_for('unfollow_county', county_geoid=item.county_geoid) }}">
-                  <button type="submit">Unfollow</button>
-                </form>
-              {% endif %}
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="following-empty">
-          <div class="following-empty-icon">★</div>
-          You're not following any states or counties yet.<br>
-          Add some above to populate your feed.
-        </div>
-      {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
 
       {% if not current_user.is_authenticated %}
         <div class="following-save-prompt">
@@ -134,10 +131,30 @@
         </div>
       {% endif %}
 
-      <div style="display:flex; gap:8px; margin-top:18px;">
-        <button type="button" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #1877f2; background:#1877f2; color:#fff;" onclick="history.back()">Done</button>
-        <button type="button" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #d1d5db; background:#fff; color:#374151;" onclick="history.back()">Cancel</button>
+      <div style="display:flex; gap:8px; margin-top:18px; justify-content:flex-end;">
+        <button type="button" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #d1d5db; background:#fff; color:#374151;" id="followingCancelBtn">Cancel</button>
+        <button type="button" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #1877f2; background:#1877f2; color:#fff;" id="followingDoneBtn">Done</button>
       </div>
+
+      <script>
+        (function(){
+          var doneBtn = document.getElementById('followingDoneBtn');
+          var cancelBtn = document.getElementById('followingCancelBtn');
+          var referrer = document.referrer || '/';
+
+          function goBack(){
+            // Navigate with a full page load so the feed refreshes
+            if(referrer && referrer.indexOf(window.location.origin) === 0 && referrer !== window.location.href){
+              window.location.href = referrer;
+            } else {
+              window.location.href = '/';
+            }
+          }
+
+          if(doneBtn) doneBtn.addEventListener('click', goBack);
+          if(cancelBtn) cancelBtn.addEventListener('click', goBack);
+        })();
+      </script>
 
     </div>
   </div>

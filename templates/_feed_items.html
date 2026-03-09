@@ -112,11 +112,11 @@
 {% set _pin_lat = r.lat if r.location_source in ['user_pin','user_pin_snapped','route_class:interstate','route_class:numbered','route_class:local','prefer_highway','nearest'] else None %}
 {% set _pin_lng = r.lng if _pin_lat is not none else None %}
 {% set _pinmode = False %}
-{% set _ccz = county_center_zoom(r.county_geoid, 640, 640) if (_pin_lat is not none) else (None, None, None) %}
+{% set _ccz = county_center_zoom(r.county_geoid, 590, 590) if (_pin_lat is not none) else (None, None, None) %}
 {# IMPORTANT (v370): Route ticket-card static maps through our own proxy endpoint so the
    Google Static Maps API key is never exposed to browsers (avoids referrer differences across browsers)
    and lets us cache responses server-side. #}
-{% set _sm = url_for('api_county_staticmap', geoid=r.county_geoid, pin_lat=_pin_lat, pin_lng=_pin_lng, center_on_pin=('1' if _pinmode else '0'), w=640, h=640, ctx='1', report_id=r.id) %}
+{% set _sm = url_for('api_county_staticmap', geoid=r.county_geoid, pin_lat=_pin_lat, pin_lng=_pin_lng, center_on_pin=('1' if _pinmode else '0'), w=590, h=590, ctx='1', report_id=r.id) %}
 {% if _sm %}
 
   <div class="ticket-staticmap-frame">
@@ -136,10 +136,10 @@
     {% set map_focus_url = county_focus_url or state_focus_url %}
     {% if map_focus_url %}
       <a class="ticket-staticmap-link" href="{{ map_focus_url }}">
-        <img class="ticket-staticmap" loading="lazy" width="640" height="640" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="{{ _sm }}"{% if _ccz[0] is not none %} data-map-clat="{{ _ccz[0] }}" data-map-clng="{{ _ccz[1] }}" data-map-zoom="{{ _ccz[2] }}"{% endif %} alt="Map preview">
+        <img class="ticket-staticmap" loading="lazy" width="590" height="590" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="{{ _sm }}"{% if _ccz[0] is not none %} data-map-clat="{{ _ccz[0] }}" data-map-clng="{{ _ccz[1] }}" data-map-zoom="{{ _ccz[2] }}"{% endif %} alt="Map preview">
       </a>
     {% else %}
-      <img class="ticket-staticmap" loading="lazy" width="640" height="640" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="{{ _sm }}"{% if _ccz[0] is not none %} data-map-clat="{{ _ccz[0] }}" data-map-clng="{{ _ccz[1] }}" data-map-zoom="{{ _ccz[2] }}"{% endif %} alt="Map preview">
+      <img class="ticket-staticmap" loading="lazy" width="590" height="590" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="{{ _sm }}"{% if _ccz[0] is not none %} data-map-clat="{{ _ccz[0] }}" data-map-clng="{{ _ccz[1] }}" data-map-zoom="{{ _ccz[2] }}"{% endif %} alt="Map preview">
     {% endif %}
   </div>
   </div>

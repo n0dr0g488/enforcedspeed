@@ -577,7 +577,7 @@
       var cLng = parseFloat(img.dataset.mapClng);
       var zoom = parseInt(img.dataset.mapZoom);
       if(isNaN(cLat)||isNaN(cLng)||isNaN(zoom)) return null;
-      var imgW = 640, imgH = 640;
+      var imgW = 590, imgH = 590;
       var wrap = img.closest('.ticket-staticmap-wrap');
       var dispW = (wrap ? wrap.offsetWidth : 0) || img.offsetWidth || img.clientWidth || imgW;
       var dispH = (wrap ? wrap.offsetHeight : 0) || img.offsetHeight || img.clientHeight || imgH;

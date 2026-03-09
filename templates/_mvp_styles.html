@@ -38,9 +38,13 @@
 
       /* Keep the feed/cards in a constrained, centered column. */
       .home-center{
-        max-width: 662px;
+        max-width: 720px;
         margin: 0 auto;
         min-width: 0;
+      }
+      /* Home feed cards slightly narrower for compact feel */
+      .home-shell:not(.map-shell) .home-center{
+        max-width: 662px;
       }
 
       /* Left rail: pinned to viewport left; does NOT affect feed centering. */

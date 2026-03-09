@@ -47,129 +47,48 @@
 
 <div class="home-shell">
 
-    {# Left sidebar: sticky filters (desktop). Collapses behind button on mobile. #}
-    <aside class="home-left" id="homeFiltersSidebar" style="display:none !important;">
+    {# Left sidebar: Following panel (desktop). Collapses behind button on mobile. #}
+    <aside class="home-left" id="homeFiltersSidebar">
       <div class="filters-rail">
-        <div class="filters-scroll">
-        <form method="get" action="{{ url_for('home') }}" class="filterbar" id="feedFilters">
-          <div class="filterbox">
-            <div class="filterbox-title">Filter Speeding Tickets</div>
-            <div class="filterbar-row filterbar-row--stack">
+        <div class="filters-scroll" style="padding-right:0;">
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-state">State</label>
-                <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
-                  <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
-                  {% for opt in state_filter_options %}
-                    <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-county">County</label>
-                <div class="filter-autocomplete-wrap">
-                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
-                  <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
-                  <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
-                </div>
-              </div>
-
-<div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-<div class="filterbar-item filterbar-item--tight">
-  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
-    <label class="switch">
-      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
-      <span class="slider"></span>
-    </label>
-  </div>
-</div>
-
-
-
-              <div class="filterbar-item">
-  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
-  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
-    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
-    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
-    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
-    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
-  </select>
-</div>
-
-              <div class="filterbar-item">
-  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
-  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
-    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
-    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
-    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
-    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
-  </select>
-</div>
-              
-              
-
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-date">Date</label>
-                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
-                  {% for o in date_options %}
-                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="filterbar-item" style="display:none;">
-                <label class="filterbar-label" for="filter-sort">Sort by</label>
-                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
-                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
-                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
-                  <option value="most_over" {% if filter_sort in ['most_over', 'least_strict'] %}selected{% endif %}>Highest overage</option>
-                  <option value="least_over" {% if filter_sort in ['least_over', 'most_strict'] %}selected{% endif %}>Lowest overage</option>
-</select>
-              </div>
-
-              
-
-<div class="filterbar-item filterbar-item--tight">
-{% if is_admin %}
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
-                  <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
-                    <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
-                    <option value="include" {% if deleted_mode == 'include' %}selected{% endif %}>Include</option>
-                    <option value="only" {% if deleted_mode == 'only' %}selected{% endif %}>Only</option>
-                  </select>
-                </div>
-                {% endif %}
-              </div>
-
-<div class="filterbox-footer">
-                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('home', clear=1) }}">Clear</a>
-              </div>
-
-            </div>
+          <div style="padding:14px 14px 12px;">
+            <div style="font-weight:600; font-size:14px; color:#111827;">Following</div>
           </div>
 
-</form>
+          <div style="padding:0 14px;">
+            {% if following_panel_items and following_panel_items|length > 0 %}
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                {% for item in following_panel_items %}
+                  <a href="{{ item.url }}" style="display:block; padding:6px 8px; border-radius:6px; text-decoration:none; font-size:13px; font-weight:500; color:#374151; line-height:1.3; transition:background 0.1s;"
+                     onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
+                    {{ item.label }}
+                  </a>
+                {% endfor %}
+              </div>
+              <div style="margin-top:10px;">
+                <a href="{{ url_for('following') }}" style="font-size:12px; color:#1877f2; text-decoration:none; font-weight:500;">Edit following</a>
+              </div>
+            {% else %}
+              <div style="font-size:13px; color:#6b7280; line-height:1.4;">
+                You're not following any areas yet.
+              </div>
+              <div style="margin-top:8px;">
+                <a href="{{ url_for('following') }}" style="font-size:13px; color:#1877f2; text-decoration:none; font-weight:600;">Set up following</a>
+              </div>
+            {% endif %}
+          </div>
+
         </div>
 
         <div class="filters-footer">
           <div class="filters-footer-links">
-          <a href="{{ url_for('privacy') }}">Privacy</a>
-          <span class="dot">·</span>
-          <a href="{{ url_for('terms') }}">Terms</a>
-          <span class="dot">·</span>
-          <a href="{{ url_for('cookies') }}">Cookie Policy</a>
-        </div>
+            <a href="{{ url_for('privacy') }}">Privacy</a>
+            <span class="dot">·</span>
+            <a href="{{ url_for('terms') }}">Terms</a>
+            <span class="dot">·</span>
+            <a href="{{ url_for('cookies') }}">Cookie Policy</a>
+          </div>
           <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Mindra LLC</div>
         </div>
       </div>
@@ -257,7 +176,7 @@
       </button>
 
       {# Mobile-only toggle button for the filter sidebar #}
-      <button type="button" class="home-filters-toggle" id="homeFiltersToggle" style="display:none !important;">Filters</button>
+      <button type="button" class="home-filters-toggle" id="homeFiltersToggle">Following</button>
 
       {# Feed starts immediately below. #}
 
@@ -1240,46 +1159,6 @@ function startAutoLoad(){
 
         </div>
 
-        <div class="rail-section">
-  <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
-    <div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-weight:600;">Following counties</div>
-    </div>
-  </div>
-
-  <div style="margin-top:10px;">
-    <div style="display:flex; justify-content:flex-end; font-size:11px; color:#6b7280; gap:4px; padding:0 0;">
-      <span style="width:24px; text-align:right;">7d</span>
-      <span style="width:24px; text-align:right;">30d</span>
-      <span style="width:24px; text-align:right;">1y</span>
-      <span style="width:46px; text-align:right; line-height:1.05;"><span style="display:block; font-size:10px; font-weight:500; opacity:0.85;">Avg.</span><span style="display:block; font-size:11px; font-weight:600;">Overage</span></span>
-    </div>
-
-    {% if not current_user.is_authenticated %}
-      <div class="subtle" style="margin-top:8px;">Log in to follow counties.</div>
-    {% elif followed_counties and followed_counties|length > 0 %}
-      <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
-        {% for c in followed_counties %}
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
-              {{ c.label }}, {{ c.st }}
-            </a>
-
-            <div style="display:flex; align-items:center; gap:4px; font-size:12px; font-variant-numeric:tabular-nums;">
-              <span style="width:24px; text-align:right;">{{ c.c7 }}</span>
-              <span style="width:24px; text-align:right;">{{ c.c30 }}</span>
-              <span style="width:24px; text-align:right;">{{ c.c365 }}</span>
-              <span style="width:46px; text-align:right;">{{ c.ovr }}</span>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <div class="subtle" style="margin-top:8px;">You haven’t followed any counties yet.</div>
-    {% endif %}
-  </div>
-
-        </div>
       </div>
     </aside>
 

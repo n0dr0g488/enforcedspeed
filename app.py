@@ -3640,17 +3640,17 @@ GROUP BY UPPER(TRIM(stusps));
             chosen = []
             chosen_geoids = set()
             for s in scored:
-                if len(chosen) >= 10:
+                if len(chosen) >= 15:
                     break
                 geoid = s[2]
                 chosen.append((geoid, s[3], s[4], s[5]))
                 chosen_geoids.add(geoid)
 
             # Fallback: if not enough trending data, fill remaining slots with most recent counties.
-            if len(chosen) < 10:
+            if len(chosen) < 15:
                 recent.sort(key=lambda x: (x[0] is not None, x[0]), reverse=True)
                 for last_ts, geoid, c7, c30, c365 in recent:
-                    if len(chosen) >= 10:
+                    if len(chosen) >= 15:
                         break
                     if not geoid or geoid in chosen_geoids:
                         continue
@@ -3659,7 +3659,7 @@ GROUP BY UPPER(TRIM(stusps));
 
             # Fallback 2: if we *still* don't have enough, fill with top counties overall
             # (so the panel never looks empty).
-            if len(chosen) < 10:
+            if len(chosen) < 15:
                 top_rows = (
                     db.session.query(
                         SpeedReport.county_geoid.label("geoid"),
@@ -3674,7 +3674,7 @@ GROUP BY UPPER(TRIM(stusps));
                     .all()
                 )
                 for r2 in top_rows:
-                    if len(chosen) >= 10:
+                    if len(chosen) >= 15:
                         break
                     geoid2 = str(r2.geoid) if r2.geoid is not None else ""
                     if not geoid2 or geoid2 in chosen_geoids:
@@ -3817,6 +3817,29 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             clickwrap_server_accepted = False
 
+        # Build following panel items for left rail
+        following_panel_items = []
+        try:
+            for sc in sorted(followed_state_codes):
+                following_panel_items.append({"type": "state", "state": sc, "label": f"All Counties, {sc}", "url": url_for("map_view", state=sc)})
+            # Only show individual counties if their state is NOT fully followed
+            for geoid in sorted(followed_county_geoids):
+                try:
+                    row = db.session.execute(
+                        text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                        {"g": geoid},
+                    ).mappings().first()
+                    if row:
+                        st = (row.get("stusps") or "").strip()
+                        if st in followed_state_codes:
+                            continue  # Skip: state is already fully followed
+                        label = row.get("namelsad") or geoid
+                        following_panel_items.append({"type": "county", "state": st, "label": f"{label}, {st}", "url": url_for("map_view", county=geoid)})
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         return render_template(
 
             "home_feed.html",
@@ -3864,6 +3887,7 @@ GROUP BY UPPER(TRIM(stusps));
             followed_geoids=followed_geoids,
             feed_is_following=feed_is_following,
             has_follows=bool(followed_state_codes or followed_county_geoids),
+            following_panel_items=following_panel_items,
             is_admin=is_admin,
             show_deleted=show_deleted,
             deleted_mode=deleted_mode,

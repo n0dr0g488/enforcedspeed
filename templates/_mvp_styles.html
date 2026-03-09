@@ -1,7 +1,7 @@
 <style>
 
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f6f7f9; }
-      .wrap { max-width: 720px; margin: 20px auto; padding: 0 16px; }
+      .wrap { max-width: 720px; margin: 8px auto; padding: 0 16px; }
 
       /* Global legal notice banner (v179) */
       .global-legal-notice{
@@ -33,11 +33,8 @@
          This intentionally allows "empty" background space between the left rail and the centered feed on wide screens. */
       .home-shell{
         position:relative;
-        padding: 0 20px 20px;
+        padding: 8px 20px 20px;
       }
-      /* First card in feed: no extra gap since shell has no top padding */
-      .home-center > .onboarding-callout:first-child{ margin-top:16px; }
-
       /* Keep the feed/cards in a constrained, centered column. */
       .home-center{
         max-width: 720px;
@@ -247,7 +244,7 @@
 
       /* When the viewport is too narrow for a pinned rail + centered feed, collapse the rail into the mobile toggle. */
       @media (max-width: 1100px){
-        .home-shell{ padding: 0 16px 16px; }
+        .home-shell{ padding: 8px 16px 16px; }
         .home-left{ position: static; width: auto; max-height: none; overflow: visible; bottom: auto; }
         .filters-rail{ height:auto; overflow:visible; }
         .filters-scroll{ overflow:visible; padding-right:0; }

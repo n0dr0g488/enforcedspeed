@@ -3,7 +3,7 @@
 
 {% block content %}
 <style>
-  .following-page{ max-width:720px; margin:0 auto; padding:0 16px 60px; }
+  .following-page{ max-width:720px; margin:0 auto; padding:8px 16px 60px; }
 
   .following-section{ margin-bottom:18px; }
   .following-add-title{ font-size:13px; font-weight:600; color:#374151; margin:0 0 10px; text-transform:uppercase; letter-spacing:0.5px; }
@@ -133,6 +133,11 @@
           </span>
         </div>
       {% endif %}
+
+      <div style="display:flex; gap:8px; margin-top:18px;">
+        <button type="button" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #1877f2; background:#1877f2; color:#fff;" onclick="history.back()">Done</button>
+        <button type="button" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #d1d5db; background:#fff; color:#374151;" onclick="history.back()">Cancel</button>
+      </div>
 
     </div>
   </div>

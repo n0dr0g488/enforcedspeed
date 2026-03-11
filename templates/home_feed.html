@@ -117,6 +117,57 @@
             </div>
           </div>
 
+          {# Suggested nearby counties #}
+          {% if suggested_counties and suggested_counties|length > 0 %}
+          <div class="rail-section" id="suggestedCountiesSection">
+            <div style="font-weight:600;">Suggested for you</div>
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
+              {% for sc in suggested_counties %}
+                <div class="suggested-county-row" data-geoid="{{ sc.geoid }}" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="font-size:13px; font-weight:500; color:#374151; line-height:1.2; min-width:0;">{{ sc.label }}</span>
+                  <button type="button" class="suggested-follow-btn" data-geoid="{{ sc.geoid }}"
+                    style="flex-shrink:0; padding:3px 10px; font-size:11px; font-weight:600; border:1px solid #1877f2; background:#fff; color:#1877f2; border-radius:6px; cursor:pointer; transition:all 0.15s;">
+                    + Follow
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <script>
+          (function(){
+            document.querySelectorAll('.suggested-follow-btn').forEach(function(btn){
+              btn.addEventListener('click', function(){
+                var geoid = this.getAttribute('data-geoid');
+                var row = this.closest('.suggested-county-row');
+                var self = this;
+                self.textContent = '...';
+                self.disabled = true;
+                fetch('/api/following/quick_add', {
+                  method: 'POST',
+                  headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({geoid: geoid})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                  if(d.ok){
+                    self.textContent = '✓ Following';
+                    self.style.background = '#1877f2';
+                    self.style.color = '#fff';
+                    self.style.borderColor = '#1877f2';
+                    setTimeout(function(){ row.style.opacity = '0.5'; }, 600);
+                  } else {
+                    self.textContent = '+ Follow';
+                    self.disabled = false;
+                  }
+                }).catch(function(){
+                  self.textContent = '+ Follow';
+                  self.disabled = false;
+                });
+              });
+            });
+          })();
+          </script>
+          {% endif %}
+
         </div>
 
         <div class="filters-footer" style="padding:0 14px 12px;">
@@ -219,7 +270,7 @@
       {# Feed starts immediately below. #}
 
       {# Onboarding callout: show for logged-out users or logged-in with no follows #}
-      {% if not has_follows %}
+      {% if not has_follows or counties_auto_added %}
         <div class="onboarding-callout" id="onboardingCallout" style="display:none;">
           <div class="onboarding-callout-inner">
             <button type="button" class="onboarding-close" id="onboardingClose" aria-label="Dismiss">&times;</button>
@@ -227,6 +278,9 @@
             <div class="onboarding-text">
               <strong>Welcome to EnforcedSpeed!</strong><br>
               Follow states or counties to see speeding tickets in your feed.
+              {% if counties_auto_added %}
+                Nearby counties have been automatically added to your following list.
+              {% endif %}
             </div>
             <a class="onboarding-btn" href="{{ url_for('following') }}">Set up following</a>
           </div>

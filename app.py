@@ -2894,6 +2894,68 @@ GROUP BY UPPER(TRIM(stusps));
         """Legacy endpoint alias (older landing pages)."""
         return redirect(url_for("submit"))
 
+    def _geolocate_from_ip() -> dict:
+        """Detect user's location from IP. Returns {state, lat, lng, city} or empty dict."""
+        try:
+            ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
+            if not ip or ip.startswith("127.") or ip.startswith("10.") or ip.startswith("192.168."):
+                return {}
+            url = f"http://ip-api.com/json/{ip}?fields=status,countryCode,region,city,lat,lon"
+            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            if data.get("status") != "success" or data.get("countryCode") != "US":
+                return {}
+            region = (data.get("region") or "").strip().upper()
+            if not region or len(region) != 2:
+                return {}
+            return {
+                "state": region,
+                "lat": data.get("lat"),
+                "lng": data.get("lon"),
+                "city": data.get("city", ""),
+            }
+        except Exception:
+            return {}
+
+    def _geolocate_state_from_ip() -> str:
+        """Shortcut: just get the state code."""
+        geo = _geolocate_from_ip()
+        return geo.get("state", "")
+
+    def _find_nearest_counties(lat: float, lng: float, limit: int = 10, exclude_geoids: set = None) -> list:
+        """Find nearest counties to a lat/lng using PostGIS. Returns list of {geoid, name, state}."""
+        if lat is None or lng is None:
+            return []
+        exclude_geoids = exclude_geoids or set()
+        try:
+            point = f"ST_SetSRID(ST_MakePoint({float(lng)}, {float(lat)}), 4326)"
+            q = text(f"""
+                SELECT geoid, namelsad, stusps,
+                       ST_Distance(COALESCE(center, centroid)::geography, {point}::geography) AS dist_m
+                FROM counties
+                WHERE COALESCE(center, centroid) IS NOT NULL
+                ORDER BY COALESCE(center, centroid) <-> {point}
+                LIMIT :lim
+            """)
+            rows = db.session.execute(q, {"lim": limit + len(exclude_geoids)}).mappings().all()
+            results = []
+            for r in rows:
+                geoid = r.get("geoid", "")
+                if geoid in exclude_geoids:
+                    continue
+                results.append({
+                    "geoid": geoid,
+                    "name": r.get("namelsad") or geoid,
+                    "state": r.get("stusps") or "",
+                    "dist_m": r.get("dist_m", 0),
+                })
+                if len(results) >= limit:
+                    break
+            return results
+        except Exception:
+            return []
+
     @app.get("/")
     def home():
         filter_county_geoid, filter_county_label = _get_county_filter_from_request()
@@ -3126,11 +3188,12 @@ GROUP BY UPPER(TRIM(stusps));
             q = q.filter(SpeedReport.county_geoid == filter_county_geoid)
 
         # Following filter: restrict feed to followed states/counties.
-        # Logged-in: read from DB. Anonymous: read from session.
-        # If no follows, show empty feed (callout guides them to follow).
+        # If no follows, auto-detect 3 nearest counties from IP and add them.
         feed_is_following = True
         followed_state_codes = set()
         followed_county_geoids = set()
+        counties_auto_added = False
+        geo_data = None  # cached IP geolocation for suggestions
 
         if not filter_state and not filter_county_geoid:
             if current_user.is_authenticated:
@@ -3147,10 +3210,52 @@ GROUP BY UPPER(TRIM(stusps));
                     followed_county_geoids = {r[0] for r in fc_rows if r[0]}
                 except Exception:
                     pass
+
+                # Auto-add 3 nearest counties from IP if user has no follows
+                if not followed_state_codes and not followed_county_geoids:
+                    cached_geo = session.get("_geo_data")
+                    if cached_geo is None:
+                        cached_geo = _geolocate_from_ip()
+                        session["_geo_data"] = cached_geo
+                        session["_geo_state"] = cached_geo.get("state", "")
+                    geo_data = cached_geo
+                    if geo_data and geo_data.get("lat") and geo_data.get("lng"):
+                        nearest = _find_nearest_counties(geo_data["lat"], geo_data["lng"], limit=3)
+                        for nc in nearest:
+                            try:
+                                existing = FollowedCounty.query.filter(
+                                    FollowedCounty.user_id == current_user.id,
+                                    FollowedCounty.county_geoid == nc["geoid"]
+                                ).first()
+                                if not existing:
+                                    db.session.add(FollowedCounty(user_id=current_user.id, county_geoid=nc["geoid"]))
+                            except Exception:
+                                pass
+                        try:
+                            db.session.commit()
+                            followed_county_geoids = {nc["geoid"] for nc in nearest}
+                            counties_auto_added = True
+                        except Exception:
+                            db.session.rollback()
             else:
                 # Anonymous: read from session
                 followed_state_codes = set(session.get("followed_states", []))
                 followed_county_geoids = set(session.get("followed_counties", []))
+
+                # Auto-add 3 nearest counties from IP if anonymous user has no follows
+                if not followed_state_codes and not followed_county_geoids:
+                    cached_geo = session.get("_geo_data")
+                    if cached_geo is None:
+                        cached_geo = _geolocate_from_ip()
+                        session["_geo_data"] = cached_geo
+                        session["_geo_state"] = cached_geo.get("state", "")
+                    geo_data = cached_geo
+                    if geo_data and geo_data.get("lat") and geo_data.get("lng"):
+                        nearest = _find_nearest_counties(geo_data["lat"], geo_data["lng"], limit=3)
+                        counties_list = [nc["geoid"] for nc in nearest]
+                        session["followed_counties"] = counties_list
+                        followed_county_geoids = set(counties_list)
+                        counties_auto_added = True
 
             if followed_state_codes or followed_county_geoids:
                 follow_conds = []
@@ -3160,7 +3265,7 @@ GROUP BY UPPER(TRIM(stusps));
                     follow_conds.append(SpeedReport.county_geoid == cg)
                 q = q.filter(or_(*follow_conds))
             else:
-                # No follows: return empty feed
+                # No follows and no IP detection: return empty feed
                 q = q.filter(db.literal(False))
 
         # Viewport filter
@@ -3882,6 +3987,35 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             pass
 
+        # Suggested nearby counties (for left panel quick-add)
+        suggested_counties = []
+        try:
+            if not geo_data:
+                cached_geo = session.get("_geo_data")
+                if cached_geo is None:
+                    cached_geo = _geolocate_from_ip()
+                    session["_geo_data"] = cached_geo
+                    session["_geo_state"] = cached_geo.get("state", "")
+                geo_data = cached_geo
+            if geo_data and geo_data.get("lat") and geo_data.get("lng"):
+                # Get nearby counties excluding already-followed
+                nearby = _find_nearest_counties(
+                    geo_data["lat"], geo_data["lng"],
+                    limit=5,
+                    exclude_geoids=followed_county_geoids,
+                )
+                for nc in nearby:
+                    # Also exclude if county's state is fully followed
+                    if nc["state"] in followed_state_codes:
+                        continue
+                    suggested_counties.append({
+                        "geoid": nc["geoid"],
+                        "label": f"{nc['name']}, {nc['state']}",
+                        "state": nc["state"],
+                    })
+        except Exception:
+            pass
+
         return render_template(
 
             "home_feed.html",
@@ -3929,6 +4063,8 @@ GROUP BY UPPER(TRIM(stusps));
             followed_geoids=followed_geoids,
             feed_is_following=feed_is_following,
             has_follows=bool(followed_state_codes or followed_county_geoids),
+            counties_auto_added=counties_auto_added,
+            suggested_counties=suggested_counties,
             following_panel_items=following_panel_items,
             recent_users=recent_users,
             is_admin=is_admin,
@@ -4046,10 +4182,45 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             pass
 
+        # Suggested nearby counties
+        suggested_counties = []
+        try:
+            cached_geo = session.get("_geo_data")
+            if cached_geo is None:
+                cached_geo = _geolocate_from_ip()
+                session["_geo_data"] = cached_geo
+                session["_geo_state"] = cached_geo.get("state", "")
+            if cached_geo and cached_geo.get("lat") and cached_geo.get("lng"):
+                all_followed_geoids = set()
+                all_followed_states = set()
+                for item in items:
+                    if item["type"] == "county":
+                        all_followed_geoids.add(item.get("county_geoid", ""))
+                    elif item["type"] == "state":
+                        all_followed_states.add(item.get("state_code", ""))
+                nearby = _find_nearest_counties(
+                    cached_geo["lat"], cached_geo["lng"],
+                    limit=8,
+                    exclude_geoids=all_followed_geoids,
+                )
+                for nc in nearby:
+                    if nc["state"] in all_followed_states:
+                        continue
+                    suggested_counties.append({
+                        "geoid": nc["geoid"],
+                        "label": f"{nc['name']}, {nc['state']}",
+                        "state": nc["state"],
+                    })
+                    if len(suggested_counties) >= 5:
+                        break
+        except Exception:
+            pass
+
         return render_template(
             "following.html",
             items=items,
             state_options=state_options,
+            suggested_counties=suggested_counties,
         )
 
     @app.route("/following/add_state", methods=["POST"])
@@ -4112,6 +4283,34 @@ GROUP BY UPPER(TRIM(stusps));
 
         return redirect(url_for("following"))
 
+    @app.route("/api/following/quick_add", methods=["POST"])
+    def api_following_quick_add():
+        """Quick-add a county to following (JSON API for left panel)."""
+        geoid = (request.form.get("geoid") or request.json.get("geoid", "") if request.is_json else request.form.get("geoid", "")).strip()
+        if not geoid:
+            return jsonify({"ok": False}), 400
+
+        if current_user.is_authenticated:
+            try:
+                FollowedCounty.__table__.create(db.engine, checkfirst=True)
+                existing = FollowedCounty.query.filter(
+                    FollowedCounty.user_id == current_user.id,
+                    FollowedCounty.county_geoid == geoid
+                ).first()
+                if not existing:
+                    db.session.add(FollowedCounty(user_id=current_user.id, county_geoid=geoid))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+                return jsonify({"ok": False}), 500
+        else:
+            counties = session.get("followed_counties", [])
+            if geoid not in counties:
+                counties.append(geoid)
+                session["followed_counties"] = counties
+
+        return jsonify({"ok": True, "geoid": geoid})
+
     @app.route("/following/unfollow_state/<state_code>", methods=["POST"])
     def unfollow_state(state_code):
         """Unfollow a state."""
@@ -4154,32 +4353,6 @@ GROUP BY UPPER(TRIM(stusps));
                 session["followed_counties"] = counties
         return redirect(url_for("following"))
 
-
-    def _geolocate_state_from_ip() -> str:
-        """Try to determine the user's US state from their IP address.
-        Returns a 2-letter state code (e.g. 'VA') or empty string on failure.
-        Uses ip-api.com (free, no key, 45 req/min)."""
-        try:
-            # Get client IP (respect proxy headers)
-            ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
-            if not ip or ip.startswith("127.") or ip.startswith("10.") or ip.startswith("192.168."):
-                return ""
-
-            url = f"http://ip-api.com/json/{ip}?fields=status,countryCode,region"
-            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-
-            if data.get("status") != "success":
-                return ""
-            if data.get("countryCode") != "US":
-                return ""
-            region = (data.get("region") or "").strip().upper()
-            if region and len(region) == 2 and region.isalpha():
-                return region
-            return ""
-        except Exception:
-            return ""
 
     @app.get("/map")
     def map_view():

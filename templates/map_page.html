@@ -389,7 +389,7 @@
         <div class="stat-title">{% if region_title %}{{ region_title }}{% else %}Select a county or state{% endif %}</div>
 
         <div class="stat-row">
-          <div class="stat-k">Pins shown</div>
+          <div class="stat-k">Filtered</div>
           <div class="stat-v" id="esMapMeta">—</div>
         </div>
 
@@ -399,7 +399,7 @@
           <div class="stat-row"><div class="stat-k">Last 30 days</div><div class="stat-v">{{ region_stats.total_30 }}</div></div>
           <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ region_stats.total_365 }}</div></div>
 
-          <div style="margin-top:10px; font-weight:600;">Avg overage by posted speed</div>
+          <div style="margin-top:10px; font-weight:600;">Overage</div>
           <table class="speed-table" aria-label="Average overage by posted speed">
             <thead>
               <tr><th>Posted</th><th>Avg over</th></tr>
@@ -718,9 +718,9 @@ async function esLoadPins(opts) {
   const pins = data.pins || [];
   if (meta) {
     if (data.inside_count != null && ES_FOCUS && ES_FOCUS.type && ES_FOCUS.value) {
-      meta.textContent = String(data.inside_count) + ' in focus • ' + pins.length + ' pins shown (max 1500).';
+      meta.textContent = String(data.inside_count);
     } else {
-      meta.textContent = pins.length + ' pins shown (max 1500).';
+      meta.textContent = String(pins.length);
     }
   }
 

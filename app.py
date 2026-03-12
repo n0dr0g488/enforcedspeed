@@ -6416,12 +6416,17 @@ GROUP BY UPPER(TRIM(stusps));
             _avatar = ""
             _car = ""
             if _user:
+                # Avatar - must not fail silently
                 try:
                     _avatar = user_avatar_url(_user, "sm")
-                except Exception:
-                    pass
+                except Exception as _av_err:
+                    try:
+                        print(f"[MAP PIN AVATAR ERROR] user_id={_user.id} err={_av_err}")
+                    except Exception:
+                        pass
+                    _avatar = url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png")
                 _car_parts = [str(_user.car_year) if getattr(_user, "car_year", None) else "", getattr(_user, "car_make", "") or "", getattr(_user, "car_model", "") or ""]
-                _car = " ".join(p for p in _car_parts if p).strip()
+                _car = " ".join(pt for pt in _car_parts if pt).strip()
 
             _county_name = getattr(r, "county_name", "") or ""
 
@@ -6436,7 +6441,7 @@ GROUP BY UPPER(TRIM(stusps));
                     "ticketed": r.ticketed_speed,
                     "created_at": r.created_at.isoformat() if r.created_at else None,
                     "username": (_user.username if _user else None),
-                    "avatar": _avatar,
+                    "avatar": _avatar or url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png"),
                     "car": _car,
                     "county": _county_name,
                     "inside_focus": bool(inside_focus),

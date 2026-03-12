@@ -135,7 +135,7 @@
   .map-zoom-controls{
     position: absolute;
     right: 12px;
-    bottom: 12px;
+    bottom: 80px;
     z-index: 6;
     display: flex;
     flex-direction: column;
@@ -878,7 +878,7 @@ window.esInitMap = async function() {
     fullscreenControl: false,
     gestureHandling: "greedy",
   });
-  ES_INFO = new google.maps.InfoWindow({ maxWidth: 220 });
+  ES_INFO = new google.maps.InfoWindow({ maxWidth: 220, disableAutoPan: true });
 
   // Custom zoom controls (+ / -) that are always available (even without a mouse wheel)
   (function esWireZoomControls(){

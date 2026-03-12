@@ -4370,7 +4370,12 @@ GROUP BY UPPER(TRIM(stusps));
 
         # Auto-detect state from IP when no state/county is selected
         # Priority: 1) last map view (session), 2) IP geolocation, 3) show overlay
-        if not filter_state and not focus_state and not filter_county_geoid:
+        # Exception: view=all means user explicitly wants full USA view
+        explicit_all = (request.args.get("view") == "all")
+        if explicit_all:
+            session.pop("_map_last", None)
+
+        if not filter_state and not focus_state and not filter_county_geoid and not explicit_all:
             # Check if user has a remembered map view
             last_map = session.get("_map_last")
             if last_map:
@@ -4452,6 +4457,7 @@ GROUP BY UPPER(TRIM(stusps));
 
         # Options for filter rail (mirrors home).
         state_filter_options = []
+        state_name_by_abbr_map = {abbr: name for (abbr, name) in STATE_PAIRS}
         try:
             rows = db.session.query(SpeedReport.state).distinct().all()
         except Exception:
@@ -4470,7 +4476,7 @@ GROUP BY UPPER(TRIM(stusps));
             if code in seen:
                 continue
             seen.add(code)
-            state_filter_options.append({"code": code})
+            state_filter_options.append({"code": code, "name": state_name_by_abbr_map.get(code, "")})
         state_filter_options.sort(key=lambda d: d["code"])
 
         speed_limit_buckets = [

@@ -203,7 +203,7 @@
                     {% endif %}
                     <datalist id="state-datalist">
                       {% for opt in state_filter_options %}
-                        <option value="{{ opt.code }}">{{ opt.code }}</option>
+                        <option value="{{ opt.code }}">{{ opt.name }}</option>
                       {% endfor %}
                     </datalist>
                   </div>
@@ -1000,25 +1000,30 @@ window.esInitMap = async function() {
   }
 
   // State: on change, set hidden + submit
+  // Build a name-to-code map for resolving typed state names
+  var stateNameMap = {};
+  document.querySelectorAll('#state-datalist option').forEach(function(opt){
+    var code = opt.value.toUpperCase();
+    var name = (opt.textContent || opt.label || '').trim().toLowerCase();
+    stateNameMap[code] = code;
+    if(name) stateNameMap[name] = code;
+  });
+
   stateInput.addEventListener('change', function(){
-    var val = this.value.trim().toUpperCase();
-    // Check if it's a valid 2-letter code from the datalist
-    var opts = document.querySelectorAll('#state-datalist option');
-    var valid = false;
-    for(var i=0; i<opts.length; i++){
-      if(opts[i].value === val){ valid = true; break; }
-    }
-    if(valid){
-      stateHidden.value = val;
+    var raw = this.value.trim();
+    var val = raw.toUpperCase();
+    // Try direct code match, then name match
+    var resolved = stateNameMap[val] || stateNameMap[raw.toLowerCase()] || '';
+    if(resolved){
+      stateHidden.value = resolved;
+      stateInput.value = resolved;
       // Clear county when state changes
       if(countyGeoid) countyGeoid.value = '';
       if(countyInput) countyInput.value = '';
       form.submit();
-    } else if(!val){
-      stateHidden.value = '';
-      if(countyGeoid) countyGeoid.value = '';
-      if(countyInput) countyInput.value = '';
-      form.submit();
+    } else if(!raw){
+      // User cleared state — go to full USA view
+      window.location.href = '/map?view=all';
     }
   });
 
@@ -1033,11 +1038,8 @@ window.esInitMap = async function() {
   // State clear button
   if(stateClear){
     stateClear.addEventListener('click', function(){
-      stateInput.value = '';
-      stateHidden.value = '';
-      if(countyGeoid) countyGeoid.value = '';
-      if(countyInput) countyInput.value = '';
-      form.submit();
+      // Navigate to full USA view, bypassing auto-detect
+      window.location.href = '/map?view=all';
     });
   }
 

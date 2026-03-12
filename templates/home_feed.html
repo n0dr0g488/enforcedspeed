@@ -62,7 +62,7 @@
                 <span style="width:24px; text-align:right;">7d</span>
                 <span style="width:24px; text-align:right;">30d</span>
                 <span style="width:24px; text-align:right;">1y</span>
-                <span style="width:46px; text-align:right; line-height:1.05;"><span style="display:block; font-size:10px; font-weight:500; opacity:0.85;">Avg.</span><span style="display:block; font-size:11px; font-weight:600;">Overage</span></span>
+                <span style="width:50px; text-align:center; line-height:1.05; margin-left:4px;"><span style="display:block; font-size:11px; color:#6b7280;">Avg.</span><span style="display:block; font-size:11px; color:#6b7280;">Overage</span></span>
               </div>
 
               {% if following_panel_items and following_panel_items|length > 0 %}
@@ -76,7 +76,7 @@
                         <span style="width:24px; text-align:right;">{{ item.c7 }}</span>
                         <span style="width:24px; text-align:right;">{{ item.c30 }}</span>
                         <span style="width:24px; text-align:right;">{{ item.c365 }}</span>
-                        <span style="width:46px; text-align:right;">{{ item.ovr }}</span>
+                        <span style="width:50px; text-align:center; margin-left:4px;">{{ item.ovr }}</span>
                       </div>
                     </div>
                   {% endfor %}
@@ -1220,7 +1220,7 @@ function startAutoLoad(){
       <span style="width:24px; text-align:right;">7d</span>
       <span style="width:24px; text-align:right;">30d</span>
       <span style="width:24px; text-align:right;">1y</span>
-      <span style="width:46px; text-align:right; line-height:1.05;"><span style="display:block; font-size:10px; font-weight:500; opacity:0.85;">Avg.</span><span style="display:block; font-size:11px; font-weight:600;">Overage</span></span>
+      <span style="width:50px; text-align:center; line-height:1.05; margin-left:4px;"><span style="display:block; font-size:11px; color:#6b7280;">Avg.</span><span style="display:block; font-size:11px; color:#6b7280;">Overage</span></span>
     </div>
 
     {% if trending_counties and trending_counties|length > 0 %}
@@ -1235,7 +1235,7 @@ function startAutoLoad(){
               <span style="width:24px; text-align:right;">{{ c.c7 }}</span>
               <span style="width:24px; text-align:right;">{{ c.c30 }}</span>
               <span style="width:24px; text-align:right;">{{ c.c365 }}</span>
-              <span style="width:46px; text-align:right;">{{ c.ovr }}</span>
+              <span style="width:50px; text-align:center; margin-left:4px;">{{ c.ovr }}</span>
             </div>
           </div>
         {% endfor %}

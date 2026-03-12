@@ -171,13 +171,14 @@
   .map-right .mini-ticket .mini-title { font-weight: 600; margin: 0 0 4px 0; }
   .map-right .mini-ticket .mini-sub { font-size: 13px; opacity: .85; }
   .map-right .stat-card { padding: 12px; margin-top: 12px; }
-  .map-right .stat-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+  .map-right .stat-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-top: 1px solid #e5e7eb; }
   .map-right .stat-row:first-of-type { border-top: 0; }
   .map-right .stat-k { opacity: .8; }
   .map-right .stat-v { font-weight: 600; white-space: nowrap; }
   .map-right .stat-title { font-weight: 600; margin: 0 0 8px 0; }
+  .map-right .stat-section-divider { border-top: 1px solid #e5e7eb; margin-top: 10px; padding-top: 10px; }
   .map-right .speed-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-  .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+  .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid #e5e7eb; }
   .map-right .speed-table th { text-align: left; font-weight: 600; opacity: .85; }
   .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
 </style>
@@ -373,12 +374,33 @@
     <aside class="home-right map-right" aria-label="Selected ticket">
       <div class="card mini-ticket" id="esSelectedTicketCard">
         {% if selected_ticket %}
-          <div class="mini-title">{{ selected_ticket.road_name or 'Road' }}, {{ (selected_ticket.state or '')[:2] }}</div>
-          <div class="mini-sub">{{ selected_ticket.posted_speed }} → {{ selected_ticket.ticketed_speed }} mph
-            {% set _ov = (selected_ticket.ticketed_speed|int - selected_ticket.posted_speed|int) %}
-            <span style="opacity:.75;">(+{{ _ov }} mph)</span>
+          {% set _st = (selected_ticket.state or '')[:2] %}
+          {% set _ov = (selected_ticket.ticketed_speed|int - selected_ticket.posted_speed|int) %}
+          {% set _user = selected_ticket.user if selected_ticket.user_id else None %}
+          <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+            {% if _user %}
+              <img src="{{ user_avatar_url(_user, 'sm') }}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
+              <div style="min-width:0;">
+                <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">{{ _user.username }}</div>
+                <div style="font-size:11px; color:#6b7280; line-height:1.2;">{{ selected_ticket.created_at.strftime('%b %d, %Y') if selected_ticket.created_at else '' }}</div>
+              </div>
+            {% else %}
+              <div style="width:32px; height:32px; border-radius:999px; background:#e5e7eb; flex-shrink:0;"></div>
+              <div style="min-width:0;">
+                <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">Anonymous</div>
+                <div style="font-size:11px; color:#6b7280; line-height:1.2;">{{ selected_ticket.created_at.strftime('%b %d, %Y') if selected_ticket.created_at else '' }}</div>
+              </div>
+            {% endif %}
           </div>
-          <div class="mini-sub" style="margin-top:6px;"><a href="{{ url_for('result', report_id=selected_ticket.id) }}">View ticket</a></div>
+          <div style="font-size:13px; color:#374151; line-height:1.4;">
+            <div style="font-weight:600;">{{ selected_ticket.road_name or 'Road' }}</div>
+            <div style="color:#6b7280;">{{ _st }}{% if selected_ticket.county_name %} · {{ selected_ticket.county_name }}{% endif %}</div>
+          </div>
+          <div style="display:flex; gap:12px; margin-top:8px; font-size:13px;">
+            <div><span style="color:#6b7280;">Posted</span> <span style="font-weight:600;">{{ selected_ticket.posted_speed }} mph</span></div>
+            <div><span style="color:#6b7280;">Ticketed</span> <span style="font-weight:600;">{{ selected_ticket.ticketed_speed }} mph</span></div>
+            <div style="color:#dc2626; font-weight:600;">+{{ _ov }} mph</div>
+          </div>
         {% else %}
           <div class="mini-title">Select a pin</div>
           <div class="mini-sub">Click a pin on the map to see its ticket details here.</div>
@@ -399,7 +421,9 @@
           <div class="stat-row"><div class="stat-k">Last 30 days</div><div class="stat-v">{{ region_stats.total_30 }}</div></div>
           <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ region_stats.total_365 }}</div></div>
 
-          <div style="margin-top:10px; font-weight:600;">Overage</div>
+          <div class="stat-section-divider">
+            <div style="font-weight:600;">Overage</div>
+          </div>
           <table class="speed-table" aria-label="Average overage by posted speed">
             <thead>
               <tr><th>Posted</th><th>Avg over</th></tr>
@@ -542,12 +566,33 @@
     function esUpdateSelectedCard(p) {
       const el = document.getElementById('esSelectedTicketCard');
       if (!el || !p) return;
-      const title = `${p.road || 'Road'}, ${p.state || ''}`;
       const over = (Number(p.ticketed) - Number(p.posted));
+      const username = p.username || 'Anonymous';
+      const avatar = p.avatar || '';
+      const car = p.car || '';
+      const county = p.county || '';
+      const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
+      const avatarHtml = avatar
+        ? `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`
+        : `<div style="width:32px; height:32px; border-radius:999px; background:#e5e7eb; flex-shrink:0;"></div>`;
+      const carLine = car ? `<div style="font-size:11px; color:#9ca3af; line-height:1.2;">${car}</div>` : '';
       el.innerHTML = `
-        <div class="mini-title">${title}</div>
-        <div class="mini-sub">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over} mph)</span></div>
-        <div class="mini-sub" style="margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+          ${avatarHtml}
+          <div style="min-width:0;">
+            <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">${username}</div>
+            <div style="font-size:11px; color:#6b7280; line-height:1.2;">${dateStr}</div>
+          </div>
+        </div>
+        <div style="font-size:13px; color:#374151; line-height:1.4;">
+          <div style="font-weight:600;">${p.road || 'Road'}</div>
+          <div style="color:#6b7280;">${p.state || ''}${county ? ' · ' + county : ''}</div>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:8px; font-size:13px;">
+          <div><span style="color:#6b7280;">Posted</span> <span style="font-weight:600;">${p.posted} mph</span></div>
+          <div><span style="color:#6b7280;">Ticketed</span> <span style="font-weight:600;">${p.ticketed} mph</span></div>
+          <div style="color:#dc2626; font-weight:600;">+${over} mph</div>
+        </div>
       `;
     }
 

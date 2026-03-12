@@ -95,28 +95,6 @@
             </div>
           </div>
 
-          {# Recent users #}
-          <div class="rail-section">
-            <div style="font-weight:600;">Recent users</div>
-            <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
-              {% if recent_users and recent_users|length > 0 %}
-                {% for ru in recent_users %}
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <img src="{{ user_avatar_url(ru.user, 'sm') }}" alt="" style="width:28px; height:28px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
-                    <div style="min-width:0;">
-                      <a href="{{ url_for('profile', username=ru.username) }}" style="font-size:13px; font-weight:500; color:#111827; text-decoration:none; display:block; line-height:1.2;">{{ ru.username }}</a>
-                      {% if ru.car %}
-                        <div style="font-size:11px; color:#6b7280; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ ru.car }}</div>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endfor %}
-              {% else %}
-                <div class="subtle" style="font-size:13px;">No recent posts yet.</div>
-              {% endif %}
-            </div>
-          </div>
-
           {# Suggested nearby counties #}
           {% if suggested_counties and suggested_counties|length > 0 %}
           <div class="rail-section" id="suggestedCountiesSection">
@@ -166,6 +144,28 @@
           })();
           </script>
           {% endif %}
+
+          {# Posting #}
+          <div class="rail-section">
+            <div style="font-weight:600;">Posting</div>
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+              {% if recent_users and recent_users|length > 0 %}
+                {% for ru in recent_users %}
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <img src="{{ user_avatar_url(ru.user, 'sm') }}" alt="" style="width:28px; height:28px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
+                    <div style="min-width:0;">
+                      <a href="{{ url_for('profile', username=ru.username) }}" style="font-size:13px; font-weight:500; color:#111827; text-decoration:none; display:block; line-height:1.2;">{{ ru.username }}</a>
+                      {% if ru.car %}
+                        <div style="font-size:11px; color:#6b7280; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ ru.car }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="subtle" style="font-size:13px;">No recent posts yet.</div>
+              {% endif %}
+            </div>
+          </div>
 
         </div>
 

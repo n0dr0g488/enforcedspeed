@@ -6412,6 +6412,19 @@ GROUP BY UPPER(TRIM(stusps));
             except Exception:
                 inside_focus = True
 
+            _user = getattr(r, "user", None)
+            _avatar = ""
+            _car = ""
+            if _user:
+                try:
+                    _avatar = user_avatar_url(_user, "sm")
+                except Exception:
+                    pass
+                _car_parts = [str(_user.car_year) if getattr(_user, "car_year", None) else "", getattr(_user, "car_make", "") or "", getattr(_user, "car_model", "") or ""]
+                _car = " ".join(p for p in _car_parts if p).strip()
+
+            _county_name = getattr(r, "county_name", "") or ""
+
             pins.append(
                 {
                     "id": r.id,
@@ -6422,7 +6435,10 @@ GROUP BY UPPER(TRIM(stusps));
                     "posted": r.posted_speed,
                     "ticketed": r.ticketed_speed,
                     "created_at": r.created_at.isoformat() if r.created_at else None,
-                    "username": (r.user.username if getattr(r, "user", None) else None),
+                    "username": (_user.username if _user else None),
+                    "avatar": _avatar,
+                    "car": _car,
+                    "county": _county_name,
                     "inside_focus": bool(inside_focus),
                 }
             )

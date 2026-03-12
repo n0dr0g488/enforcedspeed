@@ -577,13 +577,11 @@
       if (!el || !p) return;
       const over = (Number(p.ticketed) - Number(p.posted));
       const username = p.username || 'Anonymous';
-      const avatar = p.avatar || '';
+      const avatar = p.avatar || '/static/img/avatars/a01.png';
       const car = p.car || '';
       const county = p.county || '';
       const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-      const avatarHtml = avatar
-        ? `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`
-        : `<div style="width:32px; height:32px; border-radius:999px; background:#e5e7eb; flex-shrink:0;"></div>`;
+      const avatarHtml = `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
       const carLine = car ? `<div style="font-size:11px; color:#9ca3af; line-height:1.2;">${car}</div>` : '';
       el.innerHTML = `
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
@@ -814,7 +812,7 @@ async function esLoadPins(opts) {
       }
       const sp = window._esSelectedPinData;
       const over = (Number(sp.ticketed) - Number(sp.posted));
-      const avatarHtml = sp.avatar ? `<img src="${sp.avatar}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;">` : '';
+      const avatarHtml = `<img src="${sp.avatar || '/static/img/avatars/a01.png'}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;background:#e5e7eb;">`;
       const html = `
         <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
           <div style="display:flex; gap:6px; align-items:center;">
@@ -840,11 +838,11 @@ async function esLoadPins(opts) {
 
 function esSelectPin(p, marker) {
   const over = (Number(p.ticketed) - Number(p.posted));
-  const avatarHtml = p.avatar ? `<img src="${p.avatar}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;">` : '';
+  const avatarSrc = p.avatar || '/static/img/avatars/a01.png';
   const html = `
     <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
       <div style="display:flex; gap:6px; align-items:center;">
-        ${avatarHtml}
+        <img src="${avatarSrc}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;background:#e5e7eb;">
         <div style="font-weight:600; font-size:13px; line-height:1.2;">${p.road || 'Road'}</div>
       </div>
       <div style="font-size:12px; color:#374151; margin-top:3px;">${p.posted} → ${p.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>

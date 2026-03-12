@@ -98,6 +98,8 @@
         {% endif %}
       </div>
 
+      <div class="following-divider" style="border-top:1px solid #e5e7eb; margin:14px 0;"></div>
+
       {# Add all counties in a state #}
       <div class="following-section">
         <div class="following-add-title">Follow all counties in a state</div>
@@ -130,58 +132,6 @@
           </div>
         {% endif %}
       </div>
-
-      {# Suggested nearby counties #}
-      {% if suggested_counties and suggested_counties|length > 0 %}
-      <div class="following-section">
-        <div class="following-add-title">Suggested for you</div>
-        <div style="font-size:12px; color:#6b7280; margin-bottom:10px;">Based on your location</div>
-        <div class="following-list-inline" id="followingSuggestions">
-          {% for sc in suggested_counties %}
-            <div class="following-item suggested-item" data-geoid="{{ sc.geoid }}">
-              <span class="following-item-label">{{ sc.label }}</span>
-              <button type="button" class="suggested-add-btn" data-geoid="{{ sc.geoid }}"
-                style="padding:4px 12px; font-size:12px; font-weight:600; border:1px solid #1877f2; background:#fff; color:#1877f2; border-radius:6px; cursor:pointer;">
-                + Follow
-              </button>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <script>
-      (function(){
-        document.querySelectorAll('#followingSuggestions .suggested-add-btn').forEach(function(btn){
-          btn.addEventListener('click', function(){
-            var geoid = this.getAttribute('data-geoid');
-            var row = this.closest('.suggested-item');
-            var self = this;
-            self.textContent = '...';
-            self.disabled = true;
-            fetch('/api/following/quick_add', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({geoid: geoid})
-            }).then(function(r){ return r.json(); }).then(function(d){
-              if(d.ok){
-                self.textContent = '✓ Added';
-                self.style.background = '#1877f2';
-                self.style.color = '#fff';
-                self.style.borderColor = '#1877f2';
-                setTimeout(function(){ location.reload(); }, 800);
-              } else {
-                self.textContent = '+ Follow';
-                self.disabled = false;
-              }
-            }).catch(function(){
-              self.textContent = '+ Follow';
-              self.disabled = false;
-            });
-          });
-        });
-      })();
-      </script>
-      {% endif %}
 
       {% if not current_user.is_authenticated %}
         <div class="following-save-prompt">

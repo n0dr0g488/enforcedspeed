@@ -276,9 +276,9 @@
             <div class="onboarding-icon">★</div>
             <div class="onboarding-text">
               <strong>Welcome to EnforcedSpeed!</strong><br>
-              Follow states or counties to see speeding tickets in your feed.
+              Follow areas to see tickets in your feed.
               {% if counties_auto_added %}
-                Nearby counties have been automatically added to your following list.
+                Nearby counties have been added automatically.
               {% endif %}
             </div>
             <a class="onboarding-btn" href="{{ url_for('following') }}">Set up following</a>
@@ -302,21 +302,6 @@
           <a class="post-callout-btn" href="{{ url_for('submit') }}">Post your ticket</a>
         </div>
       </div>
-
-      {# Save following list callout: logged-out users who have session follows #}
-      {% if not current_user.is_authenticated and has_follows %}
-      <div class="onboarding-callout" id="saveFollowsCallout" style="display:none;">
-        <div class="save-callout-inner">
-          <button type="button" class="onboarding-close" id="saveFollowsClose" aria-label="Dismiss">&times;</button>
-          <div class="onboarding-icon">💾</div>
-          <div class="onboarding-text" style="color:#065f46;">
-            <strong>Save your following list!</strong><br>
-            Your follows will be lost when you close the browser. <a href="{{ url_for('register') }}" style="color:#047857; font-weight:600; text-decoration:underline;">Create an account</a> to keep them.
-          </div>
-          <a class="save-callout-btn" href="{{ url_for('register') }}">Create account</a>
-        </div>
-      </div>
-      {% endif %}
 
       {# Preserve active query params (used for infinite scroll + fallback pagination). #}
       {% set q = request.args.to_dict(flat=False) %}
@@ -943,25 +928,6 @@ document.addEventListener('DOMContentLoaded', function(){
           postClose.addEventListener('click', function(){
             postCallout.style.display = 'none';
             try{ localStorage.setItem('es_post_callout_dismissed', '1'); }catch(e){}
-          });
-        }
-      }
-    }catch(e){}
-
-    // Save following list callout (green, logged-out with follows)
-    try{
-      var saveCallout = document.getElementById('saveFollowsCallout');
-      var saveClose = document.getElementById('saveFollowsClose');
-      if(saveCallout){
-        var saveDismissed = false;
-        try{ saveDismissed = localStorage.getItem('es_save_follows_dismissed') === '1'; }catch(e){}
-        if(!saveDismissed){
-          saveCallout.style.display = 'block';
-        }
-        if(saveClose){
-          saveClose.addEventListener('click', function(){
-            saveCallout.style.display = 'none';
-            try{ localStorage.setItem('es_save_follows_dismissed', '1'); }catch(e){}
           });
         }
       }

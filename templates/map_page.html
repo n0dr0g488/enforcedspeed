@@ -572,6 +572,77 @@
         try { m.setMap(null); } catch(e) {}
       }
       ES_MARKERS = [];
+      esClearOverageLabels();
+    }
+
+    // --- Overage labels above pins (visible at zoom >= 12) ---
+    let ES_OVERAGE_LABELS = [];
+    const ES_OVERAGE_ZOOM_MIN = 12;
+    let EsOverageLabel = null; // defined after Maps API loads
+
+    function esInitOverageLabel() {
+      if (EsOverageLabel) return;
+      EsOverageLabel = class extends google.maps.OverlayView {
+        constructor(position, text, zIdx) {
+          super();
+          this._pos = position;
+          this._text = text;
+          this._zIdx = zIdx || 1;
+          this._div = null;
+        }
+        onAdd() {
+          const div = document.createElement('div');
+          div.style.position = 'absolute';
+          div.style.whiteSpace = 'nowrap';
+          div.style.fontSize = '11px';
+          div.style.fontWeight = '700';
+          div.style.color = '#dc2626';
+          div.style.textShadow = '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff';
+          div.style.pointerEvents = 'none';
+          div.style.zIndex = String(this._zIdx);
+          div.textContent = this._text;
+          this._div = div;
+          this.getPanes().overlayLayer.appendChild(div);
+          this._updateVisibility();
+        }
+        draw() {
+          if (!this._div) return;
+          const proj = this.getProjection();
+          if (!proj) return;
+          const pt = proj.fromLatLngToDivPixel(this._pos);
+          if (!pt) return;
+          this._div.style.left = (pt.x - this._div.offsetWidth / 2) + 'px';
+          this._div.style.top = (pt.y - 46) + 'px';
+        }
+        onRemove() {
+          if (this._div && this._div.parentNode) {
+            this._div.parentNode.removeChild(this._div);
+          }
+          this._div = null;
+        }
+        show() { if (this._div) this._div.style.display = ''; }
+        hide() { if (this._div) this._div.style.display = 'none'; }
+        _updateVisibility() {
+          if (!this._div || !ES_MAP) return;
+          const z = ES_MAP.getZoom();
+          this._div.style.display = (typeof z === 'number' && z >= ES_OVERAGE_ZOOM_MIN) ? '' : 'none';
+        }
+      };
+    }
+
+    function esClearOverageLabels() {
+      for (const lbl of ES_OVERAGE_LABELS) {
+        try { lbl.setMap(null); } catch(e) {}
+      }
+      ES_OVERAGE_LABELS = [];
+    }
+
+    function esUpdateOverageLabelVisibility() {
+      const z = ES_MAP.getZoom();
+      const show = (typeof z === 'number' && z >= ES_OVERAGE_ZOOM_MIN);
+      for (const lbl of ES_OVERAGE_LABELS) {
+        if (show) lbl.show(); else lbl.hide();
+      }
     }
 
     function esUpdateSelectedCard(p) {
@@ -583,7 +654,7 @@
       const car = p.car || '';
       const county = p.county || '';
       const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-      const avatarHtml = `<img src="${avatar}" alt="" title="${avatar}" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
+      const avatarHtml = `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
       const carLine = car ? `<div style="font-size:11px; color:#9ca3af; line-height:1.2;">${car}</div>` : '';
       el.innerHTML = `
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
@@ -764,9 +835,6 @@ async function esLoadPins(opts) {
 
   esClearMarkers();
   const pins = data.pins || [];
-  // Debug: log unique avatar URLs
-  const avatarSet = new Set(pins.map(p => p.avatar || 'EMPTY'));
-  console.log('[ES PINS] unique avatars:', [...avatarSet]);
   if (meta) {
     if (data.inside_count != null && ES_FOCUS && ES_FOCUS.type && ES_FOCUS.value) {
       meta.textContent = String(data.inside_count);
@@ -802,6 +870,18 @@ async function esLoadPins(opts) {
     });
     ES_MARKERS.push(m);
 
+    // Create overage label above pin
+    const pinOver = (Number(p.ticketed) - Number(p.posted));
+    if (pinOver > 0) {
+      const lbl = new EsOverageLabel(
+        new google.maps.LatLng(pos.lat, pos.lng),
+        '+' + pinOver,
+        isActive ? 999998 : (isInside ? 3 : 1)
+      );
+      lbl.setMap(ES_MAP);
+      ES_OVERAGE_LABELS.push(lbl);
+    }
+
     // Re-open InfoWindow on the active pin after reload (but don't touch right panel card)
     if (isActive) {
       // Store pin data for persistence (only if not already set by server render or user click)
@@ -835,7 +915,6 @@ async function esLoadPins(opts) {
 }
 
 function esSelectPin(p, marker) {
-  console.log('[ES PIN] avatar:', p.avatar, 'username:', p.username, 'id:', p.id);
   const over = (Number(p.ticketed) - Number(p.posted));
   const avatarSrc = p.avatar || '/static/img/avatars/a01.png';
   const html = `
@@ -878,6 +957,7 @@ window.esInitMap = async function() {
     gestureHandling: "greedy",
   });
   ES_INFO = new google.maps.InfoWindow({ maxWidth: 220, disableAutoPan: true });
+  esInitOverageLabel();
 
   // Custom zoom controls (+ / -) that are always available (even without a mouse wheel)
   (function esWireZoomControls(){
@@ -916,6 +996,7 @@ window.esInitMap = async function() {
     });
 
     ES_MAP.addListener('zoom_changed', updateDisabled);
+    ES_MAP.addListener('zoom_changed', esUpdateOverageLabelVisibility);
     updateDisabled();
   })();
 

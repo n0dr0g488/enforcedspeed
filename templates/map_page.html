@@ -193,20 +193,34 @@
 
                 <div class="filterbar-item">
                   <label class="filterbar-label" for="filter-state">State</label>
-                  <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
-                    <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
-                    {% for opt in state_filter_options %}
-                      <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
-                    {% endfor %}
-                  </select>
+                  <div style="position:relative;">
+                    <input list="state-datalist" id="filter-state-input" value="{{ filter_state or '' }}" placeholder="All states" autocomplete="off"
+                      style="width:100%; padding:8px 28px 8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:15px; box-sizing:border-box;">
+                    <input type="hidden" id="filter-state" name="state" value="{{ filter_state or '' }}">
+                    {% if filter_state %}
+                    <button type="button" class="combo-clear" id="stateClearBtn" aria-label="Clear state"
+                      style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:16px; color:#9ca3af; padding:2px 4px; line-height:1;">×</button>
+                    {% endif %}
+                    <datalist id="state-datalist">
+                      {% for opt in state_filter_options %}
+                        <option value="{{ opt.code }}">{{ opt.code }}</option>
+                      {% endfor %}
+                    </datalist>
+                  </div>
                 </div>
 
                 <div class="filterbar-item">
-                  <label class="filterbar-label" for="filter-county">County</label>
-                  <div class="filter-autocomplete-wrap">
-                    <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
+                  <label class="filterbar-label" for="filter-county-input">County</label>
+                  <div style="position:relative;">
+                    <input list="county-datalist" id="filter-county-input" value="{{ filter_county_label or '' }}" placeholder="All counties" autocomplete="off"
+                      style="width:100%; padding:8px 28px 8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:15px; box-sizing:border-box;"
+                      {% if not filter_state %}disabled{% endif %}>
                     <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
-                    <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
+                    {% if filter_county_geoid %}
+                    <button type="button" class="combo-clear" id="countyClearBtn" aria-label="Clear county"
+                      style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:16px; color:#9ca3af; padding:2px 4px; line-height:1;">×</button>
+                    {% endif %}
+                    <datalist id="county-datalist"></datalist>
                   </div>
                 </div>
 
@@ -945,6 +959,130 @@ window.esInitMap = async function() {
       });
     }
   })();
+</script>
+
+<script>
+// Combo inputs for State + County on map filter panel
+(function(){
+  var form = document.getElementById('mapFilters');
+  var stateInput = document.getElementById('filter-state-input');
+  var stateHidden = document.getElementById('filter-state');
+  var countyInput = document.getElementById('filter-county-input');
+  var countyGeoid = document.getElementById('filter-county-geoid');
+  var countyDatalist = document.getElementById('county-datalist');
+  var stateClear = document.getElementById('stateClearBtn');
+  var countyClear = document.getElementById('countyClearBtn');
+  if(!form || !stateInput || !stateHidden) return;
+
+  // County lookup cache: { geoid -> {name, namelsad} }
+  var countyMap = {};
+
+  // Load counties for a state into the datalist
+  function loadCounties(st){
+    countyMap = {};
+    if(countyDatalist) countyDatalist.innerHTML = '';
+    if(!st || st.length !== 2) {
+      if(countyInput) countyInput.disabled = true;
+      return;
+    }
+    if(countyInput) countyInput.disabled = false;
+    fetch('/api/counties?st=' + encodeURIComponent(st))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d.ok || !d.counties) return;
+        var html = '';
+        d.counties.forEach(function(c){
+          countyMap[c.namelsad] = c.geoid;
+          html += '<option value="' + c.namelsad + '">';
+        });
+        if(countyDatalist) countyDatalist.innerHTML = html;
+      }).catch(function(){});
+  }
+
+  // State: on change, set hidden + submit
+  stateInput.addEventListener('change', function(){
+    var val = this.value.trim().toUpperCase();
+    // Check if it's a valid 2-letter code from the datalist
+    var opts = document.querySelectorAll('#state-datalist option');
+    var valid = false;
+    for(var i=0; i<opts.length; i++){
+      if(opts[i].value === val){ valid = true; break; }
+    }
+    if(valid){
+      stateHidden.value = val;
+      // Clear county when state changes
+      if(countyGeoid) countyGeoid.value = '';
+      if(countyInput) countyInput.value = '';
+      form.submit();
+    } else if(!val){
+      stateHidden.value = '';
+      if(countyGeoid) countyGeoid.value = '';
+      if(countyInput) countyInput.value = '';
+      form.submit();
+    }
+  });
+
+  // Also handle Enter key on state
+  stateInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      stateInput.dispatchEvent(new Event('change'));
+    }
+  });
+
+  // State clear button
+  if(stateClear){
+    stateClear.addEventListener('click', function(){
+      stateInput.value = '';
+      stateHidden.value = '';
+      if(countyGeoid) countyGeoid.value = '';
+      if(countyInput) countyInput.value = '';
+      form.submit();
+    });
+  }
+
+  // County: on change, look up geoid + submit
+  if(countyInput){
+    countyInput.addEventListener('change', function(){
+      var val = this.value.trim();
+      var geoid = countyMap[val] || '';
+      if(geoid){
+        countyGeoid.value = geoid;
+        form.submit();
+      } else if(!val){
+        // Cleared county — snap back to state
+        countyGeoid.value = '';
+        form.submit();
+      }
+    });
+
+    countyInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        countyInput.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+
+  // County clear button
+  if(countyClear){
+    countyClear.addEventListener('click', function(){
+      countyInput.value = '';
+      countyGeoid.value = '';
+      form.submit();
+    });
+  }
+
+  // Load counties on page load if state is set
+  var currentState = (stateHidden.value || '').trim();
+  if(currentState) loadCounties(currentState);
+
+  // Watch for state input changes to reload county list
+  stateInput.addEventListener('input', function(){
+    var val = this.value.trim().toUpperCase();
+    if(val.length === 2) loadCounties(val);
+  });
+})();
 </script>
 
 {% endblock %}

@@ -63,16 +63,22 @@
         <div class="following-add-title">Follow a county</div>
         <form method="post" action="{{ url_for('following_add_county') }}" id="followCountyForm">
           <div class="following-add-row">
-            <select id="followCountyState" style="flex:0.5;">
-              <option value="">State</option>
-              {% for st in state_options %}
-                <option value="{{ st }}">{{ st }}</option>
-              {% endfor %}
-            </select>
-            <div class="county-search-wrap">
-              <input type="text" id="followCountyInput" placeholder="Type county name" autocomplete="off">
+            <div style="position:relative; flex:0.5;">
+              <input list="follow-county-state-list" id="followCountyState" placeholder="State" autocomplete="off"
+                style="width:100%; padding:8px 26px 8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
+              <svg style="position:absolute; right:8px; top:50%; transform:translateY(-50%); pointer-events:none; opacity:0.4;" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              <datalist id="follow-county-state-list">
+                {% for st in state_options %}
+                  <option value="{{ st }}">{{ st }}</option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="county-search-wrap" style="position:relative;">
+              <input list="follow-county-list" type="text" id="followCountyInput" placeholder="Type or select county" autocomplete="off"
+                style="padding-right:26px;">
+              <svg style="position:absolute; right:8px; top:50%; transform:translateY(-50%); pointer-events:none; opacity:0.4;" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               <input type="hidden" name="county_geoid" id="followCountyGeoid">
-              <div class="county-suggestions" id="followCountySuggestions"></div>
+              <datalist id="follow-county-list"></datalist>
             </div>
             <button type="submit">Follow</button>
           </div>
@@ -97,12 +103,16 @@
         <div class="following-add-title">Follow all counties in a state</div>
         <form method="post" action="{{ url_for('following_add_state') }}">
           <div class="following-add-row">
-            <select name="state_code" required>
-              <option value="">Select a state</option>
-              {% for st in state_options %}
-                <option value="{{ st }}">{{ st }}</option>
-              {% endfor %}
-            </select>
+            <div style="position:relative; flex:1;">
+              <input list="follow-state-list" name="state_code" id="followStateInput" placeholder="Type or select a state" autocomplete="off" required
+                style="width:100%; padding:8px 26px 8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; box-sizing:border-box;">
+              <svg style="position:absolute; right:8px; top:50%; transform:translateY(-50%); pointer-events:none; opacity:0.4;" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              <datalist id="follow-state-list">
+                {% for st in state_options %}
+                  <option value="{{ st }}">{{ st }}</option>
+                {% endfor %}
+              </datalist>
+            </div>
             <button type="submit">Follow</button>
           </div>
         </form>
@@ -213,61 +223,59 @@
 </div>
 
 <script>
-  // County autocomplete for the follow form
+  // County combo for the follow form
   (function(){
-    var stateSelect = document.getElementById('followCountyState');
+    var stateInput = document.getElementById('followCountyState');
     var input = document.getElementById('followCountyInput');
     var geoidField = document.getElementById('followCountyGeoid');
-    var suggestions = document.getElementById('followCountySuggestions');
-    if(!input || !suggestions || !stateSelect) return;
+    var datalist = document.getElementById('follow-county-list');
+    if(!input || !stateInput || !datalist) return;
 
-    var debounce = null;
-    input.addEventListener('input', function(){
-      clearTimeout(debounce);
-      var q = input.value.trim();
-      var st = stateSelect.value;
-      if(!st){ 
-        suggestions.innerHTML = '<div class="county-suggestion" style="color:#6b7280;">Select a state first</div>';
-        suggestions.classList.add('open');
-        return; 
-      }
-      if(q.length < 2){ suggestions.classList.remove('open'); return; }
-      debounce = setTimeout(function(){
-        fetch('/api/counties?st=' + encodeURIComponent(st) + '&q=' + encodeURIComponent(q))
-          .then(function(r){ return r.json(); })
-          .then(function(data){
-            suggestions.innerHTML = '';
-            var counties = (data && data.counties) ? data.counties : [];
-            if(!counties.length){ suggestions.classList.remove('open'); return; }
-            counties.forEach(function(c){
-              var div = document.createElement('div');
-              div.className = 'county-suggestion';
-              div.textContent = (c.namelsad || c.name) + ', ' + (c.stusps || st);
-              div.addEventListener('click', function(){
-                input.value = (c.namelsad || c.name) + ', ' + (c.stusps || st);
-                geoidField.value = c.geoid;
-                suggestions.classList.remove('open');
-              });
-              suggestions.appendChild(div);
-            });
-            suggestions.classList.add('open');
-          })
-          .catch(function(){ suggestions.classList.remove('open'); });
-      }, 200);
-    });
+    var countyMap = {};
 
-    stateSelect.addEventListener('change', function(){
+    function loadCounties(st){
+      countyMap = {};
+      datalist.innerHTML = '';
+      if(!st || st.length !== 2) return;
+      fetch('/api/counties?st=' + encodeURIComponent(st))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if(!d.ok || !d.counties) return;
+          var html = '';
+          d.counties.forEach(function(c){
+            var label = (c.namelsad || c.name) + ', ' + (c.stusps || st);
+            countyMap[label] = c.geoid;
+            html += '<option value="' + label + '">';
+          });
+          datalist.innerHTML = html;
+        }).catch(function(){});
+    }
+
+    // When state changes, load counties
+    stateInput.addEventListener('change', function(){
+      var val = this.value.trim().toUpperCase();
       input.value = '';
       geoidField.value = '';
-      suggestions.classList.remove('open');
-      input.focus();
+      if(val.length === 2) loadCounties(val);
+    });
+    stateInput.addEventListener('input', function(){
+      var val = this.value.trim().toUpperCase();
+      if(val.length === 2) loadCounties(val);
     });
 
-    document.addEventListener('click', function(e){
-      if(!suggestions.contains(e.target) && e.target !== input){
-        suggestions.classList.remove('open');
-      }
+    // When county selected from datalist, set geoid
+    input.addEventListener('change', function(){
+      var val = this.value.trim();
+      geoidField.value = countyMap[val] || '';
     });
+    input.addEventListener('input', function(){
+      var val = this.value.trim();
+      if(countyMap[val]) geoidField.value = countyMap[val];
+    });
+
+    // Load on page init if state already has a value
+    var initSt = stateInput.value.trim().toUpperCase();
+    if(initSt.length === 2) loadCounties(initSt);
   })();
 </script>
 {% endblock %}

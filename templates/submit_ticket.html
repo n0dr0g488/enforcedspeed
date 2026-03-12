@@ -55,17 +55,21 @@
         name="state_query"
         value=""
         placeholder="Type state (e.g., VA or Virginia)"
-        style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;"
+        style="width:100%; padding:10px 30px 10px 12px; border:1px solid #e5e7eb; border-radius:12px;"
         autocomplete="off"
       >
+      <svg style="position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; opacity:0.4;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       <div id="stateDropdown" style="position:relative;"></div>
     </div>
   </div>
 
   <div class="sg-span-6">
     <label class="es-label">County</label>
-    <input id="countyInput" name="county_query" value="{{ form.county_query.data or '' }}" placeholder="Start typing (e.g., Clay)" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px;" autocomplete="off">
-    <div id="countyDropdown" style="position:relative;"></div>
+    <div style="position:relative;">
+      <input id="countyInput" name="county_query" value="{{ form.county_query.data or '' }}" placeholder="Start typing or select" style="width:100%; padding:10px 30px 10px 12px; border:1px solid #e5e7eb; border-radius:12px;" autocomplete="off">
+      <svg style="position:absolute; right:10px; top:50%; transform:translateY(-50%); pointer-events:none; opacity:0.4;" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <div id="countyDropdown" style="position:relative;"></div>
+    </div>
   </div>
 
   <div class="sg-span-6">
@@ -286,9 +290,10 @@
     box.style.borderRadius='12px';
     box.style.background='#fff';
     box.style.boxShadow='0 12px 30px rgba(0,0,0,.08)';
-    box.style.overflow='hidden';
+    box.style.overflow='auto';
+    box.style.maxHeight='260px';
 
-    lastStateItems.slice(0, 15).forEach(it => {
+    lastStateItems.slice(0, 50).forEach(it => {
       const row = document.createElement('button');
       row.type='button';
       row.style.display='block';
@@ -383,9 +388,10 @@
     box.style.borderRadius='12px';
     box.style.background='#fff';
     box.style.boxShadow='0 12px 30px rgba(0,0,0,.08)';
-    box.style.overflow='hidden';
+    box.style.overflow='auto';
+    box.style.maxHeight='260px';
 
-    lastCountyItems.slice(0, 20).forEach(it => {
+    lastCountyItems.slice(0, 50).forEach(it => {
       const row = document.createElement('button');
       row.type='button';
       row.style.display='block';
@@ -412,11 +418,21 @@
   }
 
   let lastQ = '';
+  countyInput.addEventListener('focus', async () => {
+    const st = (stHidden.value || '').trim();
+    if(!st) return;
+    const q = countyInput.value.trim();
+    if(q.length >= 2) return; // already showing filtered results
+    try {
+      const items = await fetchCounties('');
+      renderCountyDropdown(items);
+    } catch(err){}
+  });
+
   countyInput.addEventListener('input', async () => {
     const q = countyInput.value.trim();
     countyGeoid.value = '';
     syncPinStatus();
-    if (q.length < 2) { clearCountyDropdown(); return; }
     if (q === lastQ) return;
     lastQ = q;
     try {

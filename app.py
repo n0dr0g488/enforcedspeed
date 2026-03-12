@@ -5841,6 +5841,27 @@ GROUP BY UPPER(TRIM(stusps));
         qn = (q or "").lower()
         qn = re.sub(r"[^a-z0-9\s]", " ", qn)
         qn = re.sub(r"\s+", " ", qn).strip()
+
+        # If no query, return ALL counties for the state (for dropdown)
+        if not qn:
+            try:
+                rows = db.session.execute(
+                    text("""
+                        SELECT geoid, name, namelsad, stusps, state_name
+                        FROM counties
+                        WHERE stusps = :st
+                        ORDER BY namelsad ASC
+                    """),
+                    {"st": st_up},
+                ).mappings().all()
+                return jsonify({"ok": True, "counties": [dict(r) for r in rows]})
+            except Exception as e:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+                return jsonify({"ok": False, "counties": []}), 200
+
         if len(qn) < 2:
             return jsonify({"ok": True, "counties": []})
 

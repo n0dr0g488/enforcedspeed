@@ -3998,13 +3998,18 @@ GROUP BY UPPER(TRIM(stusps));
                     session["_geo_state"] = cached_geo.get("state", "")
                 geo_data = cached_geo
             if geo_data and geo_data.get("lat") and geo_data.get("lng"):
+                # Start with 5 suggestions, shrink to 3 as they follow more
+                suggestion_limit = max(3, 8 - len(followed_county_geoids) - len(followed_state_codes))
+                suggestion_limit = min(suggestion_limit, 5)
                 # Get nearby counties excluding already-followed
                 nearby = _find_nearest_counties(
                     geo_data["lat"], geo_data["lng"],
-                    limit=5,
+                    limit=15,
                     exclude_geoids=followed_county_geoids,
                 )
                 for nc in nearby:
+                    if len(suggested_counties) >= suggestion_limit:
+                        break
                     # Also exclude if county's state is fully followed
                     if nc["state"] in followed_state_codes:
                         continue
@@ -4198,9 +4203,11 @@ GROUP BY UPPER(TRIM(stusps));
                         all_followed_geoids.add(item.get("county_geoid", ""))
                     elif item["type"] == "state":
                         all_followed_states.add(item.get("state_code", ""))
+                suggestion_limit = max(3, 8 - len(all_followed_geoids) - len(all_followed_states))
+                suggestion_limit = min(suggestion_limit, 5)
                 nearby = _find_nearest_counties(
                     cached_geo["lat"], cached_geo["lng"],
-                    limit=8,
+                    limit=15,
                     exclude_geoids=all_followed_geoids,
                 )
                 for nc in nearby:
@@ -4211,7 +4218,7 @@ GROUP BY UPPER(TRIM(stusps));
                         "label": f"{nc['name']}, {nc['state']}",
                         "state": nc["state"],
                     })
-                    if len(suggested_counties) >= 5:
+                    if len(suggested_counties) >= suggestion_limit:
                         break
         except Exception:
             pass

@@ -139,7 +139,6 @@
             document.querySelectorAll('.suggested-follow-btn').forEach(function(btn){
               btn.addEventListener('click', function(){
                 var geoid = this.getAttribute('data-geoid');
-                var row = this.closest('.suggested-county-row');
                 var self = this;
                 self.textContent = '...';
                 self.disabled = true;
@@ -153,7 +152,7 @@
                     self.style.background = '#1877f2';
                     self.style.color = '#fff';
                     self.style.borderColor = '#1877f2';
-                    setTimeout(function(){ row.style.opacity = '0.5'; }, 600);
+                    setTimeout(function(){ location.reload(); }, 400);
                   } else {
                     self.textContent = '+ Follow';
                     self.disabled = false;

@@ -600,14 +600,8 @@
 
     try {
       if (!bounds.isEmpty()) {
-        // Fit to the county boundary, then nudge one zoom level closer (tighter county view).
-        ES_MAP.fitBounds(bounds, { top: 24, right: 24, bottom: 24, left: 24 });
-        google.maps.event.addListenerOnce(ES_MAP, 'bounds_changed', () => {
-          try {
-            const z = ES_MAP.getZoom();
-            if (typeof z === 'number') ES_MAP.setZoom(Math.min(z + 1, 18));
-          } catch(e) {}
-        });
+        // Fit to county boundary with generous padding so pins near edges stay visible.
+        ES_MAP.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
       }
     } catch(e) {}
 
@@ -924,7 +918,7 @@ window.esInitMap = async function() {
 
       function setCollapsed(v, save){
         if(v){ sidebar.classList.add('is-collapsed'); btn.style.left = '0px'; }
-        else { sidebar.classList.remove('is-collapsed'); btn.style.left = '275px'; }
+        else { sidebar.classList.remove('is-collapsed'); btn.style.left = '320px'; }
         if(save){ try{ localStorage.setItem('es_filters_collapsed', v ? '1' : '0'); }catch(e){} }
       }
 

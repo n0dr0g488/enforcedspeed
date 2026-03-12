@@ -365,27 +365,6 @@
             </div>
             <div id="esMap"></div>
 
-            {# Overlay: prompt to select a county/state when nothing is selected #}
-            {% if not filter_state and not filter_county_geoid %}
-            <div class="map-select-overlay" id="mapSelectOverlay">
-              <div class="map-select-box">
-                <div class="map-select-title">Select a county or state for detailed information</div>
-                {% if map_following_items %}
-                  <div class="map-select-subtitle">Your followed areas:</div>
-                  <div class="map-select-list">
-                    {% for item in map_following_items %}
-                      <a class="map-select-item" href="{{ item.url }}">{{ item.label }}</a>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <div class="map-select-subtitle" style="margin-bottom:6px;">
-                    <a href="{{ url_for('following') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Follow states or counties</a> to see them here.
-                  </div>
-                {% endif %}
-                <button type="button" class="map-select-dismiss" id="mapSelectDismiss">Continue without selecting</button>
-              </div>
-            </div>
-            {% endif %}
           </div>
         {% endif %}
       </div>
@@ -945,19 +924,6 @@ window.esInitMap = async function() {
         setCollapsed(!sidebar.classList.contains('is-collapsed'), true);
       });
     });
-  })();
-</script>
-
-<script>
-  // Map selection overlay dismiss
-  (function(){
-    var overlay = document.getElementById('mapSelectOverlay');
-    var btn = document.getElementById('mapSelectDismiss');
-    if(overlay && btn){
-      btn.addEventListener('click', function(){
-        overlay.style.display = 'none';
-      });
-    }
   })();
 </script>
 

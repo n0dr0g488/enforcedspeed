@@ -4375,6 +4375,21 @@ GROUP BY UPPER(TRIM(stusps));
         if explicit_all:
             session.pop("_map_last", None)
 
+        # If a county is selected but no state, look up the county's state
+        if filter_county_geoid and not filter_state and not focus_state:
+            try:
+                row = db.session.execute(
+                    text("SELECT stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                    {"g": filter_county_geoid},
+                ).mappings().first()
+                if row and row.get("stusps"):
+                    filter_state = row["stusps"].strip().upper()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+
         if not filter_state and not focus_state and not filter_county_geoid and not explicit_all:
             # Check if user has a remembered map view
             last_map = session.get("_map_last")

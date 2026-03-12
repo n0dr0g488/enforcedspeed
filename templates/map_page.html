@@ -185,10 +185,11 @@
   .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
 
   /* Compact InfoWindow */
-  .gm-style-iw-c { padding: 8px !important; border-radius: 8px !important; }
-  .gm-style-iw-d { overflow: hidden !important; }
-  .gm-style-iw-tc { display: none; } /* hide the tail/arrow shadow */
-  .gm-ui-hover-effect { top: 2px !important; right: 2px !important; width: 24px !important; height: 24px !important; }
+  .gm-style-iw-c { padding: 6px 8px !important; border-radius: 8px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; }
+  .gm-style-iw-d { overflow: hidden !important; padding: 0 !important; }
+  .gm-style-iw-chr { position: absolute; top: -2px; right: -2px; }
+  .gm-ui-hover-effect { width: 20px !important; height: 20px !important; }
+  .gm-ui-hover-effect > span { width: 14px !important; height: 14px !important; margin: 3px !important; }
 </style>
 
 <div class="home-shell map-shell">
@@ -590,6 +591,7 @@
           <div style="min-width:0;">
             <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">${username}</div>
             <div style="font-size:11px; color:#6b7280; line-height:1.2;">${dateStr}</div>
+            ${carLine}
           </div>
         </div>
         <div style="font-size:13px; color:#374151; line-height:1.4;">
@@ -777,7 +779,12 @@ async function esLoadPins(opts) {
     }
   }
 
-  const selectedId = (data.selected_id != null) ? String(data.selected_id) : null;
+  // Use persistent selection: user click > URL param
+  const urlSelectedId = (data.selected_id != null) ? String(data.selected_id) : null;
+  if (!window._esSelectedPinId && urlSelectedId) {
+    window._esSelectedPinId = urlSelectedId;
+  }
+  const activeId = window._esSelectedPinId || null;
 
   let bounds = new google.maps.LatLngBounds();
   for (const p of pins) {
@@ -785,36 +792,43 @@ async function esLoadPins(opts) {
     const pos = { lat: Number(p.lat), lng: Number(p.lng) };
     bounds.extend(pos);
 
-    const isSelected = (selectedId && String(p.id) === selectedId);
+    const isActive = (activeId && String(p.id) === activeId);
     const isInside = !!p.inside_focus;
-    const icon = isSelected ? esGetPinIcon('selected') : (isInside ? esGetPinIcon('inside') : esGetPinIcon('outside'));
+    const baseKind = isInside ? 'inside' : 'outside';
+    const icon = isActive ? esGetPinIcon('selected') : esGetPinIcon(baseKind);
 
-    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isSelected ? 999999 : (isInside ? 2 : 1)) });
-    m._esPinKind = isInside ? 'inside' : 'outside';
+    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isActive ? 999999 : (isInside ? 2 : 1)) });
+    m._esPinId = String(p.id);
+    m._esPinKind = baseKind;
+
     m.addListener('click', () => {
-      const over = (Number(p.ticketed) - Number(p.posted));
+      esSelectPin(p, m);
+    });
+    ES_MARKERS.push(m);
+
+    // Re-open InfoWindow on the active pin after reload
+    if (isActive) {
+      // Store/update pin data for persistence
+      if (!window._esSelectedPinData || window._esSelectedPinData.id !== p.id) {
+        window._esSelectedPinData = p;
+      }
+      const sp = window._esSelectedPinData;
+      const over = (Number(sp.ticketed) - Number(sp.posted));
+      const avatarHtml = sp.avatar ? `<img src="${sp.avatar}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;">` : '';
       const html = `
-        <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; min-width:160px; max-width:220px; padding:2px 0;">
-          <div style="font-weight:600; font-size:13px; line-height:1.3;">${p.road || 'Road'}</div>
-          <div style="font-size:12px; color:#374151; margin-top:2px;">${p.posted} → ${p.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>
+        <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
+          <div style="display:flex; gap:6px; align-items:center;">
+            ${avatarHtml}
+            <div style="font-weight:600; font-size:13px; line-height:1.2;">${sp.road || 'Road'}</div>
+          </div>
+          <div style="font-size:12px; color:#374151; margin-top:3px;">${sp.posted} → ${sp.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>
         </div>
       `;
       ES_INFO.setContent(html);
       ES_INFO.open({ anchor: m, map: ES_MAP });
-
-      // Make clicked pin red, revert previous
-      if (window._esSelectedMarker && window._esSelectedMarker !== m) {
-        window._esSelectedMarker.setIcon(esGetPinIcon(window._esSelectedMarker._esPinKind));
-        window._esSelectedMarker.setZIndex(window._esSelectedMarker._esPinKind === 'inside' ? 2 : 1);
-      }
-      m.setIcon(esGetPinIcon('selected'));
-      m.setZIndex(999999);
-      window._esSelectedMarker = m;
-
-      // Also populate the right-side selected ticket card.
-      esUpdateSelectedCard(p);
-    });
-    ES_MARKERS.push(m);
+      // Update right panel on first load too
+      esUpdateSelectedCard(sp);
+    }
   }
 
   try {
@@ -822,6 +836,39 @@ async function esLoadPins(opts) {
       ES_MAP.fitBounds(bounds);
     }
   } catch(e) {}
+}
+
+function esSelectPin(p, marker) {
+  const over = (Number(p.ticketed) - Number(p.posted));
+  const avatarHtml = p.avatar ? `<img src="${p.avatar}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;">` : '';
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        ${avatarHtml}
+        <div style="font-weight:600; font-size:13px; line-height:1.2;">${p.road || 'Road'}</div>
+      </div>
+      <div style="font-size:12px; color:#374151; margin-top:3px;">${p.posted} → ${p.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>
+    </div>
+  `;
+  ES_INFO.setContent(html);
+  ES_INFO.open({ anchor: marker, map: ES_MAP });
+
+  // Revert ALL markers to their base color, then set this one red
+  for (const em of ES_MARKERS) {
+    if (em._esPinId !== marker._esPinId) {
+      em.setIcon(esGetPinIcon(em._esPinKind));
+      em.setZIndex(em._esPinKind === 'inside' ? 2 : 1);
+    }
+  }
+  marker.setIcon(esGetPinIcon('selected'));
+  marker.setZIndex(999999);
+
+  // Persist selection across pin reloads
+  window._esSelectedPinId = String(p.id);
+  window._esSelectedPinData = p;
+
+  // Update right panel
+  esUpdateSelectedCard(p);
 }
 
 window.esInitMap = async function() {

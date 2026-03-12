@@ -185,9 +185,11 @@
   .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
 
   /* Compact InfoWindow */
-  .gm-style-iw-c { padding: 6px 8px !important; border-radius: 8px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; }
+  .gm-style-iw-c { padding: 6px 8px !important; border-radius: 8px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; outline: none !important; }
   .gm-style-iw-d { overflow: hidden !important; padding: 0 !important; }
   .gm-style-iw-chr { position: absolute; top: -2px; right: -2px; }
+  .gm-style-iw { outline: none !important; }
+  .gm-style-iw-c:focus, .gm-style-iw-c:focus-visible { outline: none !important; }
   .gm-ui-hover-effect { width: 20px !important; height: 20px !important; }
   .gm-ui-hover-effect > span { width: 14px !important; height: 14px !important; margin: 3px !important; }
 </style>
@@ -581,7 +583,7 @@
       const car = p.car || '';
       const county = p.county || '';
       const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-      const avatarHtml = `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
+      const avatarHtml = `<img src="${avatar}" alt="" title="${avatar}" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
       const carLine = car ? `<div style="font-size:11px; color:#9ca3af; line-height:1.2;">${car}</div>` : '';
       el.innerHTML = `
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
@@ -762,6 +764,9 @@ async function esLoadPins(opts) {
 
   esClearMarkers();
   const pins = data.pins || [];
+  // Debug: log unique avatar URLs
+  const avatarSet = new Set(pins.map(p => p.avatar || 'EMPTY'));
+  console.log('[ES PINS] unique avatars:', [...avatarSet]);
   if (meta) {
     if (data.inside_count != null && ES_FOCUS && ES_FOCUS.type && ES_FOCUS.value) {
       meta.textContent = String(data.inside_count);

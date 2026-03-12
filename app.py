@@ -6413,6 +6413,12 @@ GROUP BY UPPER(TRIM(stusps));
                 inside_focus = True
 
             _user = getattr(r, "user", None)
+            # Fallback: if joinedload didn't populate user, load explicitly
+            if _user is None and r.user_id:
+                try:
+                    _user = db.session.get(User, r.user_id)
+                except Exception:
+                    pass
             _avatar = ""
             _car = ""
             if _user:

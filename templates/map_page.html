@@ -737,13 +737,6 @@ async function esLoadPins(opts) {
   if (meta) meta.textContent = 'Loading pins...';
 
   const params = new URLSearchParams(window.location.search);
-  const vp = esGetViewportBoundsParams();
-  if (vp) {
-    params.set('north', String(vp.north));
-    params.set('south', String(vp.south));
-    params.set('east', String(vp.east));
-    params.set('west', String(vp.west));
-  }
 
   // Also pass focus through explicitly for the API (lets focus work without filtering).
   if (ES_FOCUS && ES_FOCUS.type === 'state' && ES_FOCUS.value) {
@@ -804,10 +797,10 @@ async function esLoadPins(opts) {
     });
     ES_MARKERS.push(m);
 
-    // Re-open InfoWindow on the active pin after reload
+    // Re-open InfoWindow on the active pin after reload (but don't touch right panel card)
     if (isActive) {
-      // Store/update pin data for persistence
-      if (!window._esSelectedPinData || window._esSelectedPinData.id !== p.id) {
+      // Store pin data for persistence (only if not already set by server render or user click)
+      if (!window._esSelectedPinData) {
         window._esSelectedPinData = p;
       }
       const sp = window._esSelectedPinData;
@@ -824,8 +817,8 @@ async function esLoadPins(opts) {
       `;
       ES_INFO.setContent(html);
       ES_INFO.open({ anchor: m, map: ES_MAP });
-      // Update right panel on first load too
-      esUpdateSelectedCard(sp);
+      // DON'T update right panel here - server already rendered it correctly,
+      // or esSelectPin already set it from a user click
     }
   }
 
@@ -837,6 +830,7 @@ async function esLoadPins(opts) {
 }
 
 function esSelectPin(p, marker) {
+  console.log('[ES PIN] avatar:', p.avatar, 'username:', p.username, 'id:', p.id);
   const over = (Number(p.ticketed) - Number(p.posted));
   const avatarSrc = p.avatar || '/static/img/avatars/a01.png';
   const html = `
@@ -922,16 +916,8 @@ window.esInitMap = async function() {
 
   const focus = await esLoadBoundaryGeomIfAny();
 
-  // Initial pin load
+  // Initial pin load (one-time — pins stay on the map across zoom/pan)
   await esLoadPins({ skipFit: focus && focus.ok });
-
-  // Refresh pins as the viewport changes (debounced)
-  ES_MAP.addListener('idle', () => {
-    clearTimeout(ES_PINS_DEBOUNCE);
-    ES_PINS_DEBOUNCE = setTimeout(() => {
-      esLoadPins({ skipFit: true });
-    }, 220);
-  });
 }
   </script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key|urlencode }}&callback=esInitMap"></script>

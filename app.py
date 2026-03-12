@@ -4549,7 +4549,7 @@ GROUP BY UPPER(TRIM(stusps));
         context_mode = (request.args.get("context_mode") == "1")
         if selected_ticket_id.isdigit():
             try:
-                selected_ticket = SpeedReport.query.get(int(selected_ticket_id))
+                selected_ticket = SpeedReport.query.options(joinedload(SpeedReport.user)).get(int(selected_ticket_id))
                 if selected_ticket and getattr(selected_ticket, "is_deleted", False):
                     selected_ticket = None
             except Exception:

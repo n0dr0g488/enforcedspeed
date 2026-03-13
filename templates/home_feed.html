@@ -95,32 +95,10 @@
             </div>
           </div>
 
-          {# Recent users #}
-          <div class="rail-section">
-            <div style="font-weight:600;">Recent users</div>
-            <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
-              {% if recent_users and recent_users|length > 0 %}
-                {% for ru in recent_users %}
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <img src="{{ user_avatar_url(ru.user, 'sm') }}" alt="" style="width:28px; height:28px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
-                    <div style="min-width:0;">
-                      <a href="{{ url_for('profile', username=ru.username) }}" style="font-size:13px; font-weight:500; color:#111827; text-decoration:none; display:block; line-height:1.2;">{{ ru.username }}</a>
-                      {% if ru.car %}
-                        <div style="font-size:11px; color:#6b7280; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ ru.car }}</div>
-                      {% endif %}
-                    </div>
-                  </div>
-                {% endfor %}
-              {% else %}
-                <div class="subtle" style="font-size:13px;">No recent posts yet.</div>
-              {% endif %}
-            </div>
-          </div>
-
           {# Suggested nearby counties #}
           {% if suggested_counties and suggested_counties|length > 0 %}
           <div class="rail-section" id="suggestedCountiesSection">
-            <div style="font-weight:600;">Suggested for you</div>
+            <div style="font-weight:600;">Suggested</div>
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
               {% for sc in suggested_counties %}
                 <div class="suggested-county-row" data-geoid="{{ sc.geoid }}" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
@@ -166,6 +144,28 @@
           })();
           </script>
           {% endif %}
+
+          {# Posting #}
+          <div class="rail-section">
+            <div style="font-weight:600;">Posting</div>
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+              {% if recent_users and recent_users|length > 0 %}
+                {% for ru in recent_users %}
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <img src="{{ user_avatar_url(ru.user, 'sm') }}" alt="" style="width:28px; height:28px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
+                    <div style="min-width:0;">
+                      <a href="{{ url_for('profile', username=ru.username) }}" style="font-size:13px; font-weight:500; color:#111827; text-decoration:none; display:block; line-height:1.2;">{{ ru.username }}</a>
+                      {% if ru.car %}
+                        <div style="font-size:11px; color:#6b7280; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ ru.car }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="subtle" style="font-size:13px;">No recent posts yet.</div>
+              {% endif %}
+            </div>
+          </div>
 
         </div>
 
@@ -276,9 +276,9 @@
             <div class="onboarding-icon">★</div>
             <div class="onboarding-text">
               <strong>Welcome to EnforcedSpeed!</strong><br>
-              Follow states or counties to see speeding tickets in your feed.
+              Follow areas to see tickets in your feed.
               {% if counties_auto_added %}
-                Nearby counties have been automatically added to your following list.
+                Nearby counties have been added automatically.
               {% endif %}
             </div>
             <a class="onboarding-btn" href="{{ url_for('following') }}">Set up following</a>
@@ -302,21 +302,6 @@
           <a class="post-callout-btn" href="{{ url_for('submit') }}">Post your ticket</a>
         </div>
       </div>
-
-      {# Save following list callout: logged-out users who have session follows #}
-      {% if not current_user.is_authenticated and has_follows %}
-      <div class="onboarding-callout" id="saveFollowsCallout" style="display:none;">
-        <div class="save-callout-inner">
-          <button type="button" class="onboarding-close" id="saveFollowsClose" aria-label="Dismiss">&times;</button>
-          <div class="onboarding-icon">💾</div>
-          <div class="onboarding-text" style="color:#065f46;">
-            <strong>Save your following list!</strong><br>
-            Your follows will be lost when you close the browser. <a href="{{ url_for('register') }}" style="color:#047857; font-weight:600; text-decoration:underline;">Create an account</a> to keep them.
-          </div>
-          <a class="save-callout-btn" href="{{ url_for('register') }}">Create account</a>
-        </div>
-      </div>
-      {% endif %}
 
       {# Preserve active query params (used for infinite scroll + fallback pagination). #}
       {% set q = request.args.to_dict(flat=False) %}
@@ -947,25 +932,6 @@ document.addEventListener('DOMContentLoaded', function(){
         }
       }
     }catch(e){}
-
-    // Save following list callout (green, logged-out with follows)
-    try{
-      var saveCallout = document.getElementById('saveFollowsCallout');
-      var saveClose = document.getElementById('saveFollowsClose');
-      if(saveCallout){
-        var saveDismissed = false;
-        try{ saveDismissed = localStorage.getItem('es_save_follows_dismissed') === '1'; }catch(e){}
-        if(!saveDismissed){
-          saveCallout.style.display = 'block';
-        }
-        if(saveClose){
-          saveClose.addEventListener('click', function(){
-            saveCallout.style.display = 'none';
-            try{ localStorage.setItem('es_save_follows_dismissed', '1'); }catch(e){}
-          });
-        }
-      }
-    }catch(e){}
   });
 
   function initHomeRightToggle(){
@@ -1211,7 +1177,7 @@ function startAutoLoad(){
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-weight:600;">Trending counties</div>
+      <div style="font-weight:600;">Trending</div>
     </div>
   </div>
 

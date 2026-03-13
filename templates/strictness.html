@@ -1,297 +1,188 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="home-shell">
+<style>
+  .rankings-page { max-width: 960px; margin: 0 auto; padding: 12px 16px 60px; }
+  .rankings-title { font-size: 22px; font-weight: 700; color: #111827; margin: 0; }
+  .rankings-subtitle { font-size: 13px; color: #6b7280; margin-top: 4px; }
 
-  <aside class="home-left" id="homeFiltersSidebar" style="display:none !important;">
-    <div class="filters-rail">
-      <div class="filters-scroll">
-      <form method="get" action="{{ url_for('strictness') }}" class="filterbar" id="strictnessFilters">
-          <div class="filterbox">
-            <div class="filterbox-title">Filter Speeding Tickets</div>
-            <div class="filterbar-row filterbar-row--stack">
+  .summary-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .summary-card { flex: 1; min-width: 100px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; text-align: center; }
+  .summary-num { font-size: 24px; font-weight: 700; color: #111827; line-height: 1.1; }
+  .summary-label { font-size: 11px; color: #6b7280; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-state">State</label>
-                <select id="filter-state" name="state" class="filterbar-select" onchange="this.form.submit()">
-                  <option value="" {% if not filter_state %}selected{% endif %}>All states</option>
-                  {% for opt in state_filter_options %}
-                    <option value="{{ opt.code }}" {% if filter_state == opt.code %}selected{% endif %}>{{ opt.code }}</option>
-                  {% endfor %}
-                </select>
-              </div>
+  .rank-section { margin-top: 20px; }
+  .rank-section-title { font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 10px; }
 
-                            <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-county">County</label>
-                <div class="filter-autocomplete-wrap">
-                  <input id="filter-county" value="{{ filter_county_label or '' }}" placeholder="Start typing (e.g., Franklin)" autocomplete="off">
-                  <input type="hidden" id="filter-county-geoid" name="county_geoid" value="{{ filter_county_geoid or '' }}">
-                  <div class="filter-suggestions" id="filter-county-suggestions" style="display:none"></div>
-                </div>
-              </div>
+  .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+  .rank-table th { text-align: left; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  .rank-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+  .rank-table tr:last-child td { border-bottom: 0; }
+  .rank-table .rank-num { font-weight: 700; color: #9ca3af; width: 28px; text-align: center; }
+  .rank-table .rank-county a { color: #374151; text-decoration: none; font-weight: 500; }
+  .rank-table .rank-county a:hover { color: #1877f2; }
+  .rank-table .rank-state { color: #6b7280; }
+  .rank-table .rank-overage { font-weight: 700; color: #dc2626; text-align: right; white-space: nowrap; }
+  .rank-table .rank-tickets { color: #6b7280; text-align: right; white-space: nowrap; }
 
-<div class="filterbar-item filterbar-item--tight">
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-verify" style="margin:0;">Photo <span class="filter-check">✓</span></label>
-                  <label class="switch">
-                    <input type="checkbox" id="filter-verify" name="verify" value="verified" {% if filter_verify == 'verified' %}checked{% endif %} onchange="this.form.submit()">
-                    <span class="slider"></span>
-                  </label>
-                </div>
-              </div>
-<div class="filterbar-item filterbar-item--tight">
-  <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-    <label class="filterbar-label" for="filter-pin" style="margin:0;">Map pin <span class="filter-check">✓</span></label>
-    <label class="switch">
-      <input type="checkbox" id="filter-pin" name="pin" value="1" {% if filter_pin %}checked{% endif %} onchange="this.form.submit()">
-      <span class="slider"></span>
-    </label>
+  .rank-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 700px) { .rank-cols { grid-template-columns: 1fr; } }
+
+  .roads-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+  .roads-table th { text-align: left; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  .roads-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+  .roads-table tr:last-child td { border-bottom: 0; }
+  .roads-table .road-name { font-weight: 500; }
+  .roads-table .road-num { text-align: right; white-space: nowrap; }
+  .roads-table .road-over { font-weight: 600; color: #dc2626; text-align: right; white-space: nowrap; }
+
+  .speed-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .speed-pill { display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 14px; }
+  .speed-pill-speed { font-size: 18px; font-weight: 700; color: #111827; }
+  .speed-pill-count { font-size: 11px; color: #6b7280; }
+
+  .activity-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .activity-card { flex: 1; min-width: 120px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 16px; }
+  .activity-num { font-size: 20px; font-weight: 700; color: #111827; }
+  .activity-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
+</style>
+
+<div class="rankings-page">
+
+  <div style="text-align:center;">
+    <div class="rankings-title">Rankings</div>
+    <div class="rankings-subtitle">Speeding ticket enforcement data across the United States</div>
   </div>
-</div>
 
+  {% if summary %}
+  <div class="summary-row">
+    <div class="summary-card">
+      <div class="summary-num">{{ summary.total_tickets or 0 }}</div>
+      <div class="summary-label">Tickets</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num">{{ summary.total_counties or 0 }}</div>
+      <div class="summary-label">Counties</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num">{{ summary.total_states or 0 }}</div>
+      <div class="summary-label">States</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" style="color:#dc2626;">+{{ summary.avg_overage or 0 }}</div>
+      <div class="summary-label">Avg. Overage</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-num" style="color:#dc2626;">+{{ summary.max_overage or 0 }}</div>
+      <div class="summary-label">Max Overage</div>
+    </div>
+  </div>
 
+  <div class="activity-row">
+    <div class="activity-card">
+      <div class="activity-num">{{ summary.tickets_7d or 0 }}</div>
+      <div class="activity-label">Last 7 days</div>
+    </div>
+    <div class="activity-card">
+      <div class="activity-num">{{ summary.tickets_30d or 0 }}</div>
+      <div class="activity-label">Last 30 days</div>
+    </div>
+    <div class="activity-card">
+      <div class="activity-num">{{ summary.total_with_pin or 0 }}</div>
+      <div class="activity-label">With map pin</div>
+    </div>
+    <div class="activity-card">
+      <div class="activity-num">{{ summary.total_with_photo or 0 }}</div>
+      <div class="activity-label">With photo</div>
+    </div>
+  </div>
+  {% endif %}
 
-              <div class="filterbar-item">
-  <label class="filterbar-label" for="filter-speed-limit">Posted speed limit</label>
-  <select id="filter-speed-limit" name="speed_limit" class="filterbar-select" onchange="this.form.submit()">
-    <option value="any" {% if (filter_speed_limit_list|length == 0) %}selected{% endif %}>Any</option>
-    <option value="lte35" {% if 'lte35' in filter_speed_limit_list %}selected{% endif %}>≤ 35 mph</option>
-    <option value="40-55" {% if '40-55' in filter_speed_limit_list %}selected{% endif %}>40–55 mph</option>
-    <option value="gte60" {% if 'gte60' in filter_speed_limit_list %}selected{% endif %}>≥ 60 mph</option>
-  </select>
-</div>
+  <div class="rank-cols">
+    <div class="rank-section">
+      <div class="rank-section-title">Lowest Overage</div>
+      <table class="rank-table">
+        <thead>
+          <tr><th style="width:28px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tickets</th></tr>
+        </thead>
+        <tbody>
+          {% for r in most_strict[:15] %}
+          <tr>
+            <td class="rank-num">{{ loop.index }}</td>
+            <td class="rank-county"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="rank-state">{{ r.state }}</span></td>
+            <td class="rank-overage">+{{ '%.0f'|format(r.median_overage) }}</td>
+            <td class="rank-tickets">{{ r.tickets }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
 
-              <div class="filterbar-item">
-  <label class="filterbar-label" for="filter-overage">Overage (mph over)</label>
-  <select id="filter-overage" name="overage" class="filterbar-select" onchange="this.form.submit()">
-    <option value="all" {% if (filter_over_list|length == 0) %}selected{% endif %}>Any</option>
-    <option value="1-10" {% if '1-10' in filter_over_list %}selected{% endif %}>1–10 mph over</option>
-    <option value="11-20" {% if '11-20' in filter_over_list %}selected{% endif %}>11–20 mph over</option>
-    <option value="21+" {% if '21+' in filter_over_list %}selected{% endif %}>≥ 21 mph over</option>
-  </select>
-</div>
-              
-              
+    <div class="rank-section">
+      <div class="rank-section-title">Highest Overage</div>
+      <table class="rank-table">
+        <thead>
+          <tr><th style="width:28px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tickets</th></tr>
+        </thead>
+        <tbody>
+          {% for r in least_strict[:15] %}
+          <tr>
+            <td class="rank-num">{{ loop.index }}</td>
+            <td class="rank-county"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="rank-state">{{ r.state }}</span></td>
+            <td class="rank-overage">+{{ '%.0f'|format(r.median_overage) }}</td>
+            <td class="rank-tickets">{{ r.tickets }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-              <div class="filterbar-item">
-                <label class="filterbar-label" for="filter-date">Date</label>
-                <select id="filter-date" name="date" class="filterbar-select" onchange="this.form.submit()">
-                  {% for o in date_options %}
-                    <option value="{{ o.value }}" {% if filter_date == o.value %}selected{% endif %}>{{ o.label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
+  {% if summary %}
+  <div class="rank-cols">
+    {% if summary.top_roads %}
+    <div class="rank-section">
+      <div class="rank-section-title">Top Roads</div>
+      <table class="roads-table">
+        <thead>
+          <tr><th>Road</th><th style="text-align:right;">Tickets</th><th style="text-align:right;">Avg. Over</th></tr>
+        </thead>
+        <tbody>
+          {% for rd in summary.top_roads %}
+          <tr>
+            <td class="road-name">{{ rd.road }}</td>
+            <td class="road-num">{{ rd.count }}</td>
+            <td class="road-over">+{{ rd.avg_over }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
 
-              <div class="filterbar-item" style="display:none;">
-                <label class="filterbar-label" for="filter-sort">Sort by</label>
-                <select id="filter-sort" name="sort" class="filterbar-select" aria-label="Sort by" onchange="this.form.submit()">
-                  <option value="new" {% if filter_sort == 'new' %}selected{% endif %}>Newest</option>
-                  <option value="old" {% if filter_sort == 'old' %}selected{% endif %}>Oldest</option>
-                  <option value="most_over" {% if filter_sort == 'most_over' %}selected{% endif %}>Most over</option>
-                  <option value="most_strict" {% if filter_sort == 'most_strict' %}selected{% endif %}>Lower median overage</option>
-                  <option value="least_strict" {% if filter_sort == 'least_strict' %}selected{% endif %}>Higher median overage</option>
-                </select>
-              </div>
-
-              
-
-<div class="filterbar-item filterbar-item--tight">
-{% if is_admin %}
-                <div class="filterbar-rowline filterbar-rowline--tight" style="margin-top:0;">
-                  <label class="filterbar-label" for="filter-deleted-mode" style="margin:0;">Deleted (admin)</label>
-                  <select id="filter-deleted-mode" name="deleted" class="filter-select" onchange="this.form.submit()" style="max-width:140px;">
-                    <option value="hide" {% if (deleted_mode or 'hide') == 'hide' %}selected{% endif %}>Hide</option>
-                    <option value="include" {% if deleted_mode == 'include' %}selected{% endif %}>Include</option>
-                    <option value="only" {% if deleted_mode == 'only' %}selected{% endif %}>Only</option>
-                  </select>
-                </div>
-                {% endif %}
-              </div>
-
-<div class="filterbox-footer">
-                <a class="filterbar-clear {% if not filters_active %}is-disabled{% endif %}" href="{{ url_for('strictness', clear=1) }}">Clear</a>
-              </div>
-
-            </div>
+    {% if summary.top_posted %}
+    <div class="rank-section">
+      <div class="rank-section-title">Common Posted Speeds</div>
+      <div class="speed-pills">
+        {% for sp in summary.top_posted %}
+        <div class="speed-pill">
+          <div class="speed-pill-speed">{{ sp.speed }}</div>
+          <div>
+            <div style="font-size:12px; font-weight:600; color:#374151;">mph</div>
+            <div class="speed-pill-count">{{ sp.count }} tickets</div>
           </div>
-
-</form>
-      </div>
-
-      <div class="filters-footer">
-        <div class="filters-footer-links">
-        <a href="{{ url_for('privacy') }}">Privacy</a>
-        <span class="dot">·</span>
-        <a href="{{ url_for('terms') }}">Terms</a>
-          <span class="dot">·</span>
-          <a href="{{ url_for('cookies') }}">Cookie Policy</a>
-      </div>
-        <div class="filters-footer-meta">© 2025–2026 EnforcedSpeed™ · Mindra LLC</div>
+        </div>
+        {% endfor %}
       </div>
     </div>
-  </aside>
-
-  {# Filter drawer handle — fixed position, outside the aside so it survives collapse #}
-  <button type="button" class="home-filter-collapse-btn" id="homeFilterCollapseBtn" aria-label="Toggle filters" style="display:none !important;">
-    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="3" y1="6" x2="21" y2="6"></line>
-      <line x1="3" y1="12" x2="21" y2="12"></line>
-      <line x1="3" y1="18" x2="21" y2="18"></line>
-    </svg>
-  </button>
-
-  <main class="home-center">
-  <div class="card" style="padding:14px;">
-    <div style="margin-bottom:14px; text-align:center;">
-      <h1 style="margin:0;">County Rankings</h1>
-      <div class="subtle" style="margin-top:6px; font-size:14px;">Based on median ticketed speed over posted speed</div>
-    </div>
-
-    <div class="blocks">
-      <div class="block">
-        <strong>Lower median overage</strong>
-        <ol class="stat-list">
-          {% for i in range(20) %}
-            {% if i < most_strict|length %}
-              {% set r = most_strict[i] %}
-              <li class="stat-row">
-                <div class="stat-place">
-                  <span class="stat-state">{{ r.state_name }}</span>,
-                  <a class="stat-county" href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a>
-                </div>
-                <div class="stat-metrics">
-                  +{{ '%.1f'|format(r.median_overage) }} mph <span class="stat-tickets">({{ r.tickets }} tickets)</span>
-                </div>
-              </li>
-            {% else %}
-              <li class="subtle">Waiting for more data…</li>
-            {% endif %}
-          {% endfor %}
-        </ol>
-      </div>
-
-      <div class="block">
-        <strong>Higher median overage</strong>
-        <ol class="stat-list">
-          {% for i in range(20) %}
-            {% if i < least_strict|length %}
-              {% set r = least_strict[i] %}
-              <li class="stat-row">
-                <div class="stat-place">
-                  <span class="stat-state">{{ r.state_name }}</span>,
-                  <a class="stat-county" href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a>
-                </div>
-                <div class="stat-metrics">
-                  +{{ '%.1f'|format(r.median_overage) }} mph <span class="stat-tickets">({{ r.tickets }} tickets)</span>
-                </div>
-              </li>
-            {% else %}
-              <li class="subtle">Waiting for more data…</li>
-            {% endif %}
-          {% endfor %}
-        </ol>
-      </div>
-    </div>
-
+    {% endif %}
   </div>
-</main>
+  {% endif %}
 
 </div>
-
-<script>
-  // Multi-select dropdown behavior (speed limit + overage):
-  // - Do NOT submit on each checkbox click (allows multi-select)
-  // - Close on outside click or Done, keeping selections
-  // - Submit when the dropdown closes if selections changed
-  (function(){
-    var form = document.getElementById("strictnessFilters");
-    if(!form) return;
-
-    function textOf(cb){
-      return cb.getAttribute("data-label") || "";
-    }
-
-    function updateSummary(d){
-      var summary = d.querySelector(".multi-summary");
-      if(!summary) return;
-      var checks = Array.prototype.slice.call(d.querySelectorAll("input[type=checkbox]"));
-      var selected = checks.filter(function(c){ return c.checked; }).map(textOf).filter(Boolean);
-      summary.textContent = selected.length ? selected.join(", ") : "Any";
-    }
-
-    function submitIfDirty(d){
-      if(!d || !d._dirty) return;
-      if(d._submitting) return;
-      d._submitting = true;
-      d._dirty = false;
-      form.submit();
-    }
-
-    var multis = Array.prototype.slice.call(form.querySelectorAll("details[data-multi]"));
-    multis.forEach(function(d){
-      d._dirty = false;
-      d._submitting = false;
-      updateSummary(d);
-
-      d.addEventListener("change", function(e){
-        if(e.target && e.target.matches && e.target.matches("input[type=checkbox]")){
-          d._dirty = true;
-          updateSummary(d);
-        }
-      });
-
-      var done = d.querySelector("[data-multi-done]");
-      if(done){
-        done.addEventListener("click", function(ev){
-          ev.preventDefault();
-          d.open = false;
-          submitIfDirty(d);
-        });
-      }
-
-      d.addEventListener("toggle", function(){
-        if(!d.open){
-          submitIfDirty(d);
-        }
-      });
-    });
-
-    document.addEventListener("click", function(e){
-      multis.forEach(function(d){
-        if(!d.open) return;
-        if(d.contains(e.target)) return;
-        d.open = false;
-        submitIfDirty(d);
-      });
-    });
-  })();
-</script>
-
-<script>
-  // Filter panel drawer handle (statistics page)
-  (function(){
-    document.addEventListener('DOMContentLoaded', function(){
-      var sidebar = document.getElementById('homeFiltersSidebar');
-      var btn = document.getElementById('homeFilterCollapseBtn');
-      if(!sidebar || !btn) return;
-      btn.style.display = 'flex';
-
-      function setCollapsed(v, save){
-        if(v){ sidebar.classList.add('is-collapsed'); btn.style.left = '0px'; }
-        else { sidebar.classList.remove('is-collapsed'); btn.style.left = '320px'; }
-        if(save){ try{ localStorage.setItem('es_filters_collapsed', v ? '1' : '0'); }catch(e){} }
-      }
-
-      try{
-        var saved = localStorage.getItem('es_filters_collapsed');
-        setCollapsed(saved === '1', false);
-      }catch(e){ setCollapsed(false, false); }
-
-      btn.addEventListener('click', function(){
-        setCollapsed(!sidebar.classList.contains('is-collapsed'), true);
-      });
-    });
-  })();
-</script>
 
 {% endblock %}

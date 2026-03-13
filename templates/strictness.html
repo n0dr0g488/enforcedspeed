@@ -4,43 +4,32 @@
 <style>
   .stats-page { max-width: 960px; margin: 0 auto; padding: 12px 16px 60px; }
 
-  /* Summary strip */
-  .stats-strip { display: flex; gap: 1px; margin-bottom: 16px; background: #e5e7eb; border-radius: 10px; overflow: hidden; }
-  .stats-strip-item { flex: 1; background: #fff; padding: 14px 10px; text-align: center; }
-  .stats-strip-num { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.1; }
-  .stats-strip-label { font-size: 10px; color: #6b7280; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.4px; }
-
-  /* Activity strip */
-  .activity-strip { display: flex; gap: 1px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
-  .activity-strip-item { flex: 1; background: #fff; padding: 10px; text-align: center; }
-  .activity-strip-num { font-size: 18px; font-weight: 700; color: #111827; }
-  .activity-strip-label { font-size: 10px; color: #6b7280; margin-top: 2px; }
-
-  /* Heatmap */
-  .heatmap-section { margin-bottom: 24px; }
-  .heatmap-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 4px; }
-  .heatmap-sub { font-size: 12px; color: #6b7280; margin-bottom: 12px; }
-  .heatmap-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; max-width: 720px; }
-  .heatmap-cell { aspect-ratio: 1; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; cursor: default; position: relative; transition: transform 0.1s; }
-  .heatmap-cell:hover { transform: scale(1.15); z-index: 2; }
-  .heatmap-cell .hc-abbr { line-height: 1; }
-  .heatmap-cell .hc-val { font-size: 8px; font-weight: 400; opacity: 0.85; line-height: 1; margin-top: 1px; }
-  .heatmap-cell.no-data { background: #f3f4f6; color: #9ca3af; }
-  .heatmap-legend { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: #6b7280; }
-  .heatmap-legend-bar { height: 8px; width: 120px; border-radius: 4px; background: linear-gradient(to right, #fca5a5, #dc2626, #7f1d1d); }
-
-  /* EnforcedSpeed breakdown */
-  .es-section { margin-bottom: 24px; }
-  .es-section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 4px; }
-  .es-section-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
+  /* EnforcedSpeed zone cards */
+  .es-section { margin-bottom: 28px; }
+  .es-section-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+  .es-section-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; line-height: 1.4; }
   .es-speed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   .es-speed-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
-  .es-speed-card.no-data { opacity: 0.5; }
+  .es-speed-card.no-data { opacity: 0.45; }
   .es-speed-zone { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
   .es-speed-val { font-size: 28px; font-weight: 800; color: #dc2626; line-height: 1.1; margin-top: 4px; }
   .es-speed-val span { font-size: 13px; font-weight: 500; color: #6b7280; }
   .es-speed-val.empty { color: #d1d5db; font-size: 22px; }
   .es-speed-detail { font-size: 11px; color: #9ca3af; margin-top: 6px; }
+
+  /* Heatmap */
+  .heatmap-section { margin-bottom: 28px; }
+  .heatmap-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+  .heatmap-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
+  .heatmap-wrap { display: flex; justify-content: center; }
+  .heatmap-grid { display: grid; gap: 3px; max-width: 660px; width: 100%; }
+  .heatmap-cell { aspect-ratio: 1; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; cursor: default; position: relative; transition: transform 0.1s; }
+  .heatmap-cell:hover { transform: scale(1.15); z-index: 2; }
+  .heatmap-cell .hc-abbr { line-height: 1; }
+  .heatmap-cell .hc-val { font-size: 8px; font-weight: 400; opacity: 0.85; line-height: 1; margin-top: 1px; }
+  .heatmap-cell.no-data { background: #e5e7eb; color: #9ca3af; }
+  .heatmap-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 11px; color: #6b7280; }
+  .heatmap-legend-bar { height: 10px; width: 140px; border-radius: 5px; background: linear-gradient(to right, #3b82f6, #60a5fa, #fbbf24, #f97316, #dc2626); }
 
   /* Section */
   .stats-section { margin-bottom: 24px; }
@@ -58,82 +47,61 @@
   .stats-table .t-over { font-weight: 700; color: #dc2626; text-align: right; white-space: nowrap; }
   .stats-table .t-count { color: #6b7280; text-align: right; white-space: nowrap; }
 
-  /* Two-column layout */
   .stats-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 700px) { .stats-cols { grid-template-columns: 1fr; } }
 
-  /* Disclaimer */
   .stats-disclaimer { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 30px; line-height: 1.5; max-width: 600px; margin-left: auto; margin-right: auto; }
 </style>
 
 <div class="stats-page">
 
-  <div style="text-align:center; margin-bottom: 16px;">
+  <div style="text-align:center; margin-bottom: 20px;">
     <div style="font-size: 22px; font-weight: 700; color: #111827;">Statistics</div>
     <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">Speeding ticket enforcement data across the United States</div>
   </div>
 
-  {# ═══ SUMMARY STRIP ═══ #}
-  {% if summary %}
-  <div class="stats-strip">
-    <div class="stats-strip-item">
-      <div class="stats-strip-num">{{ summary.total_tickets or 0 }}</div>
-      <div class="stats-strip-label">Tickets</div>
+  {# ═══ ENFORCEDSPEED BY ZONE ═══ #}
+  {% if summary and summary.enforced_speeds %}
+  <div class="es-section">
+    <div class="es-section-title">EnforcedSpeed™ by Zone</div>
+    <div class="es-section-sub">
+      The EnforcedSpeed™ is the ticketed speed at which 90% of reported tickets occur in each speed zone — the point where enforcement is observed to begin based on user-reported data.
     </div>
-    <div class="stats-strip-item">
-      <div class="stats-strip-num">{{ summary.total_counties or 0 }}</div>
-      <div class="stats-strip-label">Counties</div>
-    </div>
-    <div class="stats-strip-item">
-      <div class="stats-strip-num">{{ summary.total_states or 0 }}</div>
-      <div class="stats-strip-label">States</div>
-    </div>
-    <div class="stats-strip-item">
-      <div class="stats-strip-num" style="color:#dc2626;">+{{ summary.avg_overage }}</div>
-      <div class="stats-strip-label">Avg. Overage</div>
-    </div>
-    <div class="stats-strip-item">
-      <div class="stats-strip-num" style="color:#dc2626;">+{{ summary.max_overage }}</div>
-      <div class="stats-strip-label">Max Overage</div>
+    <div class="es-speed-grid">
+      {% for es in summary.enforced_speeds %}
+      <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
+        <div class="es-speed-zone">{{ es.posted }} mph zone</div>
+        {% if es.has_data %}
+          <div class="es-speed-val">{{ es.enforced }} <span>mph</span></div>
+          <div class="es-speed-detail">+{{ es.p10_over }} over · {{ es.tickets }} tickets</div>
+        {% else %}
+          <div class="es-speed-val empty">—</div>
+          <div class="es-speed-detail">Needs more data</div>
+        {% endif %}
+      </div>
+      {% endfor %}
     </div>
   </div>
-
-  <div class="activity-strip">
-    <div class="activity-strip-item">
-      <div class="activity-strip-num">{{ summary.tickets_7d or 0 }}</div>
-      <div class="activity-strip-label">Last 7 days</div>
-    </div>
-    <div class="activity-strip-item">
-      <div class="activity-strip-num">{{ summary.tickets_30d or 0 }}</div>
-      <div class="activity-strip-label">Last 30 days</div>
-    </div>
-    <div class="activity-strip-item">
-      <div class="activity-strip-num">{{ summary.total_with_pin or 0 }}</div>
-      <div class="activity-strip-label">Map Pins</div>
-    </div>
-    <div class="activity-strip-item">
-      <div class="activity-strip-num">{{ summary.total_with_photo or 0 }}</div>
-      <div class="activity-strip-label">Photos</div>
-    </div>
-  </div>
+  {% endif %}
 
   {# ═══ STATE HEATMAP ═══ #}
-  {% if summary.state_stats %}
+  {% if summary and summary.state_stats %}
   <div class="heatmap-section">
     <div class="heatmap-title">Enforcement by State</div>
-    <div class="heatmap-sub">Average overage on reported tickets · Lower = stricter enforcement</div>
-    <div class="heatmap-grid" id="stateHeatmap"></div>
+    <div class="heatmap-sub">Average overage on reported tickets · Warmer colors indicate stricter enforcement (lower overage threshold)</div>
+    <div class="heatmap-wrap">
+      <div class="heatmap-grid" id="stateHeatmap"></div>
+    </div>
     <div class="heatmap-legend">
-      <span>Stricter</span>
-      <div class="heatmap-legend-bar"></div>
       <span>More lenient</span>
-      <span style="margin-left:12px; color:#d1d5db;">■</span> <span>No data</span>
+      <div class="heatmap-legend-bar"></div>
+      <span>Stricter</span>
+      <span style="margin-left:14px; color:#d1d5db;">■</span> <span>No data</span>
     </div>
   </div>
 
   <script>
   (function(){
-    // US state tile grid positions (row, col) — standard cartogram layout
     var grid = {
       'AK':[0,0],'ME':[0,11],'WI':[1,5],'VT':[1,10],'NH':[1,11],
       'WA':[2,0],'ID':[2,1],'MT':[2,2],'ND':[2,3],'MN':[2,4],'IL':[2,5],
@@ -152,16 +120,40 @@
     var el = document.getElementById('stateHeatmap');
     if(!el) return;
 
-    // Find min/max for color scale
     var vals = Object.values(stats).map(function(s){ return s.avg; });
     var mn = vals.length ? Math.min.apply(null, vals) : 5;
     var mx = vals.length ? Math.max.apply(null, vals) : 15;
-    if(mn === mx) mx = mn + 1;
+    if(mx - mn < 1) { mn -= 1; mx += 1; }
 
-    // All 50 states + DC
+    // Cool-to-warm: blue (lenient/high overage) → yellow → red (strict/low overage)
+    function heatColor(avg) {
+      var t = 1 - ((avg - mn) / (mx - mn)); // invert: low avg = strict = warm
+      t = Math.max(0, Math.min(1, t));
+      // 5-stop gradient: blue → light blue → yellow → orange → red
+      var r, g, b;
+      if (t < 0.25) {
+        var p = t / 0.25;
+        r = Math.round(59 + (96-59)*p); g = Math.round(130 + (165-130)*p); b = Math.round(246 + (250-246)*p);
+      } else if (t < 0.5) {
+        var p = (t - 0.25) / 0.25;
+        r = Math.round(96 + (251-96)*p); g = Math.round(165 + (191-165)*p); b = Math.round(250 + (36-250)*p);
+      } else if (t < 0.75) {
+        var p = (t - 0.5) / 0.25;
+        r = Math.round(251 + (249-251)*p); g = Math.round(191 + (115-191)*p); b = Math.round(36 + (22-36)*p);
+      } else {
+        var p = (t - 0.75) / 0.25;
+        r = Math.round(249 + (220-249)*p); g = Math.round(115 + (38-115)*p); b = Math.round(22 + (38-22)*p);
+      }
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+
+    function textColor(avg) {
+      var t = 1 - ((avg - mn) / (mx - mn));
+      return t > 0.45 ? '#fff' : '#1e293b';
+    }
+
     var allStates = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 
-    // Find grid bounds
     var maxRow = 0, maxCol = 0;
     for(var k in grid){
       if(grid[k][0] > maxRow) maxRow = grid[k][0];
@@ -169,38 +161,28 @@
     }
     el.style.gridTemplateColumns = 'repeat(' + (maxCol+1) + ', 1fr)';
 
-    // Create empty grid
     var cells = {};
     for(var r=0; r<=maxRow; r++){
       for(var c=0; c<=maxCol; c++){
         var d = document.createElement('div');
         d.style.gridRow = (r+1);
         d.style.gridColumn = (c+1);
-        d.style.background = 'transparent';
         el.appendChild(d);
         cells[r+','+c] = d;
       }
     }
 
-    // Place states
     allStates.forEach(function(st){
       var pos = grid[st];
       if(!pos) return;
       var key = pos[0]+','+pos[1];
       var cell = cells[key];
       if(!cell) return;
-
       cell.className = 'heatmap-cell';
       var s = stats[st];
       if(s){
-        var t = (s.avg - mn) / (mx - mn); // 0=strict, 1=lenient
-        // Color: strict=light red, lenient=dark red
-        var r = Math.round(220 + (127-220)*t*(t<0.5?0:1));
-        var g = Math.round(160 - 130*t);
-        var b = Math.round(160 - 130*t);
-        // Simpler: use opacity on a red base
-        var intensity = 0.25 + 0.75 * t;
-        cell.style.background = 'rgba(185, 28, 28, ' + intensity + ')';
+        cell.style.background = heatColor(s.avg);
+        cell.style.color = textColor(s.avg);
         cell.innerHTML = '<span class="hc-abbr">' + st + '</span><span class="hc-val">+' + Math.round(s.avg) + '</span>';
         cell.title = st + ': avg +' + s.avg + ' mph over (' + s.tickets + ' tickets)';
       } else {
@@ -211,29 +193,6 @@
     });
   })();
   </script>
-  {% endif %}
-  {% endif %}
-
-  {# ═══ ENFORCEDSPEED BY ZONE ═══ #}
-  {% if summary and summary.enforced_speeds %}
-  <div class="es-section">
-    <div class="es-section-title">EnforcedSpeed™ by Zone</div>
-    <div class="es-section-sub">The ticketed speed at which 90% of reported tickets occur</div>
-    <div class="es-speed-grid">
-      {% for es in summary.enforced_speeds %}
-      <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
-        <div class="es-speed-zone">{{ es.posted }} mph zone</div>
-        {% if es.has_data %}
-          <div class="es-speed-val">{{ es.enforced }} <span>mph</span></div>
-          <div class="es-speed-detail">+{{ es.p10_over }} over · {{ es.tickets }} tickets</div>
-        {% else %}
-          <div class="es-speed-val empty">—</div>
-          <div class="es-speed-detail">Needs more data</div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </div>
   {% endif %}
 
   {# ═══ COUNTY RANKINGS ═══ #}
@@ -276,25 +235,6 @@
       </table>
     </div>
   </div>
-
-  {# ═══ TOP ROADS ═══ #}
-  {% if summary and summary.top_roads %}
-  <div class="stats-section">
-    <div class="stats-section-title">Top Roads</div>
-    <table class="stats-table" style="max-width:480px;">
-      <thead><tr><th>Road</th><th style="text-align:right;">Tickets</th><th style="text-align:right;">Avg. Over</th></tr></thead>
-      <tbody>
-        {% for rd in summary.top_roads %}
-        <tr>
-          <td style="font-weight:500;">{{ rd.road }}</td>
-          <td class="t-count">{{ rd.count }}</td>
-          <td class="t-over">+{{ rd.avg_over }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
 
   <div class="stats-disclaimer">
     For informational purposes only. Based on voluntarily submitted, unverified user reports.

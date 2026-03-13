@@ -2781,6 +2781,55 @@ GROUP BY UPPER(TRIM(stusps));
             summary["tickets_7d"] = base.filter(SpeedReport.created_at >= (now - timedelta(days=7))).count()
             summary["tickets_30d"] = base.filter(SpeedReport.created_at >= (now - timedelta(days=30))).count()
 
+            # EnforcedSpeed: for each posted speed, find the 10th percentile overage
+            # (90% of tickets are at or above this overage)
+            enforced_speeds = []
+            es_rows = db.session.query(
+                SpeedReport.posted_speed,
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("overage"),
+            ).filter(
+                SpeedReport.is_deleted.is_(False),
+                SpeedReport.posted_speed.isnot(None),
+                SpeedReport.ticketed_speed.isnot(None),
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed) > 0,
+            ).all()
+
+            # Group by posted speed
+            es_groups = {}
+            for row in es_rows:
+                ps = int(row.posted_speed)
+                ov = int(row.overage)
+                if ps not in es_groups:
+                    es_groups[ps] = []
+                es_groups[ps].append(ov)
+
+            # Compute for speeds with enough data
+            for ps in sorted(es_groups.keys()):
+                ovs = sorted(es_groups[ps])
+                if len(ovs) < 3:
+                    continue
+                # 10th percentile index
+                idx = max(0, int(len(ovs) * 0.10))
+                p10 = ovs[idx]
+                avg_ov = round(sum(ovs) / len(ovs), 1)
+                enforced_speeds.append({
+                    "posted": ps,
+                    "enforced": ps + p10,
+                    "p10_over": p10,
+                    "avg_over": avg_ov,
+                    "tickets": len(ovs),
+                })
+
+            summary["enforced_speeds"] = enforced_speeds
+
+            # Overall EnforcedSpeed (across all speed limits)
+            all_ovs = sorted([ov for ovs in es_groups.values() for ov in ovs])
+            if all_ovs:
+                idx = max(0, int(len(all_ovs) * 0.10))
+                summary["overall_p10"] = all_ovs[idx]
+            else:
+                summary["overall_p10"] = 0
+
         except Exception:
             try:
                 db.session.rollback()

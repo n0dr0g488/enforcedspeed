@@ -2,116 +2,164 @@
 {% block content %}
 
 <style>
-  .rankings-page { max-width: 960px; margin: 0 auto; padding: 12px 16px 60px; }
-  .rankings-title { font-size: 22px; font-weight: 700; color: #111827; margin: 0; }
-  .rankings-subtitle { font-size: 13px; color: #6b7280; margin-top: 4px; }
+  .stats-page { max-width: 960px; margin: 0 auto; padding: 12px 16px 60px; }
 
-  .summary-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-  .summary-card { flex: 1; min-width: 100px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; text-align: center; }
-  .summary-num { font-size: 24px; font-weight: 700; color: #111827; line-height: 1.1; }
-  .summary-label { font-size: 11px; color: #6b7280; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+  /* Hero */
+  .es-hero { background: linear-gradient(135deg, #111827 0%, #1e293b 100%); border-radius: 14px; padding: 32px 28px; color: #fff; text-align: center; margin-bottom: 20px; position: relative; overflow: hidden; }
+  .es-hero::before { content: ''; position: absolute; top: -40%; right: -20%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(220,38,38,0.15) 0%, transparent 70%); pointer-events: none; }
+  .es-hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af; margin-bottom: 6px; }
+  .es-hero-title { font-size: 14px; font-weight: 500; color: #d1d5db; margin-bottom: 16px; line-height: 1.4; }
+  .es-hero-metric { font-size: 56px; font-weight: 800; color: #dc2626; line-height: 1; margin-bottom: 4px; letter-spacing: -1px; }
+  .es-hero-unit { font-size: 16px; font-weight: 500; color: #9ca3af; }
+  .es-hero-note { font-size: 11px; color: #6b7280; margin-top: 14px; line-height: 1.4; }
 
-  .rank-section { margin-top: 20px; }
-  .rank-section-title { font-size: 14px; font-weight: 600; color: #111827; margin: 0 0 10px; }
+  /* Summary strip */
+  .stats-strip { display: flex; gap: 1px; margin-bottom: 16px; background: #e5e7eb; border-radius: 10px; overflow: hidden; }
+  .stats-strip-item { flex: 1; background: #fff; padding: 14px 10px; text-align: center; }
+  .stats-strip-num { font-size: 22px; font-weight: 700; color: #111827; line-height: 1.1; }
+  .stats-strip-label { font-size: 10px; color: #6b7280; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.4px; }
 
-  .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-  .rank-table th { text-align: left; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-  .rank-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; color: #374151; }
-  .rank-table tr:last-child td { border-bottom: 0; }
-  .rank-table .rank-num { font-weight: 700; color: #9ca3af; width: 28px; text-align: center; }
-  .rank-table .rank-county a { color: #374151; text-decoration: none; font-weight: 500; }
-  .rank-table .rank-county a:hover { color: #1877f2; }
-  .rank-table .rank-state { color: #6b7280; }
-  .rank-table .rank-overage { font-weight: 700; color: #dc2626; text-align: right; white-space: nowrap; }
-  .rank-table .rank-tickets { color: #6b7280; text-align: right; white-space: nowrap; }
+  /* Activity strip */
+  .activity-strip { display: flex; gap: 1px; background: #e5e7eb; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+  .activity-strip-item { flex: 1; background: #fff; padding: 10px; text-align: center; }
+  .activity-strip-num { font-size: 18px; font-weight: 700; color: #111827; }
+  .activity-strip-label { font-size: 10px; color: #6b7280; margin-top: 2px; }
 
-  .rank-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-  @media (max-width: 700px) { .rank-cols { grid-template-columns: 1fr; } }
+  /* EnforcedSpeed breakdown */
+  .es-breakdown { margin-bottom: 24px; }
+  .es-breakdown-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+  .es-breakdown-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
+  .es-speed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; }
+  .es-speed-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
+  .es-speed-posted { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
+  .es-speed-enforced { font-size: 28px; font-weight: 800; color: #dc2626; line-height: 1.1; margin-top: 4px; }
+  .es-speed-enforced span { font-size: 14px; font-weight: 500; color: #6b7280; }
+  .es-speed-detail { font-size: 11px; color: #9ca3af; margin-top: 6px; }
+  .es-speed-bar { height: 3px; background: #f3f4f6; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .es-speed-bar-fill { height: 100%; background: #dc2626; border-radius: 2px; }
 
-  .roads-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
-  .roads-table th { text-align: left; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-  .roads-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; color: #374151; }
-  .roads-table tr:last-child td { border-bottom: 0; }
-  .roads-table .road-name { font-weight: 500; }
-  .roads-table .road-num { text-align: right; white-space: nowrap; }
-  .roads-table .road-over { font-weight: 600; color: #dc2626; text-align: right; white-space: nowrap; }
+  /* Section */
+  .stats-section { margin-bottom: 24px; }
+  .stats-section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 12px; }
 
-  .speed-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  /* Tables */
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+  .stats-table th { text-align: left; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; padding: 7px 10px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+  .stats-table td { padding: 6px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+  .stats-table tr:last-child td { border-bottom: 0; }
+  .stats-table .t-num { font-weight: 700; color: #9ca3af; width: 24px; text-align: center; font-size: 11px; }
+  .stats-table .t-name a { color: #374151; text-decoration: none; font-weight: 500; }
+  .stats-table .t-name a:hover { color: #1877f2; }
+  .stats-table .t-state { color: #9ca3af; font-size: 12px; }
+  .stats-table .t-over { font-weight: 700; color: #dc2626; text-align: right; white-space: nowrap; }
+  .stats-table .t-count { color: #6b7280; text-align: right; white-space: nowrap; }
+
+  /* Two-column layout */
+  .stats-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .stats-cols { grid-template-columns: 1fr; } }
+
+  /* Speed pills */
+  .speed-pills { display: flex; gap: 8px; flex-wrap: wrap; }
   .speed-pill { display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 14px; }
   .speed-pill-speed { font-size: 18px; font-weight: 700; color: #111827; }
   .speed-pill-count { font-size: 11px; color: #6b7280; }
 
-  .activity-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-  .activity-card { flex: 1; min-width: 120px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 16px; }
-  .activity-num { font-size: 20px; font-weight: 700; color: #111827; }
-  .activity-label { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  /* Disclaimer */
+  .stats-disclaimer { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 30px; line-height: 1.5; max-width: 600px; margin-left: auto; margin-right: auto; }
+  .stats-disclaimer a { color: #9ca3af; }
 </style>
 
-<div class="rankings-page">
+<div class="stats-page">
 
-  <div style="text-align:center;">
-    <div class="rankings-title">Rankings</div>
-    <div class="rankings-subtitle">Speeding ticket enforcement data across the United States</div>
-  </div>
-
-  {% if summary %}
-  <div class="summary-row">
-    <div class="summary-card">
-      <div class="summary-num">{{ summary.total_tickets or 0 }}</div>
-      <div class="summary-label">Tickets</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-num">{{ summary.total_counties or 0 }}</div>
-      <div class="summary-label">Counties</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-num">{{ summary.total_states or 0 }}</div>
-      <div class="summary-label">States</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-num" style="color:#dc2626;">+{{ summary.avg_overage or 0 }}</div>
-      <div class="summary-label">Avg. Overage</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-num" style="color:#dc2626;">+{{ summary.max_overage or 0 }}</div>
-      <div class="summary-label">Max Overage</div>
-    </div>
-  </div>
-
-  <div class="activity-row">
-    <div class="activity-card">
-      <div class="activity-num">{{ summary.tickets_7d or 0 }}</div>
-      <div class="activity-label">Last 7 days</div>
-    </div>
-    <div class="activity-card">
-      <div class="activity-num">{{ summary.tickets_30d or 0 }}</div>
-      <div class="activity-label">Last 30 days</div>
-    </div>
-    <div class="activity-card">
-      <div class="activity-num">{{ summary.total_with_pin or 0 }}</div>
-      <div class="activity-label">With map pin</div>
-    </div>
-    <div class="activity-card">
-      <div class="activity-num">{{ summary.total_with_photo or 0 }}</div>
-      <div class="activity-label">With photo</div>
-    </div>
+  {# ═══ HERO ═══ #}
+  {% if summary and summary.overall_p10 %}
+  <div class="es-hero">
+    <div class="es-hero-label">EnforcedSpeed™</div>
+    <div class="es-hero-title">The overage at which 90% of reported tickets occur</div>
+    <div class="es-hero-metric">+{{ summary.overall_p10 }} mph</div>
+    <div class="es-hero-unit">over the posted limit</div>
+    <div class="es-hero-note">Based on {{ summary.total_tickets or 0 }} user-reported tickets across {{ summary.total_states or 0 }} states</div>
   </div>
   {% endif %}
 
-  <div class="rank-cols">
-    <div class="rank-section">
-      <div class="rank-section-title">Lowest Overage</div>
-      <table class="rank-table">
-        <thead>
-          <tr><th style="width:28px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tickets</th></tr>
-        </thead>
+  {# ═══ SUMMARY STRIP ═══ #}
+  {% if summary %}
+  <div class="stats-strip">
+    <div class="stats-strip-item">
+      <div class="stats-strip-num">{{ summary.total_tickets or 0 }}</div>
+      <div class="stats-strip-label">Tickets</div>
+    </div>
+    <div class="stats-strip-item">
+      <div class="stats-strip-num">{{ summary.total_counties or 0 }}</div>
+      <div class="stats-strip-label">Counties</div>
+    </div>
+    <div class="stats-strip-item">
+      <div class="stats-strip-num">{{ summary.total_states or 0 }}</div>
+      <div class="stats-strip-label">States</div>
+    </div>
+    <div class="stats-strip-item">
+      <div class="stats-strip-num" style="color:#dc2626;">+{{ summary.avg_overage }}</div>
+      <div class="stats-strip-label">Avg. Overage</div>
+    </div>
+    <div class="stats-strip-item">
+      <div class="stats-strip-num" style="color:#dc2626;">+{{ summary.max_overage }}</div>
+      <div class="stats-strip-label">Max Overage</div>
+    </div>
+  </div>
+
+  <div class="activity-strip">
+    <div class="activity-strip-item">
+      <div class="activity-strip-num">{{ summary.tickets_7d or 0 }}</div>
+      <div class="activity-strip-label">Last 7 days</div>
+    </div>
+    <div class="activity-strip-item">
+      <div class="activity-strip-num">{{ summary.tickets_30d or 0 }}</div>
+      <div class="activity-strip-label">Last 30 days</div>
+    </div>
+    <div class="activity-strip-item">
+      <div class="activity-strip-num">{{ summary.total_with_pin or 0 }}</div>
+      <div class="activity-strip-label">Map Pins</div>
+    </div>
+    <div class="activity-strip-item">
+      <div class="activity-strip-num">{{ summary.total_with_photo or 0 }}</div>
+      <div class="activity-strip-label">Photos</div>
+    </div>
+  </div>
+
+  {# ═══ ENFORCEDSPEED BY ZONE ═══ #}
+  {% if summary.enforced_speeds %}
+  <div class="es-breakdown">
+    <div class="es-breakdown-title">EnforcedSpeed™ by Posted Limit</div>
+    <div class="es-breakdown-sub">The ticketed speed at which 90% of reported tickets occur for each speed zone</div>
+    <div class="es-speed-grid">
+      {% for es in summary.enforced_speeds %}
+      <div class="es-speed-card">
+        <div class="es-speed-posted">{{ es.posted }} mph zone</div>
+        <div class="es-speed-enforced">{{ es.enforced }} <span>mph</span></div>
+        <div class="es-speed-detail">+{{ es.p10_over }} over · {{ es.tickets }} tickets</div>
+        <div class="es-speed-bar">
+          <div class="es-speed-bar-fill" style="width: {{ [es.p10_over * 5, 100]|min }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {# ═══ STRICTNESS RANKINGS ═══ #}
+  <div class="stats-cols">
+    <div class="stats-section">
+      <div class="stats-section-title">Strictest Counties</div>
+      <table class="stats-table">
+        <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
         <tbody>
           {% for r in most_strict[:15] %}
           <tr>
-            <td class="rank-num">{{ loop.index }}</td>
-            <td class="rank-county"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="rank-state">{{ r.state }}</span></td>
-            <td class="rank-overage">+{{ '%.0f'|format(r.median_overage) }}</td>
-            <td class="rank-tickets">{{ r.tickets }}</td>
+            <td class="t-num">{{ loop.index }}</td>
+            <td class="t-name"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="t-state">{{ r.state }}</span></td>
+            <td class="t-over">+{{ '%.0f'|format(r.median_overage) }}</td>
+            <td class="t-count">{{ r.tickets }}</td>
           </tr>
           {% else %}
           <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
@@ -120,19 +168,17 @@
       </table>
     </div>
 
-    <div class="rank-section">
-      <div class="rank-section-title">Highest Overage</div>
-      <table class="rank-table">
-        <thead>
-          <tr><th style="width:28px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tickets</th></tr>
-        </thead>
+    <div class="stats-section">
+      <div class="stats-section-title">Most Lenient Counties</div>
+      <table class="stats-table">
+        <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
         <tbody>
           {% for r in least_strict[:15] %}
           <tr>
-            <td class="rank-num">{{ loop.index }}</td>
-            <td class="rank-county"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="rank-state">{{ r.state }}</span></td>
-            <td class="rank-overage">+{{ '%.0f'|format(r.median_overage) }}</td>
-            <td class="rank-tickets">{{ r.tickets }}</td>
+            <td class="t-num">{{ loop.index }}</td>
+            <td class="t-name"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="t-state">{{ r.state }}</span></td>
+            <td class="t-over">+{{ '%.0f'|format(r.median_overage) }}</td>
+            <td class="t-count">{{ r.tickets }}</td>
           </tr>
           {% else %}
           <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
@@ -142,21 +188,20 @@
     </div>
   </div>
 
+  {# ═══ TOP ROADS + SPEED LIMITS ═══ #}
   {% if summary %}
-  <div class="rank-cols">
+  <div class="stats-cols">
     {% if summary.top_roads %}
-    <div class="rank-section">
-      <div class="rank-section-title">Top Roads</div>
-      <table class="roads-table">
-        <thead>
-          <tr><th>Road</th><th style="text-align:right;">Tickets</th><th style="text-align:right;">Avg. Over</th></tr>
-        </thead>
+    <div class="stats-section">
+      <div class="stats-section-title">Top Roads</div>
+      <table class="stats-table">
+        <thead><tr><th>Road</th><th style="text-align:right;">Tickets</th><th style="text-align:right;">Avg. Over</th></tr></thead>
         <tbody>
           {% for rd in summary.top_roads %}
           <tr>
-            <td class="road-name">{{ rd.road }}</td>
-            <td class="road-num">{{ rd.count }}</td>
-            <td class="road-over">+{{ rd.avg_over }}</td>
+            <td style="font-weight:500;">{{ rd.road }}</td>
+            <td class="t-count">{{ rd.count }}</td>
+            <td class="t-over">+{{ rd.avg_over }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -165,8 +210,8 @@
     {% endif %}
 
     {% if summary.top_posted %}
-    <div class="rank-section">
-      <div class="rank-section-title">Common Posted Speeds</div>
+    <div class="stats-section">
+      <div class="stats-section-title">Common Posted Speeds</div>
       <div class="speed-pills">
         {% for sp in summary.top_posted %}
         <div class="speed-pill">
@@ -182,6 +227,11 @@
     {% endif %}
   </div>
   {% endif %}
+
+  <div class="stats-disclaimer">
+    For informational purposes only. Based on voluntarily submitted, unverified user reports.
+    This data does not represent official enforcement policy. Always obey posted speed limits.
+  </div>
 
 </div>
 

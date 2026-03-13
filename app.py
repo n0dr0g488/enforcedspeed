@@ -2781,8 +2781,34 @@ GROUP BY UPPER(TRIM(stusps));
             summary["tickets_7d"] = base.filter(SpeedReport.created_at >= (now - timedelta(days=7))).count()
             summary["tickets_30d"] = base.filter(SpeedReport.created_at >= (now - timedelta(days=30))).count()
 
-            # EnforcedSpeed: for each posted speed, find the 10th percentile overage
-            # (90% of tickets are at or above this overage)
+            # EnforcedSpeed per state for heatmap
+            state_stats = {}
+            st_rows = db.session.query(
+                SpeedReport.state,
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("overage"),
+            ).filter(
+                SpeedReport.is_deleted.is_(False),
+                SpeedReport.posted_speed.isnot(None),
+                SpeedReport.ticketed_speed.isnot(None),
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed) > 0,
+            ).all()
+            st_groups = {}
+            for row in st_rows:
+                sc = normalize_state_group(row.state)
+                if not sc or len(sc) != 2:
+                    continue
+                if sc not in st_groups:
+                    st_groups[sc] = []
+                st_groups[sc].append(int(row.overage))
+
+            for sc, ovs in st_groups.items():
+                ovs_sorted = sorted(ovs)
+                avg_ov = round(sum(ovs) / len(ovs), 1)
+                med_ov = ovs_sorted[len(ovs_sorted) // 2]
+                state_stats[sc] = {"avg": avg_ov, "median": med_ov, "tickets": len(ovs)}
+            summary["state_stats"] = state_stats
+
+            # EnforcedSpeed by zone (template all common zones)
             enforced_speeds = []
             es_rows = db.session.query(
                 SpeedReport.posted_speed,
@@ -2794,7 +2820,6 @@ GROUP BY UPPER(TRIM(stusps));
                 (SpeedReport.ticketed_speed - SpeedReport.posted_speed) > 0,
             ).all()
 
-            # Group by posted speed
             es_groups = {}
             for row in es_rows:
                 ps = int(row.posted_speed)
@@ -2803,26 +2828,35 @@ GROUP BY UPPER(TRIM(stusps));
                     es_groups[ps] = []
                 es_groups[ps].append(ov)
 
-            # Compute for speeds with enough data
-            for ps in sorted(es_groups.keys()):
-                ovs = sorted(es_groups[ps])
-                if len(ovs) < 3:
-                    continue
-                # 10th percentile index
-                idx = max(0, int(len(ovs) * 0.10))
-                p10 = ovs[idx]
-                avg_ov = round(sum(ovs) / len(ovs), 1)
-                enforced_speeds.append({
-                    "posted": ps,
-                    "enforced": ps + p10,
-                    "p10_over": p10,
-                    "avg_over": avg_ov,
-                    "tickets": len(ovs),
-                })
+            # Template common zones even without data
+            common_zones = [25, 35, 45, 55, 65, 70]
+            for ps in common_zones:
+                ovs = sorted(es_groups.get(ps, []))
+                if len(ovs) >= 3:
+                    idx = max(0, int(len(ovs) * 0.10))
+                    p10 = ovs[idx]
+                    avg_ov = round(sum(ovs) / len(ovs), 1)
+                    enforced_speeds.append({
+                        "posted": ps,
+                        "enforced": ps + p10,
+                        "p10_over": p10,
+                        "avg_over": avg_ov,
+                        "tickets": len(ovs),
+                        "has_data": True,
+                    })
+                else:
+                    enforced_speeds.append({
+                        "posted": ps,
+                        "enforced": None,
+                        "p10_over": None,
+                        "avg_over": None,
+                        "tickets": len(ovs),
+                        "has_data": False,
+                    })
 
             summary["enforced_speeds"] = enforced_speeds
 
-            # Overall EnforcedSpeed (across all speed limits)
+            # Overall EnforcedSpeed
             all_ovs = sorted([ov for ovs in es_groups.values() for ov in ovs])
             if all_ovs:
                 idx = max(0, int(len(all_ovs) * 0.10))

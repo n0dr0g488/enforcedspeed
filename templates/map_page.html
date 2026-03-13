@@ -135,7 +135,7 @@
   .map-zoom-controls{
     position: absolute;
     right: 12px;
-    bottom: 80px;
+    bottom: 12px;
     z-index: 6;
     display: flex;
     flex-direction: column;
@@ -171,27 +171,15 @@
   .map-right .mini-ticket .mini-title { font-weight: 600; margin: 0 0 4px 0; }
   .map-right .mini-ticket .mini-sub { font-size: 13px; opacity: .85; }
   .map-right .stat-card { padding: 12px; margin-top: 12px; }
-  .map-right .stat-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #e5e7eb; }
-  .map-right .stat-row:last-child { border-bottom: 0; }
-  .map-right .stat-row + .stat-section-divider { border-top: 0; }
-  .map-right .stat-row:has(+ .stat-section-divider) { border-bottom: 0; }
+  .map-right .stat-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
+  .map-right .stat-row:first-of-type { border-top: 0; }
   .map-right .stat-k { opacity: .8; }
   .map-right .stat-v { font-weight: 600; white-space: nowrap; }
-  .map-right .stat-title { font-weight: 600; margin: 0; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
-  .map-right .stat-section-divider { margin-top: 10px; padding-top: 4px; }
+  .map-right .stat-title { font-weight: 600; margin: 0 0 8px 0; }
   .map-right .speed-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-  .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid #e5e7eb; }
+  .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.06); }
   .map-right .speed-table th { text-align: left; font-weight: 600; opacity: .85; }
   .map-right .speed-table td:last-child, .map-right .speed-table th:last-child { text-align: right; }
-
-  /* Compact InfoWindow */
-  .gm-style-iw-c { padding: 6px 8px !important; border-radius: 8px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; outline: none !important; }
-  .gm-style-iw-d { overflow: hidden !important; padding: 0 !important; }
-  .gm-style-iw-chr { position: absolute; top: -2px; right: -2px; }
-  .gm-style-iw { outline: none !important; }
-  .gm-style-iw-c:focus, .gm-style-iw-c:focus-visible { outline: none !important; }
-  .gm-ui-hover-effect { width: 20px !important; height: 20px !important; }
-  .gm-ui-hover-effect > span { width: 14px !important; height: 14px !important; margin: 3px !important; }
 </style>
 
 <div class="home-shell map-shell">
@@ -377,6 +365,27 @@
             </div>
             <div id="esMap"></div>
 
+            {# Overlay: prompt to select a county/state when nothing is selected #}
+            {% if not filter_state and not filter_county_geoid %}
+            <div class="map-select-overlay" id="mapSelectOverlay">
+              <div class="map-select-box">
+                <div class="map-select-title">Select a county or state for detailed information</div>
+                {% if map_following_items %}
+                  <div class="map-select-subtitle">Your followed areas:</div>
+                  <div class="map-select-list">
+                    {% for item in map_following_items %}
+                      <a class="map-select-item" href="{{ item.url }}">{{ item.label }}</a>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="map-select-subtitle" style="margin-bottom:6px;">
+                    <a href="{{ url_for('following') }}" style="color:#1877f2; text-decoration:none; font-weight:600;">Follow states or counties</a> to see them here.
+                  </div>
+                {% endif %}
+                <button type="button" class="map-select-dismiss" id="mapSelectDismiss">Continue without selecting</button>
+              </div>
+            </div>
+            {% endif %}
           </div>
         {% endif %}
       </div>
@@ -385,33 +394,12 @@
     <aside class="home-right map-right" aria-label="Selected ticket">
       <div class="card mini-ticket" id="esSelectedTicketCard">
         {% if selected_ticket %}
-          {% set _st = (selected_ticket.state or '')[:2] %}
-          {% set _ov = (selected_ticket.ticketed_speed|int - selected_ticket.posted_speed|int) %}
-          {% set _user = selected_ticket.user if selected_ticket.user_id else None %}
-          <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
-            {% if _user %}
-              <img src="{{ user_avatar_url(_user, 'sm') }}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
-              <div style="min-width:0;">
-                <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">{{ _user.username }}</div>
-                <div style="font-size:11px; color:#6b7280; line-height:1.2;">{{ selected_ticket.created_at.strftime('%b %d, %Y') if selected_ticket.created_at else '' }}</div>
-              </div>
-            {% else %}
-              <div style="width:32px; height:32px; border-radius:999px; background:#e5e7eb; flex-shrink:0;"></div>
-              <div style="min-width:0;">
-                <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">Anonymous</div>
-                <div style="font-size:11px; color:#6b7280; line-height:1.2;">{{ selected_ticket.created_at.strftime('%b %d, %Y') if selected_ticket.created_at else '' }}</div>
-              </div>
-            {% endif %}
+          <div class="mini-title">{{ selected_ticket.road_name or 'Road' }}, {{ (selected_ticket.state or '')[:2] }}</div>
+          <div class="mini-sub">{{ selected_ticket.posted_speed }} → {{ selected_ticket.ticketed_speed }} mph
+            {% set _ov = (selected_ticket.ticketed_speed|int - selected_ticket.posted_speed|int) %}
+            <span style="opacity:.75;">(+{{ _ov }} mph)</span>
           </div>
-          <div style="font-size:13px; color:#374151; line-height:1.4;">
-            <div style="font-weight:600;">{{ selected_ticket.road_name or 'Road' }}</div>
-            <div style="color:#6b7280;">{{ _st }}{% if selected_ticket.county_name %} · {{ selected_ticket.county_name }}{% endif %}</div>
-          </div>
-          <div style="display:flex; gap:12px; margin-top:8px; font-size:13px;">
-            <div><span style="color:#6b7280;">Posted</span> <span style="font-weight:600;">{{ selected_ticket.posted_speed }} mph</span></div>
-            <div><span style="color:#6b7280;">Ticketed</span> <span style="font-weight:600;">{{ selected_ticket.ticketed_speed }} mph</span></div>
-            <div style="color:#dc2626; font-weight:600;">+{{ _ov }} mph</div>
-          </div>
+          <div class="mini-sub" style="margin-top:6px;"><a href="{{ url_for('result', report_id=selected_ticket.id) }}">View ticket</a></div>
         {% else %}
           <div class="mini-title">Select a pin</div>
           <div class="mini-sub">Click a pin on the map to see its ticket details here.</div>
@@ -422,7 +410,7 @@
         <div class="stat-title">{% if region_title %}{{ region_title }}{% else %}Select a county or state{% endif %}</div>
 
         <div class="stat-row">
-          <div class="stat-k">Filtered</div>
+          <div class="stat-k">Pins shown</div>
           <div class="stat-v" id="esMapMeta">—</div>
         </div>
 
@@ -432,9 +420,7 @@
           <div class="stat-row"><div class="stat-k">Last 30 days</div><div class="stat-v">{{ region_stats.total_30 }}</div></div>
           <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ region_stats.total_365 }}</div></div>
 
-          <div class="stat-section-divider">
-            <div style="font-weight:600;">Overage</div>
-          </div>
+          <div style="margin-top:10px; font-weight:600;">Avg overage by posted speed</div>
           <table class="speed-table" aria-label="Average overage by posted speed">
             <thead>
               <tr><th>Posted</th><th>Avg over</th></tr>
@@ -572,108 +558,17 @@
         try { m.setMap(null); } catch(e) {}
       }
       ES_MARKERS = [];
-      esClearOverageLabels();
-    }
-
-    // --- Overage labels above pins (visible at zoom >= 12) ---
-    let ES_OVERAGE_LABELS = [];
-    const ES_OVERAGE_ZOOM_MIN = 12;
-    let EsOverageLabel = null; // defined after Maps API loads
-
-    function esInitOverageLabel() {
-      if (EsOverageLabel) return;
-      EsOverageLabel = class extends google.maps.OverlayView {
-        constructor(position, text, zIdx) {
-          super();
-          this._pos = position;
-          this._text = text;
-          this._zIdx = zIdx || 1;
-          this._div = null;
-        }
-        onAdd() {
-          const div = document.createElement('div');
-          div.style.position = 'absolute';
-          div.style.whiteSpace = 'nowrap';
-          div.style.fontSize = '11px';
-          div.style.fontWeight = '700';
-          div.style.color = '#dc2626';
-          div.style.textShadow = '0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff';
-          div.style.pointerEvents = 'none';
-          div.style.zIndex = String(this._zIdx);
-          div.textContent = this._text;
-          this._div = div;
-          this.getPanes().overlayLayer.appendChild(div);
-          this._updateVisibility();
-        }
-        draw() {
-          if (!this._div) return;
-          const proj = this.getProjection();
-          if (!proj) return;
-          const pt = proj.fromLatLngToDivPixel(this._pos);
-          if (!pt) return;
-          this._div.style.left = (pt.x - this._div.offsetWidth / 2) + 'px';
-          this._div.style.top = (pt.y - 46) + 'px';
-        }
-        onRemove() {
-          if (this._div && this._div.parentNode) {
-            this._div.parentNode.removeChild(this._div);
-          }
-          this._div = null;
-        }
-        show() { if (this._div) this._div.style.display = ''; }
-        hide() { if (this._div) this._div.style.display = 'none'; }
-        _updateVisibility() {
-          if (!this._div || !ES_MAP) return;
-          const z = ES_MAP.getZoom();
-          this._div.style.display = (typeof z === 'number' && z >= ES_OVERAGE_ZOOM_MIN) ? '' : 'none';
-        }
-      };
-    }
-
-    function esClearOverageLabels() {
-      for (const lbl of ES_OVERAGE_LABELS) {
-        try { lbl.setMap(null); } catch(e) {}
-      }
-      ES_OVERAGE_LABELS = [];
-    }
-
-    function esUpdateOverageLabelVisibility() {
-      const z = ES_MAP.getZoom();
-      const show = (typeof z === 'number' && z >= ES_OVERAGE_ZOOM_MIN);
-      for (const lbl of ES_OVERAGE_LABELS) {
-        if (show) lbl.show(); else lbl.hide();
-      }
     }
 
     function esUpdateSelectedCard(p) {
       const el = document.getElementById('esSelectedTicketCard');
       if (!el || !p) return;
+      const title = `${p.road || 'Road'}, ${p.state || ''}`;
       const over = (Number(p.ticketed) - Number(p.posted));
-      const username = p.username || 'Anonymous';
-      const avatar = p.avatar || '/static/img/avatars/a01.png';
-      const car = p.car || '';
-      const county = p.county || '';
-      const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-      const avatarHtml = `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
-      const carLine = car ? `<div style="font-size:11px; color:#9ca3af; line-height:1.2;">${car}</div>` : '';
       el.innerHTML = `
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
-          ${avatarHtml}
-          <div style="min-width:0;">
-            <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">${username}</div>
-            <div style="font-size:11px; color:#6b7280; line-height:1.2;">${dateStr}</div>
-            ${carLine}
-          </div>
-        </div>
-        <div style="font-size:13px; color:#374151; line-height:1.4;">
-          <div style="font-weight:600;">${p.road || 'Road'}</div>
-          <div style="color:#6b7280;">${p.state || ''}${county ? ' · ' + county : ''}</div>
-        </div>
-        <div style="display:flex; gap:12px; margin-top:8px; font-size:13px;">
-          <div><span style="color:#6b7280;">Posted</span> <span style="font-weight:600;">${p.posted} mph</span></div>
-          <div><span style="color:#6b7280;">Ticketed</span> <span style="font-weight:600;">${p.ticketed} mph</span></div>
-          <div style="color:#dc2626; font-weight:600;">+${over} mph</div>
-        </div>
+        <div class="mini-title">${title}</div>
+        <div class="mini-sub">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over} mph)</span></div>
+        <div class="mini-sub" style="margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
       `;
     }
 
@@ -810,6 +705,13 @@ async function esLoadPins(opts) {
   if (meta) meta.textContent = 'Loading pins...';
 
   const params = new URLSearchParams(window.location.search);
+  const vp = esGetViewportBoundsParams();
+  if (vp) {
+    params.set('north', String(vp.north));
+    params.set('south', String(vp.south));
+    params.set('east', String(vp.east));
+    params.set('west', String(vp.west));
+  }
 
   // Also pass focus through explicitly for the API (lets focus work without filtering).
   if (ES_FOCUS && ES_FOCUS.type === 'state' && ES_FOCUS.value) {
@@ -837,18 +739,13 @@ async function esLoadPins(opts) {
   const pins = data.pins || [];
   if (meta) {
     if (data.inside_count != null && ES_FOCUS && ES_FOCUS.type && ES_FOCUS.value) {
-      meta.textContent = String(data.inside_count);
+      meta.textContent = String(data.inside_count) + ' in focus • ' + pins.length + ' pins shown (max 1500).';
     } else {
-      meta.textContent = String(pins.length);
+      meta.textContent = pins.length + ' pins shown (max 1500).';
     }
   }
 
-  // Use persistent selection: user click > URL param
-  const urlSelectedId = (data.selected_id != null) ? String(data.selected_id) : null;
-  if (!window._esSelectedPinId && urlSelectedId) {
-    window._esSelectedPinId = urlSelectedId;
-  }
-  const activeId = window._esSelectedPinId || null;
+  const selectedId = (data.selected_id != null) ? String(data.selected_id) : null;
 
   let bounds = new google.maps.LatLngBounds();
   for (const p of pins) {
@@ -856,55 +753,28 @@ async function esLoadPins(opts) {
     const pos = { lat: Number(p.lat), lng: Number(p.lng) };
     bounds.extend(pos);
 
-    const isActive = (activeId && String(p.id) === activeId);
+    const isSelected = (selectedId && String(p.id) === selectedId);
     const isInside = !!p.inside_focus;
-    const baseKind = isInside ? 'inside' : 'outside';
-    const icon = isActive ? esGetPinIcon('selected') : esGetPinIcon(baseKind);
+    const icon = isSelected ? esGetPinIcon('selected') : (isInside ? esGetPinIcon('inside') : esGetPinIcon('outside'));
 
-    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isActive ? 999999 : (isInside ? 2 : 1)) });
-    m._esPinId = String(p.id);
-    m._esPinKind = baseKind;
-
+    const m = new google.maps.Marker({ position: pos, map: ES_MAP, icon: icon, zIndex: (isSelected ? 999999 : (isInside ? 2 : 1)) });
     m.addListener('click', () => {
-      esSelectPin(p, m);
-    });
-    ES_MARKERS.push(m);
-
-    // Create overage label above pin
-    const pinOver = (Number(p.ticketed) - Number(p.posted));
-    if (pinOver > 0) {
-      const lbl = new EsOverageLabel(
-        new google.maps.LatLng(pos.lat, pos.lng),
-        '+' + pinOver,
-        isActive ? 999998 : (isInside ? 3 : 1)
-      );
-      lbl.setMap(ES_MAP);
-      ES_OVERAGE_LABELS.push(lbl);
-    }
-
-    // Re-open InfoWindow on the active pin after reload (but don't touch right panel card)
-    if (isActive) {
-      // Store pin data for persistence (only if not already set by server render or user click)
-      if (!window._esSelectedPinData) {
-        window._esSelectedPinData = p;
-      }
-      const sp = window._esSelectedPinData;
-      const over = (Number(sp.ticketed) - Number(sp.posted));
-      const avatarHtml = `<img src="${sp.avatar || '/static/img/avatars/a01.png'}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;background:#e5e7eb;">`;
+      const title = `${p.road || 'Road'}, ${p.state || ''}`;
+      const over = (Number(p.ticketed) - Number(p.posted));
       const html = `
-        <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
-          <div style="display:flex; gap:6px; align-items:center;">
-            ${avatarHtml}
-            <div style="font-weight:600; font-size:13px; line-height:1.2;">${sp.road || 'Road'}</div>
-          </div>
-          <div style="font-size:12px; color:#374151; margin-top:3px;">${sp.posted} → ${sp.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>
+        <div style="font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width:240px;">
+          <div style="font-weight:600; margin-bottom:4px;">${title}</div>
+          <div style="font-size:13px;">${p.posted} → ${p.ticketed} mph <span style="opacity:.75;">(+${over})</span></div>
+          <div style="font-size:13px; margin-top:6px;"><a href="/result/${p.id}">View ticket</a></div>
         </div>
       `;
       ES_INFO.setContent(html);
       ES_INFO.open({ anchor: m, map: ES_MAP });
-      // DON'T update right panel here - server already rendered it correctly,
-      // or esSelectPin already set it from a user click
-    }
+
+      // Also populate the right-side selected ticket card.
+      esUpdateSelectedCard(p);
+    });
+    ES_MARKERS.push(m);
   }
 
   try {
@@ -912,39 +782,6 @@ async function esLoadPins(opts) {
       ES_MAP.fitBounds(bounds);
     }
   } catch(e) {}
-}
-
-function esSelectPin(p, marker) {
-  const over = (Number(p.ticketed) - Number(p.posted));
-  const avatarSrc = p.avatar || '/static/img/avatars/a01.png';
-  const html = `
-    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
-      <div style="display:flex; gap:6px; align-items:center;">
-        <img src="${avatarSrc}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;background:#e5e7eb;">
-        <div style="font-weight:600; font-size:13px; line-height:1.2;">${p.road || 'Road'}</div>
-      </div>
-      <div style="font-size:12px; color:#374151; margin-top:3px;">${p.posted} → ${p.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>
-    </div>
-  `;
-  ES_INFO.setContent(html);
-  ES_INFO.open({ anchor: marker, map: ES_MAP });
-
-  // Revert ALL markers to their base color, then set this one red
-  for (const em of ES_MARKERS) {
-    if (em._esPinId !== marker._esPinId) {
-      em.setIcon(esGetPinIcon(em._esPinKind));
-      em.setZIndex(em._esPinKind === 'inside' ? 2 : 1);
-    }
-  }
-  marker.setIcon(esGetPinIcon('selected'));
-  marker.setZIndex(999999);
-
-  // Persist selection across pin reloads
-  window._esSelectedPinId = String(p.id);
-  window._esSelectedPinData = p;
-
-  // Update right panel
-  esUpdateSelectedCard(p);
 }
 
 window.esInitMap = async function() {
@@ -956,8 +793,7 @@ window.esInitMap = async function() {
     fullscreenControl: false,
     gestureHandling: "greedy",
   });
-  ES_INFO = new google.maps.InfoWindow({ maxWidth: 220, disableAutoPan: true });
-  esInitOverageLabel();
+  ES_INFO = new google.maps.InfoWindow();
 
   // Custom zoom controls (+ / -) that are always available (even without a mouse wheel)
   (function esWireZoomControls(){
@@ -996,14 +832,21 @@ window.esInitMap = async function() {
     });
 
     ES_MAP.addListener('zoom_changed', updateDisabled);
-    ES_MAP.addListener('zoom_changed', esUpdateOverageLabelVisibility);
     updateDisabled();
   })();
 
   const focus = await esLoadBoundaryGeomIfAny();
 
-  // Initial pin load (one-time — pins stay on the map across zoom/pan)
+  // Initial pin load
   await esLoadPins({ skipFit: focus && focus.ok });
+
+  // Refresh pins as the viewport changes (debounced)
+  ES_MAP.addListener('idle', () => {
+    clearTimeout(ES_PINS_DEBOUNCE);
+    ES_PINS_DEBOUNCE = setTimeout(() => {
+      esLoadPins({ skipFit: true });
+    }, 220);
+  });
 }
   </script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key|urlencode }}&callback=esInitMap"></script>
@@ -1102,6 +945,19 @@ window.esInitMap = async function() {
         setCollapsed(!sidebar.classList.contains('is-collapsed'), true);
       });
     });
+  })();
+</script>
+
+<script>
+  // Map selection overlay dismiss
+  (function(){
+    var overlay = document.getElementById('mapSelectOverlay');
+    var btn = document.getElementById('mapSelectDismiss');
+    if(overlay && btn){
+      btn.addEventListener('click', function(){
+        overlay.style.display = 'none';
+      });
+    }
   })();
 </script>
 

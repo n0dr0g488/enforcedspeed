@@ -1320,65 +1320,81 @@ def create_app() -> Flask:
         except Exception:
             return None
 
-    def _profile_photo_base_url() -> str:
-        """Public URL base for profile photos."""
-        try:
-            cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
-        except Exception:
-            cfg = (os.environ.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
-        if cfg:
-            if cfg.endswith("/profile_photos"):
-                cfg = cfg[: -len("/profile_photos")]
-            return cfg
-        try:
-            pin = (app.config.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
-        except Exception:
-            pin = (os.environ.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
-        if not pin:
-            return ""
-        base = pin
-        if base.endswith("/pins"):
-            base = base[: -len("/pins")]
-        base = base.rstrip("/")
-        return base
-
-    def user_avatar_url(user, size: str = "sm") -> str:
-        """Return a URL for the user's avatar."""
-        try:
-            base_key = user_profile_photo_key(user) if user else ""
-            if base_key:
-                base_url = _profile_photo_base_url()
-                if base_url and base_key:
-                    suffix = "_256.jpg" if str(size).lower() in ("lg", "large", "256") else "_64.jpg"
-                    return f"{base_url.rstrip('/')}/{base_key}{suffix}"
-            raw = getattr(user, "avatar_key", None) if user else None
-            key = normalize_avatar_key(raw)
-            return url_for("static", filename=f"img/avatars/{key}.png") + f"?v={_ES_VERSION}"
-        except Exception:
-            return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png") + f"?v={_ES_VERSION}"
-
-    def user_avatar_is_photo(user) -> bool:
-        try:
-            return bool(user_profile_photo_key(user) if user else "")
-        except Exception:
-            return False
-
-    def car_photo_url(user, slot: int) -> str:
-        """Return URL for a user's car photo in the given slot (1-3), or empty."""
-        try:
-            key = getattr(user, f"car_photo_{slot}", None) or ""
-            key = key.strip()
-            if not key:
-                return ""
-            base = _profile_photo_base_url()
-            if base:
-                return f"{base}/{key}"
-            return ""
-        except Exception:
-            return ""
-
     @app.context_processor
     def inject_helpers():
+        def _profile_photo_base_url() -> str:
+            """Public URL base for profile photos.
+
+            Priority:
+              1) PROFILE_PHOTO_BASE_URL (env/config) — e.g. https://static.enforcedspeed.com/profile_photos
+              2) derive from STATIC_PIN_BASE_URL — e.g. https://static.enforcedspeed.com/pins -> /profile_photos
+            """
+            try:
+                cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
+            except Exception:
+                cfg = (os.environ.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
+            if cfg:
+                # Accept either base root or /profile_photos; normalize to base root.
+                if cfg.endswith("/profile_photos"):
+                    cfg = cfg[: -len("/profile_photos")]
+                return cfg
+
+            try:
+                pin = (app.config.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+            except Exception:
+                pin = (os.environ.get("STATIC_PIN_BASE_URL") or "").strip().rstrip("/")
+            if not pin:
+                return ""
+            base = pin
+            if base.endswith("/pins"):
+                base = base[: -len("/pins")]
+            base = base.rstrip("/")
+            return base
+
+        def user_avatar_url(user, size: str = "sm") -> str:
+            """Return a URL for the user's avatar.
+
+            size:
+              - "sm" => 64px (header/feed)
+              - "lg" => 256px (profile)
+            """
+            try:
+                base_key = user_profile_photo_key(user) if user else ""
+                if base_key:
+                    base_url = _profile_photo_base_url()
+                    if base_url and base_key:
+                        suffix = "_256.jpg" if str(size).lower() in ("lg", "large", "256") else "_64.jpg"
+                        return f"{base_url.rstrip('/')}/{base_key}{suffix}"
+
+                raw = getattr(user, "avatar_key", None) if user else None
+                key = normalize_avatar_key(raw)
+                # System avatars are immutable assets. Add a stable version query so browsers
+                # can cache aggressively, while still allowing us to bust caches by bumping
+                # app version.
+                return url_for("static", filename=f"img/avatars/{key}.png") + f"?v={_ES_VERSION}"
+            except Exception:
+                return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png") + f"?v={_ES_VERSION}"
+
+        def user_avatar_is_photo(user) -> bool:
+            try:
+                return bool(user_profile_photo_key(user) if user else "")
+            except Exception:
+                return False
+
+        def car_photo_url(user, slot: int) -> str:
+            """Return URL for a user's car photo in the given slot (1-3), or empty."""
+            try:
+                key = getattr(user, f"car_photo_{slot}", None) or ""
+                key = key.strip()
+                if not key:
+                    return ""
+                base = _profile_photo_base_url()
+                if base:
+                    return f"{base}/{key}"
+                return ""
+            except Exception:
+                return ""
+
         return {
             "format_road_bucket": format_road_bucket,
             "static_map_url": static_map_url,
@@ -4359,21 +4375,6 @@ GROUP BY UPPER(TRIM(stusps));
         if explicit_all:
             session.pop("_map_last", None)
 
-        # If a county is selected but no state, look up the county's state
-        if filter_county_geoid and not filter_state and not focus_state:
-            try:
-                row = db.session.execute(
-                    text("SELECT stusps FROM counties WHERE geoid = :g LIMIT 1"),
-                    {"g": filter_county_geoid},
-                ).mappings().first()
-                if row and row.get("stusps"):
-                    filter_state = row["stusps"].strip().upper()
-            except Exception:
-                try:
-                    db.session.rollback()
-                except Exception:
-                    pass
-
         if not filter_state and not focus_state and not filter_county_geoid and not explicit_all:
             # Check if user has a remembered map view
             last_map = session.get("_map_last")
@@ -4533,7 +4534,7 @@ GROUP BY UPPER(TRIM(stusps));
         context_mode = (request.args.get("context_mode") == "1")
         if selected_ticket_id.isdigit():
             try:
-                selected_ticket = SpeedReport.query.options(joinedload(SpeedReport.user)).get(int(selected_ticket_id))
+                selected_ticket = SpeedReport.query.get(int(selected_ticket_id))
                 if selected_ticket and getattr(selected_ticket, "is_deleted", False):
                     selected_ticket = None
             except Exception:
@@ -6396,21 +6397,6 @@ GROUP BY UPPER(TRIM(stusps));
             except Exception:
                 inside_focus = True
 
-            _user = getattr(r, "user", None)
-            if _user is None and r.user_id:
-                try:
-                    _user = db.session.get(User, r.user_id)
-                except Exception:
-                    pass
-            _avatar = ""
-            _car = ""
-            if _user:
-                _avatar = user_avatar_url(_user, "sm")
-                _car_parts = [str(_user.car_year) if getattr(_user, "car_year", None) else "", getattr(_user, "car_make", "") or "", getattr(_user, "car_model", "") or ""]
-                _car = " ".join(pt for pt in _car_parts if pt).strip()
-
-            _county_name = getattr(r, "county_name", "") or ""
-
             pins.append(
                 {
                     "id": r.id,
@@ -6421,10 +6407,7 @@ GROUP BY UPPER(TRIM(stusps));
                     "posted": r.posted_speed,
                     "ticketed": r.ticketed_speed,
                     "created_at": r.created_at.isoformat() if r.created_at else None,
-                    "username": (_user.username if _user else None),
-                    "avatar": _avatar,
-                    "car": _car,
-                    "county": _county_name,
+                    "username": (r.user.username if getattr(r, "user", None) else None),
                     "inside_focus": bool(inside_focus),
                 }
             )

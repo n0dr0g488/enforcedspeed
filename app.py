@@ -4085,15 +4085,25 @@ GROUP BY UPPER(TRIM(stusps));
         except Exception:
             pass
 
-        # Recent users: last 5 unique users who posted in the feed
+        # Posting: last 5 unique users who posted in the followed areas (chronological)
         recent_users = []
         try:
+            ru_q = SpeedReport.query.filter(SpeedReport.is_deleted.is_(False), SpeedReport.user_id.isnot(None))
+            if followed_state_codes or followed_county_geoids:
+                ru_conds = []
+                for sc in followed_state_codes:
+                    ru_conds.append(SpeedReport.state.ilike(f"{sc}%"))
+                for cg in followed_county_geoids:
+                    ru_conds.append(SpeedReport.county_geoid == cg)
+                ru_q = ru_q.filter(or_(*ru_conds))
+            # Get the most recent tickets, walk them for unique users
+            ru_rows = ru_q.order_by(SpeedReport.created_at.desc()).limit(50).all()
             seen_uids = set()
-            for r in reports:
+            for r in ru_rows:
                 if len(recent_users) >= 5:
                     break
-                uid = getattr(r, "user_id", None)
-                if not uid or uid in seen_uids:
+                uid = r.user_id
+                if uid in seen_uids:
                     continue
                 seen_uids.add(uid)
                 u = db.session.get(User, uid)

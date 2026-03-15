@@ -55,8 +55,20 @@ def _gemini_verify_image(
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(_GEMINI_MODEL)
+    # Explicitly configure with api_key only.
+    # We temporarily unset ADC env vars so google-generativeai doesn't
+    # silently fall back to the service account (which lacks Gemini access).
+    _saved_adc = os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+    _saved_creds = os.environ.pop("GOOGLE_CREDENTIALS_JSON", None)
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(_GEMINI_MODEL)
+    finally:
+        # Always restore so other Google services (Vision, Maps) keep working
+        if _saved_adc is not None:
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _saved_adc
+        if _saved_creds is not None:
+            os.environ["GOOGLE_CREDENTIALS_JSON"] = _saved_creds
 
     # Encode image as base64 for inline sending
     b64 = base64.b64encode(img_bytes).decode("utf-8")

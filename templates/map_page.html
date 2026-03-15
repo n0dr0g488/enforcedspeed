@@ -683,7 +683,7 @@
   const geoid = (params.get('focus_county_geoid') || params.get('county_geoid') || params.get('county') || '').trim();
   if (!geoid) return { ok: false };
 
-  // Clear county outlines layer when drilling into a single county
+  // Don't clear county layer yet — we'll repopulate it with neighbor counties below
   esClearCountyLayer();
 
   try {
@@ -729,6 +729,13 @@
     } catch(e) {}
 
     ES_FOCUS = { type: 'county', value: data.geoid || geoid };
+
+    // Load neighboring counties (lighter style) for the same state
+    const st = (params.get('state') || params.get('focus_state') || '').trim().toUpperCase();
+    if (st && st.length === 2) {
+      await esLoadCountyOutlines(st, data.geoid || geoid);
+    }
+
     return { ok: true, geoid: data.geoid, centroid: data.centroid || null };
   } catch(e) {
     return { ok: false };
@@ -745,7 +752,7 @@
       }
     }
 
-    async function esLoadCountyOutlines(stusps) {
+    async function esLoadCountyOutlines(stusps, focusedGeoid) {
       esClearCountyLayer();
       if (!stusps) return;
 
@@ -757,23 +764,46 @@
         ES_COUNTY_LAYER = new google.maps.Data({ map: ES_MAP });
         ES_COUNTY_LAYER.addGeoJson(data.geojson);
 
-        // Default style: thin border, transparent fill
-        ES_COUNTY_LAYER.setStyle({
-          strokeColor: '#1e293b',
-          strokeWeight: 0.8,
-          strokeOpacity: 0.6,
-          fillColor: '#000000',
-          fillOpacity: 0,
-          cursor: 'pointer',
+        const isCountyView = !!focusedGeoid;
+
+        // Style function: focused county is invisible (drawn by ES_MAP.data), others are lighter in county view
+        ES_COUNTY_LAYER.setStyle(function(feature) {
+          const geoid = feature.getProperty('geoid');
+          if (isCountyView && geoid === focusedGeoid) {
+            // Hide — the focused county is already drawn on ES_MAP.data
+            return { strokeWeight: 0, fillOpacity: 0, clickable: false };
+          }
+          if (isCountyView) {
+            // Neighbor county: lighter/more subtle style
+            return {
+              strokeColor: '#1e293b',
+              strokeWeight: 0.5,
+              strokeOpacity: 0.35,
+              fillColor: '#000000',
+              fillOpacity: 0,
+              cursor: 'pointer',
+            };
+          }
+          // Normal state view style
+          return {
+            strokeColor: '#1e293b',
+            strokeWeight: 0.8,
+            strokeOpacity: 0.6,
+            fillColor: '#000000',
+            fillOpacity: 0,
+            cursor: 'pointer',
+          };
         });
 
         // Hover: highlight county
         ES_COUNTY_LAYER.addListener('mouseover', function(e) {
+          const geoid = e.feature.getProperty('geoid');
+          if (isCountyView && geoid === focusedGeoid) return;
           ES_COUNTY_LAYER.overrideStyle(e.feature, {
-            fillOpacity: 0.08,
+            fillOpacity: isCountyView ? 0.05 : 0.08,
             fillColor: '#1877f2',
-            strokeWeight: 1.5,
-            strokeOpacity: 0.8,
+            strokeWeight: isCountyView ? 1.0 : 1.5,
+            strokeOpacity: isCountyView ? 0.5 : 0.8,
             strokeColor: '#1877f2',
           });
           // Show county name tooltip
@@ -794,9 +824,9 @@
         // Click: navigate to county view
         ES_COUNTY_LAYER.addListener('click', function(e) {
           var geoid = e.feature.getProperty('geoid');
-          if (geoid) {
-            window.location.href = '/map?county=' + encodeURIComponent(geoid) + '&state=' + encodeURIComponent(stusps);
-          }
+          if (!geoid) return;
+          if (isCountyView && geoid === focusedGeoid) return;
+          window.location.href = '/map?county=' + encodeURIComponent(geoid) + '&state=' + encodeURIComponent(stusps);
         });
 
         // Mouse move: position tooltip near cursor

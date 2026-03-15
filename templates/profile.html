@@ -24,7 +24,7 @@
   .avatar-layout{ display:flex; align-items:flex-start; gap:24px; }
   .avatar-left{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:100px; }
   .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; }
-  .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:cover; background:#e5e7eb; display:block; }
+  .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:contain; background:transparent; display:block; }
   .avatar-overlay{
     position:absolute; inset:0; border-radius:999px;
     background:rgba(0,0,0,0.45);
@@ -60,7 +60,7 @@
   .es-avatar-choice.is-selected{ border-color:#1877f2; }
   .es-avatar-choice img{
     width:40px; height:40px; border-radius:999px;
-    object-fit:cover; background:#e5e7eb; display:block;
+    object-fit:contain; background:transparent; display:block;
   }
 
   @media(max-width:520px){
@@ -68,7 +68,7 @@
     .avatar-left{ width:auto; }
     .avatar-grid-compact{ grid-template-columns:repeat(6, 40px); grid-template-rows:repeat(2, 40px); }
     .es-avatar-choice{ width:40px; height:40px; }
-    .es-avatar-choice img{ width:36px; height:36px; }
+    .es-avatar-choice img{ width:36px; height:36px; object-fit:contain; }
   }
 
   /* Car photo slots */

@@ -23,8 +23,8 @@
   /* Avatar: left (preview+upload) / right (grid+save/cancel) */
   .avatar-layout{ display:flex; align-items:flex-start; gap:24px; }
   .avatar-left{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:100px; }
-  .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; }
-  .avatar-wrap img{ width:80px; height:80px; border-radius:999px; object-fit:contain; background:transparent; display:block; }
+  .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; border-radius:999px; overflow:hidden; }
+  .avatar-wrap img{ width:80px; height:80px; transform:scale(1.27); object-fit:contain; background:transparent; display:block; }
   .avatar-overlay{
     position:absolute; inset:0; border-radius:999px;
     background:rgba(0,0,0,0.45);
@@ -54,12 +54,14 @@
     background:transparent; cursor:pointer;
     width:44px; height:44px;
     display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
     transition:border-color 0.1s, transform 0.1s;
   }
   .es-avatar-choice:hover{ transform:scale(1.08); }
   .es-avatar-choice.is-selected{ border-color:#1877f2; }
   .es-avatar-choice img{
-    width:40px; height:40px; border-radius:999px;
+    width:44px; height:44px; flex-shrink:0;
+    transform:scale(1.27);
     object-fit:contain; background:transparent; display:block;
   }
 
@@ -68,7 +70,7 @@
     .avatar-left{ width:auto; }
     .avatar-grid-compact{ grid-template-columns:repeat(6, 40px); grid-template-rows:repeat(2, 40px); }
     .es-avatar-choice{ width:40px; height:40px; }
-    .es-avatar-choice img{ width:36px; height:36px; object-fit:contain; }
+    .es-avatar-choice img{ width:40px; height:40px; transform:scale(1.27); }
   }
 
   /* Car photo slots */

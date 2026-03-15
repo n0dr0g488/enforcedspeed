@@ -318,6 +318,7 @@ def ensure_schema_patches() -> None:
         # --- users: account integrity fields ---
         _ensure_col(conn, "users", "phone", "phone TEXT")
         _ensure_col(conn, "users", "birthdate", "birthdate DATE")
+        _ensure_col(conn, "users", "avatar_mode", "avatar_mode TEXT")
 
 from queue_utils import get_queue
 from r2_utils import put_bytes, delete_object
@@ -1346,12 +1347,14 @@ def create_app() -> Flask:
     def user_avatar_url(user, size: str = "sm") -> str:
         """Return a URL for the user's avatar."""
         try:
-            base_key = user_profile_photo_key(user) if user else ""
-            if base_key:
-                base_url = _profile_photo_base_url()
-                if base_url and base_key:
-                    suffix = "_256.jpg" if str(size).lower() in ("lg", "large", "256") else "_64.jpg"
-                    return f"{base_url.rstrip('/')}/{base_key}{suffix}"
+            mode = (getattr(user, "avatar_mode", None) or "system").strip().lower()
+            if mode == "photo":
+                base_key = user_profile_photo_key(user) if user else ""
+                if base_key:
+                    base_url = _profile_photo_base_url()
+                    if base_url:
+                        suffix = "_256.jpg" if str(size).lower() in ("lg", "large", "256") else "_64.jpg"
+                        return f"{base_url.rstrip('/')}/{base_key}{suffix}"
             raw = getattr(user, "avatar_key", None) if user else None
             key = normalize_avatar_key(raw)
             return url_for("static", filename=f"img/avatars/{key}.png") + f"?v={_ES_VERSION}"
@@ -1360,7 +1363,8 @@ def create_app() -> Flask:
 
     def user_avatar_is_photo(user) -> bool:
         try:
-            return bool(user_profile_photo_key(user) if user else "")
+            mode = (getattr(user, "avatar_mode", None) or "system").strip().lower()
+            return mode == "photo" and bool(user_profile_photo_key(user) if user else "")
         except Exception:
             return False
 
@@ -1387,6 +1391,7 @@ def create_app() -> Flask:
             "county_center_zoom": county_center_zoom,
             "user_avatar_url": user_avatar_url,
             "user_avatar_is_photo": user_avatar_is_photo,
+            "user_profile_photo_key": user_profile_photo_key,
             "car_photo_url": car_photo_url,
             "system_avatars": system_avatars,
             "default_avatar_key": _DEFAULT_SYSTEM_AVATAR_KEY,
@@ -2252,7 +2257,7 @@ GROUP BY UPPER(TRIM(stusps));
                 if avatar_form.validate_on_submit():
                     key = normalize_avatar_key(avatar_form.avatar_key.data)
                     u.avatar_key = key
-                    u.profile_photo_key = None  # clear uploaded photo so system avatar takes effect
+                    u.avatar_mode = "system"  # keep photo_key intact for easy switch-back
                     db.session.commit()
                     flash("Avatar saved.", "success")
                     return redirect(url_for("profile", username=u.username))
@@ -5028,7 +5033,7 @@ GROUP BY UPPER(TRIM(stusps));
 
         try:
             current_user.avatar_key = key
-            current_user.profile_photo_key = None  # clear uploaded photo so system avatar takes effect
+            current_user.avatar_mode = "system"  # switch mode, keep photo_key intact for easy switch-back
             db.session.commit()
         except Exception:
             try:
@@ -5043,6 +5048,27 @@ GROUP BY UPPER(TRIM(stusps));
             "avatar_key": key,
             "avatar_url": url_for("static", filename=f"img/avatars/{key}.png"),
         })
+
+    @app.post("/api/profile/avatar/use-photo")
+    def api_profile_avatar_use_photo():
+        """Switch the current user back to their uploaded photo (if they have one)."""
+        if not current_user.is_authenticated:
+            return jsonify({"ok": False, "auth": False}), 401
+        base_key = user_profile_photo_key(current_user)
+        if not base_key:
+            return jsonify({"ok": False, "error": "no_photo"}), 400
+        try:
+            current_user.avatar_mode = "photo"
+            db.session.commit()
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "db_error"}), 500
+        base_url = _profile_photo_base_url()
+        avatar_url = f"{base_url.rstrip('/')}/{base_key}_64.jpg" if base_url else ""
+        return jsonify({"ok": True, "auth": True, "avatar_url": avatar_url})
 
 
     # --- Profile photo upload (v426) ---
@@ -5192,6 +5218,7 @@ GROUP BY UPPER(TRIM(stusps));
         # Persist
         try:
             current_user.profile_photo_key = base_key
+            current_user.avatar_mode = "photo"
             db.session.commit()
         except Exception:
             try:
@@ -5256,6 +5283,7 @@ GROUP BY UPPER(TRIM(stusps));
 
         try:
             current_user.profile_photo_key = None
+            current_user.avatar_mode = "system"
             db.session.commit()
         except Exception:
             try:

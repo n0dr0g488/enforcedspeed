@@ -143,6 +143,10 @@ class User(UserMixin, db.Model):
     # Stores a base key WITHOUT the size suffix, e.g. "profile_photos/<uid>/<uuid>".
     profile_photo_key = db.Column(db.String(255), nullable=True)
 
+    # Avatar mode (v578): 'photo' = show uploaded photo, 'system' = show system avatar.
+    # Switching to a system avatar no longer clears profile_photo_key so user can switch back.
+    avatar_mode = db.Column(db.String(10), nullable=True)  # 'photo' | 'system' | None→system
+
     # Clickwrap acceptance (v442): store user's agreement timestamp + version.
     tos_accepted_at = db.Column(db.DateTime, nullable=True)
     tos_version = db.Column(db.String(32), nullable=True)

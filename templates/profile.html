@@ -24,7 +24,7 @@
   .avatar-layout{ display:flex; align-items:flex-start; gap:24px; }
   .avatar-left{ display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:100px; }
   .avatar-wrap{ position:relative; display:inline-block; margin-bottom:4px; border-radius:999px; overflow:hidden; }
-  .avatar-wrap img{ width:80px; height:80px; transform:scale(1.27); object-fit:contain; background:transparent; display:block; }
+  .avatar-wrap img{ width:80px; height:80px;  object-fit:cover; background:#e5e7eb; display:block; }
   .avatar-overlay{
     position:absolute; inset:0; border-radius:999px;
     background:rgba(0,0,0,0.45);
@@ -51,7 +51,7 @@
   }
   .es-avatar-choice{
     padding:0; border:2px solid transparent; border-radius:999px;
-    background:transparent; cursor:pointer;
+    background:#e5e7eb; cursor:pointer;
     width:44px; height:44px;
     display:flex; align-items:center; justify-content:center;
     overflow:hidden;
@@ -61,8 +61,8 @@
   .es-avatar-choice.is-selected{ border-color:#1877f2; }
   .es-avatar-choice img{
     width:44px; height:44px; flex-shrink:0;
-    transform:scale(1.27);
-    object-fit:contain; background:transparent; display:block;
+    
+    object-fit:cover; background:#e5e7eb; display:block;
   }
 
   @media(max-width:520px){
@@ -70,7 +70,7 @@
     .avatar-left{ width:auto; }
     .avatar-grid-compact{ grid-template-columns:repeat(6, 40px); grid-template-rows:repeat(2, 40px); }
     .es-avatar-choice{ width:40px; height:40px; }
-    .es-avatar-choice img{ width:40px; height:40px; transform:scale(1.27); }
+    .es-avatar-choice img{ width:40px; height:40px;  }
   }
 
   /* Car photo slots */
@@ -130,8 +130,8 @@
 
       {# ── Header ── #}
       <div style="display:flex; align-items:center; gap:14px;">
-        <div style="width:56px;height:56px;border-radius:999px;overflow:hidden;flex:0 0 auto;background:transparent;">
-          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:56px;height:56px;transform:scale(1.27);object-fit:contain;background:transparent;display:block;"></div>
+        <div style="width:56px;height:56px;border-radius:999px;overflow:hidden;flex:0 0 auto;background:#e5e7eb;">
+          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:56px;height:56px;object-fit:cover;background:#e5e7eb;display:block;"></div>
         <div>
           <h1 style="margin:0; text-align:left;">@{{ profile_user.username }}</h1>
           <div class="subtle" style="margin-top:4px;">Joined: {{ profile_user.created_at.strftime("%b %d, %Y") }}</div>
@@ -316,6 +316,11 @@
         {% else %}
           <div class="subtle">No tickets posted yet.</div>
         {% endif %}
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:24px; justify-content:flex-end;">
+        <button type="button" id="profileCancelBtn" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #d1d5db; background:#fff; color:#374151;">Cancel</button>
+        <button type="button" id="profileDoneBtn" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #1877f2; background:#1877f2; color:#fff;">Done</button>
       </div>
 
     </div>
@@ -558,17 +563,11 @@
 })();
 </script>
 
-<div style="display:flex; gap:8px; margin-top:24px; justify-content:flex-end;">
-  <button type="button" id="profileCancelBtn" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #d1d5db; background:#fff; color:#374151;">Cancel</button>
-  <button type="button" id="profileDoneBtn" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #1877f2; background:#1877f2; color:#fff;">Done</button>
-</div>
-
 <script>
 (function(){
   var doneBtn = document.getElementById('profileDoneBtn');
   var cancelBtn = document.getElementById('profileCancelBtn');
   var referrer = document.referrer || '/';
-
   function goBack(){
     if(referrer && referrer.indexOf(window.location.origin) === 0 && referrer !== window.location.href){
       window.location.href = referrer;
@@ -576,7 +575,6 @@
       window.location.href = '/';
     }
   }
-
   if(doneBtn) doneBtn.addEventListener('click', goBack);
   if(cancelBtn) cancelBtn.addEventListener('click', goBack);
 })();

@@ -4,7 +4,7 @@
   /* Right rail: match left filter rail (flush to edge, sharp corners) */
   .home-right{background:#fff;border-left:1px solid #e5e7eb;border-radius:0;box-shadow:none;}
   /* Two stacked blocks (mini-map + stats) but flush; divider between them */
-  .rail-card{border:0;border-radius:0;background:transparent;overflow:hidden;}
+  .rail-card{border:0;border-radius:0;background:#e5e7eb;overflow:hidden;}
   .rail-card + .rail-card{margin-top:0;border-top:1px solid #e5e7eb;}
   .rail-card-head{padding:14px 14px 12px;background:#fff;}
   .rail-section{padding:14px 14px 12px;border-top:1px solid #e5e7eb;background:#fff;}
@@ -152,7 +152,7 @@
               {% if recent_users and recent_users|length > 0 %}
                 {% for ru in recent_users %}
                   <div style="display:flex; align-items:center; gap:8px;">
-                    <img src="{{ user_avatar_url(ru.user, 'sm') }}" alt="" style="width:28px; height:28px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
+                    <div class="es-av" style="width:28px;height:28px;"><img src="{{ user_avatar_url(ru.user, 'sm') }}" alt=""></div>
                     <div style="min-width:0;">
                       <a href="{{ url_for('profile', username=ru.username) }}" style="font-size:13px; font-weight:500; color:#111827; text-decoration:none; display:block; line-height:1.2;">{{ ru.username }}</a>
                       {% if ru.car %}
@@ -446,10 +446,10 @@
   .ticket-headwrap{display:block}
   .ticket-headrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
   .ticket-userline{display:flex;align-items:center;gap:10px}
-  .ticket-avatar{width:40px;height:40px;border-radius:999px;object-fit:cover;display:block;background:#e5e7eb;flex:0 0 auto}
+  .ticket-avatar{width:40px;height:40px;border-radius:999px;overflow:hidden;display:block;background:#e5e7eb;flex:0 0 auto} .ticket-avatar img{width:100%;height:100%;object-fit:cover;background:#e5e7eb;display:block;}
   .ticket-user-info{display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0}
   .comment-userline{display:inline-flex;align-items:center;gap:6px}
-  .comment-avatar{width:18px;height:18px;border-radius:999px;object-fit:cover;display:inline-block;background:#e5e7eb;vertical-align:middle}
+  .comment-avatar{width:18px;height:18px;border-radius:999px;overflow:hidden;display:inline-block;background:#e5e7eb;vertical-align:middle} .comment-avatar img{width:100%;height:100%;object-fit:cover;background:#e5e7eb;display:block;}
 
   .ticket-usercount{font-size:13px;font-weight:600;color:#6b7280}
   .ticket-ocr{align-self:flex-start;margin-top:0;display:flex;flex-direction:column;align-items:flex-end;gap:0;}
@@ -495,7 +495,7 @@
     border-radius:0;
     width:100%;
     height:100%;
-    background:transparent;
+    background:#e5e7eb;
     position:relative;
     aspect-ratio:auto;
   }
@@ -504,7 +504,7 @@
     display:block;
     width:100%;
     height:100%;
-    object-fit:contain;
+    object-fit:cover;
     object-position:center center;
   }
 

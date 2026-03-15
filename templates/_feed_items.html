@@ -17,7 +17,7 @@
       {% if r.user %}
         {% set user_count = user_ticket_counts.get(r.user_id, 0) %}
         <div class="ticket-userline">
-          <img class="ticket-avatar" src="{{ user_avatar_url(r.user) }}" alt="">
+          <div class="ticket-avatar"><img src="{{ user_avatar_url(r.user) }}" alt=""></div>
           <div class="ticket-user-info">
             <a href="{{ url_for('profile', username=r.user.username) }}" class="user-link">{{ r.user.username }}</a>
             {% if is_admin and r.is_deleted %}
@@ -222,7 +222,7 @@
             <div id="comment-{{ c.id }}" class="subtle" style="margin-top:6px; display:none;">
               <strong style="color:#111827;">
                 <span class="comment-userline">
-                  <img class="comment-avatar" src="{{ user_avatar_url(c.user) }}" alt="">
+                  <div class="comment-avatar"><img src="{{ user_avatar_url(c.user) }}" alt=""></div>
                   <a href="{{ url_for('profile', username=c.user.username) }}" style="color:inherit;text-decoration:none;">{{ c.user.username }}</a>
                 </span>
               </strong>
@@ -258,7 +258,7 @@
                       <div id="comment-{{ rc.id }}" class="subtle" style="margin-top:6px; margin-left:{{ 18 * d }}px; display:none;">
                         <strong style="color:#111827;">
                           <span class="comment-userline">
-                            <img class="comment-avatar" src="{{ user_avatar_url(rc.user) }}" alt="">
+                            <div class="comment-avatar"><img src="{{ user_avatar_url(rc.user) }}" alt=""></div>
                             <a href="{{ url_for('profile', username=rc.user.username) }}" style="color:inherit;text-decoration:none;">{{ rc.user.username }}</a>
                           </span>
                         </strong>

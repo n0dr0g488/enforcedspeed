@@ -391,7 +391,7 @@
           {% set _user = selected_ticket.user if selected_ticket.user_id else None %}
           <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
             {% if _user %}
-              <img src="{{ user_avatar_url(_user, 'sm') }}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">
+              <div class="es-av" style="width:32px;height:32px;flex-shrink:0;"><img src="{{ user_avatar_url(_user, 'sm') }}" alt=""></div>
               <div style="min-width:0;">
                 <div style="font-weight:600; font-size:13px; color:#111827; line-height:1.2;">{{ _user.username }}</div>
                 <div style="font-size:11px; color:#6b7280; line-height:1.2;">{{ selected_ticket.created_at.strftime('%b %d, %Y') if selected_ticket.created_at else '' }}</div>
@@ -655,7 +655,7 @@
       const car = p.car || '';
       const county = p.county || '';
       const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '';
-      const avatarHtml = `<img src="${avatar}" alt="" style="width:32px; height:32px; border-radius:999px; object-fit:cover; background:#e5e7eb; flex-shrink:0;">`;
+      const avatarHtml = `<div class="es-av" style="width:32px;height:32px;flex-shrink:0;"><img src="${avatar}" alt=""></div>`;
       const carLine = car ? `<div style="font-size:11px; color:#9ca3af; line-height:1.2;">${car}</div>` : '';
       el.innerHTML = `
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
@@ -978,7 +978,7 @@ async function esLoadPins(opts) {
       }
       const sp = window._esSelectedPinData;
       const over = (Number(sp.ticketed) - Number(sp.posted));
-      const avatarHtml = `<img src="${sp.avatar || '/static/img/avatars/a01.png'}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;background:#e5e7eb;">`;
+      const avatarHtml = `<div class="es-av" style="width:22px;height:22px;flex-shrink:0;"><img src="${sp.avatar || '/static/img/avatars/a01.png'}"></div>`;
       const html = `
         <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
           <div style="display:flex; gap:6px; align-items:center;">
@@ -1008,7 +1008,7 @@ function esSelectPin(p, marker) {
   const html = `
     <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; max-width:200px; padding:0;">
       <div style="display:flex; gap:6px; align-items:center;">
-        <img src="${avatarSrc}" style="width:22px;height:22px;border-radius:999px;object-fit:cover;flex-shrink:0;background:#e5e7eb;">
+        <div class="es-av" style="width:22px;height:22px;flex-shrink:0;"><img src="${avatarSrc}"></div>
         <div style="font-weight:600; font-size:13px; line-height:1.2;">${p.road || 'Road'}</div>
       </div>
       <div style="font-size:12px; color:#374151; margin-top:3px;">${p.posted} → ${p.ticketed} mph <span style="color:#dc2626; font-weight:600;">(+${over})</span></div>

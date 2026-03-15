@@ -2704,8 +2704,8 @@ GROUP BY UPPER(TRIM(stusps));
 
         verify_options = [
             {"value": "any", "label": "Any"},
-            {"value": "verified", "label": "Auto-Extracted"},
-            {"value": "not_verified", "label": "Not auto-extracted"},
+            {"value": "verified", "label": "AI Verified"},
+            {"value": "not_verified", "label": "Not AI Verified"},
         ]
 
         filters_active = bool(
@@ -3281,8 +3281,8 @@ GROUP BY UPPER(TRIM(stusps));
 
         verify_options = [
             {"value": "any", "label": "Any"},
-            {"value": "verified", "label": "Auto-Extracted"},
-            {"value": "not_verified", "label": "Not auto-extracted"},
+            {"value": "verified", "label": "AI Verified"},
+            {"value": "not_verified", "label": "Not AI Verified"},
         ]
 
         filters_active = bool(
@@ -4667,8 +4667,8 @@ GROUP BY UPPER(TRIM(stusps));
 
         verify_options = [
             {"value": "any", "label": "Any"},
-            {"value": "verified", "label": "Auto-Extracted"},
-            {"value": "not_verified", "label": "Not auto-extracted"},
+            {"value": "verified", "label": "AI Verified"},
+            {"value": "not_verified", "label": "Not AI Verified"},
         ]
 
         filters_active = bool(

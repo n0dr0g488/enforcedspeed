@@ -558,4 +558,28 @@
 })();
 </script>
 
+<div style="display:flex; gap:8px; margin-top:24px; justify-content:flex-end;">
+  <button type="button" id="profileCancelBtn" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #d1d5db; background:#fff; color:#374151;">Cancel</button>
+  <button type="button" id="profileDoneBtn" style="display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 14px; font-size:13px; font-weight:500; border-radius:8px; cursor:pointer; border:1px solid #1877f2; background:#1877f2; color:#fff;">Done</button>
+</div>
+
+<script>
+(function(){
+  var doneBtn = document.getElementById('profileDoneBtn');
+  var cancelBtn = document.getElementById('profileCancelBtn');
+  var referrer = document.referrer || '/';
+
+  function goBack(){
+    if(referrer && referrer.indexOf(window.location.origin) === 0 && referrer !== window.location.href){
+      window.location.href = referrer;
+    } else {
+      window.location.href = '/';
+    }
+  }
+
+  if(doneBtn) doneBtn.addEventListener('click', goBack);
+  if(cancelBtn) cancelBtn.addEventListener('click', goBack);
+})();
+</script>
+
 {% endblock %}

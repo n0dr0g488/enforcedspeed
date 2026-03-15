@@ -5028,6 +5028,7 @@ GROUP BY UPPER(TRIM(stusps));
 
         try:
             current_user.avatar_key = key
+            current_user.profile_photo_key = None  # clear uploaded photo so system avatar takes effect
             db.session.commit()
         except Exception:
             try:

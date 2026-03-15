@@ -467,6 +467,8 @@
     let ES_MARKERS = [];
     let ES_FOCUS = { type: null, value: null };
     let ES_PINS_DEBOUNCE;
+    // Server-resolved state — reliable even when URL has no &state= param
+    const ES_SERVER_STATE = {{ (filter_state or '')|tojson }};
 
     // Follow/Following pill (county focus only)
     (function(){
@@ -731,7 +733,7 @@
     ES_FOCUS = { type: 'county', value: data.geoid || geoid };
 
     // Load neighboring counties (lighter style) for the same state
-    const st = (params.get('state') || params.get('focus_state') || '').trim().toUpperCase();
+    const st = (params.get('state') || params.get('focus_state') || ES_SERVER_STATE || '').trim().toUpperCase();
     if (st && st.length === 2) {
       await esLoadCountyOutlines(st, data.geoid || geoid);
     }

@@ -12,7 +12,7 @@
   .es-speed-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
   .es-speed-card.no-data { opacity: 0.45; }
   .es-speed-zone { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
-  .es-speed-val { font-size: 28px; font-weight: 800; color: #dc2626; line-height: 1.1; margin-top: 4px; }
+  .es-speed-val { font-size: 28px; font-weight: 800; color: #e07070; line-height: 1.1; margin-top: 4px; }
   .es-speed-val span { font-size: 13px; font-weight: 500; color: #6b7280; }
   .es-speed-val.empty { color: #d1d5db; font-size: 22px; }
   .es-speed-detail { font-size: 11px; color: #9ca3af; margin-top: 6px; }
@@ -23,13 +23,13 @@
   .heatmap-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
   .heatmap-wrap { display: flex; justify-content: center; }
   .heatmap-grid { display: grid; gap: 3px; max-width: 660px; width: 100%; }
-  .heatmap-cell { aspect-ratio: 1; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; cursor: default; position: relative; transition: transform 0.1s; }
+  .heatmap-cell { aspect-ratio: 1; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; cursor: pointer; position: relative; transition: transform 0.1s; text-decoration: none; }
   .heatmap-cell:hover { transform: scale(1.15); z-index: 2; }
   .heatmap-cell .hc-abbr { line-height: 1; }
   .heatmap-cell .hc-val { font-size: 8px; font-weight: 400; opacity: 0.85; line-height: 1; margin-top: 1px; }
   .heatmap-cell.no-data { background: #e5e7eb; color: #9ca3af; }
   .heatmap-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 11px; color: #6b7280; }
-  .heatmap-legend-bar { height: 10px; width: 140px; border-radius: 5px; background: linear-gradient(to right, #3b82f6, #60a5fa, #fbbf24, #f97316, #dc2626); }
+  .heatmap-legend-bar { height: 10px; width: 140px; border-radius: 5px; background: linear-gradient(to right, #6366f1, #60a5fa, #a3e635, #fbbf24, #f87171); }
 
   /* Section */
   .stats-section { margin-bottom: 24px; }
@@ -44,7 +44,7 @@
   .stats-table .t-name a { color: #374151; text-decoration: none; font-weight: 500; }
   .stats-table .t-name a:hover { color: #1877f2; }
   .stats-table .t-state { color: #9ca3af; font-size: 12px; }
-  .stats-table .t-over { font-weight: 700; color: #dc2626; text-align: right; white-space: nowrap; }
+  .stats-table .t-over { font-weight: 700; color: #e07070; text-align: right; white-space: nowrap; }
   .stats-table .t-count { color: #6b7280; text-align: right; white-space: nowrap; }
 
   .stats-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -129,20 +129,20 @@
     function heatColor(avg) {
       var t = 1 - ((avg - mn) / (mx - mn)); // invert: low avg = strict = warm
       t = Math.max(0, Math.min(1, t));
-      // 5-stop gradient: blue → light blue → yellow → orange → red
+      // 5-stop gradient: indigo → blue → lime → amber → soft coral
       var r, g, b;
       if (t < 0.25) {
         var p = t / 0.25;
-        r = Math.round(59 + (96-59)*p); g = Math.round(130 + (165-130)*p); b = Math.round(246 + (250-246)*p);
+        r = Math.round(99 + (96-99)*p); g = Math.round(102 + (165-102)*p); b = Math.round(241 + (250-241)*p);
       } else if (t < 0.5) {
         var p = (t - 0.25) / 0.25;
-        r = Math.round(96 + (251-96)*p); g = Math.round(165 + (191-165)*p); b = Math.round(250 + (36-250)*p);
+        r = Math.round(96 + (163-96)*p); g = Math.round(165 + (230-165)*p); b = Math.round(250 + (53-250)*p);
       } else if (t < 0.75) {
         var p = (t - 0.5) / 0.25;
-        r = Math.round(251 + (249-251)*p); g = Math.round(191 + (115-191)*p); b = Math.round(36 + (22-36)*p);
+        r = Math.round(163 + (251-163)*p); g = Math.round(230 + (191-230)*p); b = Math.round(53 + (36-53)*p);
       } else {
         var p = (t - 0.75) / 0.25;
-        r = Math.round(249 + (220-249)*p); g = Math.round(115 + (38-115)*p); b = Math.round(22 + (38-22)*p);
+        r = Math.round(251 + (248-251)*p); g = Math.round(191 + (113-191)*p); b = Math.round(36 + (113-36)*p);
       }
       return 'rgb(' + r + ',' + g + ',' + b + ')';
     }
@@ -185,6 +185,8 @@
         cell.style.color = textColor(s.avg);
         cell.innerHTML = '<span class="hc-abbr">' + st + '</span><span class="hc-val">+' + Math.round(s.avg) + '</span>';
         cell.title = st + ': avg +' + s.avg + ' mph over (' + s.tickets + ' tickets)';
+        cell.style.cursor = 'pointer';
+        (function(state){ cell.addEventListener('click', function(){ window.location.href = '/map?state=' + encodeURIComponent(state); }); })(st);
       } else {
         cell.classList.add('no-data');
         cell.innerHTML = '<span class="hc-abbr">' + st + '</span>';

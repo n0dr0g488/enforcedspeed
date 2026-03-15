@@ -6178,6 +6178,71 @@ GROUP BY UPPER(TRIM(stusps));
             return jsonify({"ok": False, "error": "counties_unavailable"}), 200
 
 
+    @app.get("/api/state_counties_geom/<stusps>")
+    def api_state_counties_geom(stusps: str):
+        """Return simplified GeoJSON for all counties in a state (for interactive map overlays)."""
+        st = (stusps or "").strip().upper()
+        if len(st) != 2 or not st.isalpha():
+            return jsonify({"ok": False}), 400
+
+        cache_dir = "/tmp/es_state_geom_cache"
+        cache_key = f"es_state_counties_geom_v1_{st}.json"
+        cache_path = os.path.join(cache_dir, cache_key)
+
+        # Check cache
+        try:
+            if os.path.exists(cache_path):
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    return Response(f.read(), mimetype="application/json")
+        except Exception:
+            pass
+
+        try:
+            rows = db.session.execute(
+                text("""
+                    SELECT geoid, namelsad, stusps,
+                           ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, 0.005)) AS geom_json
+                    FROM counties
+                    WHERE stusps = :st AND geom IS NOT NULL
+                    ORDER BY namelsad
+                """),
+                {"st": st},
+            ).mappings().all()
+
+            features = []
+            for r in rows:
+                try:
+                    geom = json.loads(r["geom_json"])
+                except Exception:
+                    continue
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "geoid": r.get("geoid"),
+                        "name": r.get("namelsad"),
+                        "stusps": r.get("stusps"),
+                    },
+                    "geometry": geom,
+                })
+
+            result = json.dumps({"ok": True, "geojson": {"type": "FeatureCollection", "features": features}})
+
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    f.write(result)
+            except Exception:
+                pass
+
+            return Response(result, mimetype="application/json")
+        except Exception as e:
+            try:
+                db.session.rollback()
+                print(f"[STATE COUNTIES GEOM ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False}), 200
+
     @app.get("/api/state_geom/<stusps>")
     def api_state_geom(stusps: str):
         """Return GeoJSON geometry for a state (for the interactive map boundary focus).

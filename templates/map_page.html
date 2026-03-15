@@ -376,6 +376,7 @@
               <button type="button" class="map-zoom-btn" id="esZoomOut" aria-label="Zoom out">−</button>
             </div>
             <div id="esMap"></div>
+            <div id="esCountyTooltip" style="display:none; position:absolute; z-index:10; background:rgba(0,0,0,0.8); color:#fff; padding:4px 8px; border-radius:5px; font-size:12px; font-weight:500; pointer-events:none; white-space:nowrap;"></div>
 
           </div>
         {% endif %}
@@ -682,6 +683,9 @@
   const geoid = (params.get('focus_county_geoid') || params.get('county_geoid') || params.get('county') || '').trim();
   if (!geoid) return { ok: false };
 
+  // Clear county outlines layer when drilling into a single county
+  esClearCountyLayer();
+
   try {
     const res = await fetch(`/api/county_geom/${encodeURIComponent(geoid)}`, { headers: { 'Accept': 'application/json' } });
     const data = await res.json();
@@ -732,6 +736,86 @@
 }
 
 
+    let ES_COUNTY_LAYER = null; // separate Data layer for county outlines
+
+    function esClearCountyLayer() {
+      if (ES_COUNTY_LAYER) {
+        try { ES_COUNTY_LAYER.setMap(null); } catch(e) {}
+        ES_COUNTY_LAYER = null;
+      }
+    }
+
+    async function esLoadCountyOutlines(stusps) {
+      esClearCountyLayer();
+      if (!stusps) return;
+
+      try {
+        const res = await fetch(`/api/state_counties_geom/${encodeURIComponent(stusps)}`, { headers: { 'Accept': 'application/json' } });
+        const data = await res.json();
+        if (!data || !data.ok || !data.geojson) return;
+
+        ES_COUNTY_LAYER = new google.maps.Data({ map: ES_MAP });
+        ES_COUNTY_LAYER.addGeoJson(data.geojson);
+
+        // Default style: thin border, transparent fill
+        ES_COUNTY_LAYER.setStyle({
+          strokeColor: '#6b7280',
+          strokeWeight: 0.8,
+          strokeOpacity: 0.5,
+          fillColor: '#000000',
+          fillOpacity: 0,
+          cursor: 'pointer',
+        });
+
+        // Hover: highlight county
+        ES_COUNTY_LAYER.addListener('mouseover', function(e) {
+          ES_COUNTY_LAYER.overrideStyle(e.feature, {
+            fillOpacity: 0.08,
+            fillColor: '#1877f2',
+            strokeWeight: 1.5,
+            strokeOpacity: 0.8,
+            strokeColor: '#1877f2',
+          });
+          // Show county name tooltip
+          var name = e.feature.getProperty('name') || '';
+          if (name && window._esCountyTooltip) {
+            window._esCountyTooltip.textContent = name;
+            window._esCountyTooltip.style.display = 'block';
+          }
+        });
+
+        ES_COUNTY_LAYER.addListener('mouseout', function(e) {
+          ES_COUNTY_LAYER.revertStyle(e.feature);
+          if (window._esCountyTooltip) {
+            window._esCountyTooltip.style.display = 'none';
+          }
+        });
+
+        // Click: navigate to county view
+        ES_COUNTY_LAYER.addListener('click', function(e) {
+          var geoid = e.feature.getProperty('geoid');
+          if (geoid) {
+            window.location.href = '/map?county=' + encodeURIComponent(geoid) + '&state=' + encodeURIComponent(stusps);
+          }
+        });
+
+        // Mouse move: position tooltip near cursor
+        ES_MAP.addListener('mousemove', function(e) {
+          if (window._esCountyTooltip && window._esCountyTooltip.style.display !== 'none') {
+            var mapDiv = document.getElementById('esMap');
+            if (mapDiv) {
+              var rect = mapDiv.getBoundingClientRect();
+              window._esCountyTooltip.style.left = (e.domEvent.clientX - rect.left + 14) + 'px';
+              window._esCountyTooltip.style.top = (e.domEvent.clientY - rect.top - 10) + 'px';
+            }
+          }
+        });
+
+      } catch(e) {
+        // silent
+      }
+    }
+
 async function esLoadStateGeomIfAny() {
   const params = new URLSearchParams(window.location.search);
   const geoid = (params.get('focus_county_geoid') || params.get('county_geoid') || params.get('county') || '').trim();
@@ -772,6 +856,10 @@ async function esLoadStateGeomIfAny() {
     } catch(e) {}
 
     ES_FOCUS = { type: 'state', value: (data.stusps || st) };
+
+    // Load county outlines within the state
+    await esLoadCountyOutlines(st);
+
     return { ok: true, stusps: data.stusps || st, centroid: data.centroid || null };
   } catch(e) {
     return { ok: false };
@@ -958,6 +1046,7 @@ window.esInitMap = async function() {
   });
   ES_INFO = new google.maps.InfoWindow({ maxWidth: 220, disableAutoPan: true });
   esInitOverageLabel();
+  window._esCountyTooltip = document.getElementById('esCountyTooltip');
 
   // Custom zoom controls (+ / -) that are always available (even without a mouse wheel)
   (function esWireZoomControls(){

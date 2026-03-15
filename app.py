@@ -5847,6 +5847,26 @@ GROUP BY UPPER(TRIM(stusps));
                 flash("Ticket saved, but photo processing failed.", "error")
 
         flash("Ticket submitted!", "success")
+
+        # Auto-follow the submitted county if user is logged in and not already following
+        if current_user.is_authenticated and county_geoid:
+            try:
+                existing = FollowedCounty.query.filter_by(
+                    user_id=current_user.id,
+                    county_geoid=county_geoid,
+                ).first()
+                if not existing:
+                    db.session.add(FollowedCounty(
+                        user_id=current_user.id,
+                        county_geoid=county_geoid,
+                    ))
+                    db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+
         return redirect(url_for("home"))
 
     @app.post("/api/confirm_location")

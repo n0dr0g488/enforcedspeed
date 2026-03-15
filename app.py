@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import random
 import requests
 
 # Used by /healthz to prove which build is serving traffic (deploy troubleshooting).
@@ -1990,6 +1991,13 @@ GROUP BY UPPER(TRIM(stusps));
                 return render_template("register.html", form=form)
             user = User(email=email, username=username, birthdate=dob)
             user.set_password(form.password.data)
+            # Assign a random avatar
+            try:
+                manifest = _load_system_avatar_manifest()
+                if manifest:
+                    user.avatar_key = random.choice(manifest)["key"]
+            except Exception:
+                pass
             db.session.add(user)
             db.session.commit()
 
@@ -7879,6 +7887,12 @@ GROUP BY UPPER(TRIM(stusps));
 
         u = User(email=email, username=username)
         u.set_password(password)
+        try:
+            manifest = _load_system_avatar_manifest()
+            if manifest:
+                u.avatar_key = random.choice(manifest)["key"]
+        except Exception:
+            pass
         db.session.add(u)
         db.session.commit()
 

@@ -38,7 +38,7 @@
   .avatar-right{ flex:1; min-width:0; display:flex; align-items:center; }
   .avatar-grid-compact{
     display:grid;
-    grid-template-columns:repeat(5, 44px);
+    grid-template-columns:repeat(6, 44px);
     grid-template-rows:repeat(2, 44px);
     gap:6px;
   }
@@ -66,7 +66,7 @@
   @media(max-width:520px){
     .avatar-layout{ flex-direction:column; align-items:flex-start; gap:14px; }
     .avatar-left{ width:auto; }
-    .avatar-grid-compact{ grid-template-columns:repeat(5, 40px); grid-template-rows:repeat(2, 40px); }
+    .avatar-grid-compact{ grid-template-columns:repeat(6, 40px); grid-template-rows:repeat(2, 40px); }
     .es-avatar-choice{ width:40px; height:40px; }
     .es-avatar-choice img{ width:36px; height:36px; }
   }
@@ -168,7 +168,7 @@
           {# Right: 10 default avatars #}
           <div class="avatar-right">
             <div id="esAvatarGrid" class="avatar-grid-compact">
-              {% for a in system_avatars[:10] %}
+              {% for a in system_avatars[:12] %}
                 {% set k = a.key %}
                 {% set f = a.file %}
                 <button type="button"

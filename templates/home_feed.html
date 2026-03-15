@@ -1261,10 +1261,11 @@ function startAutoLoad(){
       const posted = btn.getAttribute('data-posted-speed') || '';
       const ticketed = btn.getAttribute('data-ticketed-speed') || '';
       const overage = btn.getAttribute('data-overage') || '';
+      const aiConf = btn.getAttribute('data-ai-confidence') || '';
+      const aiModel = btn.getAttribute('data-ai-model') || '';
 
       const lines = [];
       lines.push(`Photo: ${photoKey ? 'uploaded' : 'none'}`);
-      if(photoKey) lines.push(`Photo key: ${photoKey}`);
       if(posted !== '' || ticketed !== ''){
         let p = posted === '' ? null : parseInt(posted,10);
         let t = ticketed === '' ? null : parseInt(ticketed,10);
@@ -1274,11 +1275,14 @@ function startAutoLoad(){
         if(p !== null && t !== null) lines.push(`Overage: ${t - p}`);
         else if(overage !== '') lines.push(`Overage: ${overage}`);
       }
-      lines.push(`OCR status: ${ocrStatus || 'n/a'}`);
-      if(ocrError) lines.push(`OCR error: ${ocrError}`);
       lines.push(`Verification: ${verStatus || 'n/a'}`);
-      if(attempts !== '') lines.push(`Verify attempts: ${attempts}`);
-      if(reason) lines.push(`Verify reason: ${reason}`);
+      if(aiConf !== '') lines.push(`AI confidence: ${Math.round(parseFloat(aiConf)*100)}%`);
+      if(aiModel) lines.push(`AI model: ${aiModel}`);
+      if(ocrError) lines.push(`Error: ${ocrError}`);
+      if(attempts !== '') lines.push(`Attempts: ${attempts}`);
+      if(reason) lines.push(`Reason: ${reason}`);
+
+      open(lines.join('\n'));
 
       open(lines.join('\n'));
     });

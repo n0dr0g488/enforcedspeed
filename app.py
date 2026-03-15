@@ -319,6 +319,9 @@ def ensure_schema_patches() -> None:
         _ensure_col(conn, "users", "phone", "phone TEXT")
         _ensure_col(conn, "users", "birthdate", "birthdate DATE")
         _ensure_col(conn, "users", "avatar_mode", "avatar_mode TEXT")
+        # --- speed_reports: AI verification fields (v583) ---
+        _ensure_col(conn, "speed_reports", "ai_confidence", "ai_confidence DOUBLE PRECISION")
+        _ensure_col(conn, "speed_reports", "ai_model", "ai_model TEXT")
 
 from queue_utils import get_queue
 from r2_utils import put_bytes, delete_object

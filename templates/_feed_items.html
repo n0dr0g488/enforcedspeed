@@ -58,7 +58,7 @@
           <span class="pill pill-photo pill-photo-ok">Pin ✓</span>
         {% endif %}
 
-        {# Photo pill with status (Option 2): one pill when a photo exists. (Photo right) #}
+        {# Photo pill with status #}
         {% set has_photo = (r.photo_key is not none) %}
         {% if has_photo %}
           {% set pk = (r.photo_key|string) %}
@@ -69,7 +69,12 @@
           {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
             <span class="pill pill-photo pill-photo-fail">Photo !</span>
           {% elif st == 'verified' or vs == 'verified' %}
-            <span class="pill pill-photo pill-photo-ok">Photo ✓</span>
+            {% set conf = r.ai_confidence if r.ai_confidence is not none else 1.0 %}
+            {% if conf >= 0.85 %}
+              <span class="pill pill-photo pill-photo-ok pill-ai-high">Photo AI ✓</span>
+            {% else %}
+              <span class="pill pill-photo pill-photo-ok pill-ai-mid" title="AI verified (moderate confidence)">Photo AI ✓</span>
+            {% endif %}
           {% else %}
             <span class="pill pill-photo pill-photo-fail">Photo !</span>
           {% endif %}
@@ -86,6 +91,8 @@
                 data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
                 data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
                 data-overage="{{ r.overage if r.overage is not none else '' }}"
+                data-ai-confidence="{{ '%.2f'|format(r.ai_confidence) if r.ai_confidence is not none else '' }}"
+                data-ai-model="{{ r.ai_model or '' }}"
                 title="Details">i</button>
       </div>
       <div class="ticket-date-right">

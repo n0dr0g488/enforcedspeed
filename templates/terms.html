@@ -5,7 +5,7 @@
   <div class="home-center">
     <div class="card ticket-card policy-page">
       <h2 style="margin-top:0">Terms of Service</h2>
-      <p>Effective Date: The date on which you first accept these Terms<br>Last Updated: February 13, 2026</p>
+      <p>Effective Date: The date on which you first accept these Terms<br>Last Updated: March 15, 2026</p>
       <p>These Terms of Service (“Terms”) constitute a legally binding agreement between you (“you” or “User”) and Mindra LLC, a Wyoming limited liability company (“Mindra,” “Company,” “we,” “us,” or “our”), governing your access to and use of the website located at www.enforcedspeed.com, including any subdomains, features, content, and services offered thereon (collectively, the “Platform” or “Services”).</p>
       <p>BY CLICKING “I AGREE,” “ACCEPT,” OR A SIMILAR BUTTON, OR BY ACCESSING OR USING THE SERVICES, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THESE TERMS. THESE TERMS APPLY TO ALL VISITORS TO THE PLATFORM, INCLUDING USERS WHO BROWSE THE WEBSITE WITHOUT SUBMITTING TICKET INFORMATION, AS WELL AS USERS WHO CREATE ACCOUNTS OR SUBMIT USER CONTENT.</p>
       <p>If you do not agree to these Terms, you may not access or use the Services.</p>
@@ -31,7 +31,7 @@
       <p>When a User submits information about a speeding ticket, the User may optionally upload an image of the ticket (i.e., a Ticket Image). Under normal operation, image handling is functions as follows:</p>
       <p>Sanitization and Standardization. Uploaded images are sanitized server-side and re-encoded or resized to remove embedded metadata and prepare the image for Automated Processing.</p>
       <p>Temporary Quarantine Storage. Sanitized images are placed in private, non-public storage for short-term processing. Only a reference to the image is stored in application databases.</p>
-      <p>Automated OCR Processing. Background processing systems retrieve the image and submit it to automated OCR services to extract text and identify relevant ticket values (i.e., speed, speed limit, location).</p>
+      <p>Automated OCR Processing. Background processing systems retrieve the image and submit it to AI-based image analysis services to determine whether the image is a genuine traffic citation and to extract relevant ticket values (i.e., speed limit, ticketed speed). The AI model independently assesses the document before any verification is applied. No personally identifiable information from the image is extracted or retained.</p>
       <p>Deletion After Processing. Following completion of Automated Processing, the system is designed to delete the image as part of cleanup procedures.</p>
       <p>Deletion Backstop. Temporary image storage is subject to automated lifecycle controls intended to delete images within a limited time window (not to exceed twenty-four (24) hours), even if processing is not completed as expected.</p>
       <p><b>3.2 Image Retention and Visibility</b></p>
@@ -67,7 +67,7 @@
       <p>The Services do not perform biometric identification, facial recognition, or automated legal decision-making with legal or similarly significant effects.</p>
       <p>Company may engage third-party service providers to perform processing on its behalf, subject to contractual confidentiality and data protection obligations. Company’s current service providers and their uses include:</p>
       <p>- Cloudflare R2 (temporary private storage for Ticket Images)</p>
-      <p>- Google Cloud Vision (OCR)</p>
+      <p>- Google Gemini (AI-based ticket image verification)</p>
       <p>- Google Maps/Places/Roads (mapping and location features)</p>
       <p>- Render (hosting and database infrastructure)</p>
       <p>- SendGrid (email delivery)</p>

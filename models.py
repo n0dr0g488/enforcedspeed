@@ -219,14 +219,18 @@ class SpeedReport(db.Model):
 
     # Evidence / OCR / verification
     photo_key = db.Column(db.String(255), nullable=True)
-    ocr_status = db.Column(db.String(30), nullable=False, default='pending')  # pending|processing|done|failed
+    ocr_status = db.Column(db.String(30), nullable=False, default='pending')  # pending|processing|verified|not_verified|failed
     # Internal error details from OCR pipeline (short code / message).
     ocr_error = db.Column(db.String(255), nullable=True)
-    verification_status = db.Column(db.String(30), nullable=False, default='pending')  # pending|verified|rejected
+    verification_status = db.Column(db.String(30), nullable=False, default='pending')  # pending|verified|unverified
 
     ocr_posted_speed = db.Column(db.Integer, nullable=True)
     ocr_ticketed_speed = db.Column(db.Integer, nullable=True)
     ocr_confidence = db.Column(db.Float, nullable=True)
+
+    # AI verification fields (v583)
+    ai_confidence = db.Column(db.Float, nullable=True)   # 0.0–1.0 from Gemini
+    ai_model = db.Column(db.String(60), nullable=True)   # e.g. 'gemini-1.5-flash'
 
     verified_at = db.Column(db.DateTime, nullable=True)
     verified_by = db.Column(db.Integer, nullable=True)

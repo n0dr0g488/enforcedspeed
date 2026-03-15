@@ -2252,6 +2252,7 @@ GROUP BY UPPER(TRIM(stusps));
                 if avatar_form.validate_on_submit():
                     key = normalize_avatar_key(avatar_form.avatar_key.data)
                     u.avatar_key = key
+                    u.profile_photo_key = None  # clear uploaded photo so system avatar takes effect
                     db.session.commit()
                     flash("Avatar saved.", "success")
                     return redirect(url_for("profile", username=u.username))

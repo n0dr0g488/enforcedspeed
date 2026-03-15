@@ -130,7 +130,8 @@
 
       {# ── Header ── #}
       <div style="display:flex; align-items:center; gap:14px;">
-        <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:56px;height:56px;border-radius:999px;object-fit:cover;background:#e5e7eb;flex:0 0 auto;">
+        <div style="width:56px;height:56px;border-radius:999px;overflow:hidden;flex:0 0 auto;background:transparent;">
+          <img id="profileAvatarImg" src="{{ user_avatar_url(profile_user, 'lg') }}" alt="" style="width:56px;height:56px;transform:scale(1.27);object-fit:contain;background:transparent;display:block;"></div>
         <div>
           <h1 style="margin:0; text-align:left;">@{{ profile_user.username }}</h1>
           <div class="subtle" style="margin-top:4px;">Joined: {{ profile_user.created_at.strftime("%b %d, %Y") }}</div>

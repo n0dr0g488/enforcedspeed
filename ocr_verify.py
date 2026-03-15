@@ -33,7 +33,7 @@ from r2_utils import get_bytes, delete_object
 _CONFIDENCE_THRESHOLD = 0.60
 
 # Gemini model
-_GEMINI_MODEL = "gemini-1.5-flash"
+_GEMINI_MODEL = "gemini-1.5-flash-latest"
 
 # Tolerance: AI can misread a digit
 _SPEED_TOLERANCE = 2

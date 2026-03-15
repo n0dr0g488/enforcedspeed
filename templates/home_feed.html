@@ -1508,4 +1508,70 @@ function startAutoLoad(){
     });
   })();
 </script>
+
+<script>
+(function(){
+  // Poll for photo verification status on any "Photo ..." pills
+  var POLL_INTERVAL = 4000; // 4 seconds
+  var MAX_POLLS = 15;       // give up after ~60 seconds
+  var pollCount = 0;
+  var pollTimer = null;
+
+  function getPendingIds(){
+    var pills = document.querySelectorAll('.pill-photo-processing[data-poll-id]');
+    var ids = [];
+    pills.forEach(function(p){
+      var id = p.getAttribute('data-poll-id');
+      if(id) ids.push(id);
+    });
+    return ids;
+  }
+
+  function pillHtml(status, confidence){
+    var conf = confidence !== null ? parseFloat(confidence) : 1.0;
+    if(status === 'verified'){
+      var cls = conf >= 0.85 ? 'pill-ai-high' : 'pill-ai-mid';
+      var title = conf >= 0.85 ? '' : ' title="AI verified (moderate confidence)"';
+      return '<span class="pill pill-photo pill-photo-ok ' + cls + '"' + title + '>Photo AI ✓</span>';
+    }
+    // not_verified / failed / anything else
+    return '<span class="pill pill-photo pill-photo-fail">Photo !</span>';
+  }
+
+  function poll(){
+    var ids = getPendingIds();
+    if(ids.length === 0 || pollCount >= MAX_POLLS){
+      clearInterval(pollTimer);
+      return;
+    }
+    pollCount++;
+    fetch('/api/tickets/photo_status?ids=' + ids.join(','), { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(!data || !data.ok) return;
+        Object.keys(data.statuses).forEach(function(id){
+          var s = data.statuses[id];
+          var ocr = s.ocr_status || '';
+          if(ocr === 'processing' || ocr === 'pending') return; // still running
+          // Find the pill and replace it
+          var pill = document.querySelector('.pill-photo-processing[data-poll-id="' + id + '"]');
+          if(!pill) return;
+          var html = pillHtml(ocr === 'verified' ? 'verified' : 'fail', s.ai_confidence);
+          var tmp = document.createElement('span');
+          tmp.innerHTML = html;
+          pill.parentNode.replaceChild(tmp.firstChild, pill);
+        });
+        // Stop if nothing left to poll
+        if(getPendingIds().length === 0) clearInterval(pollTimer);
+      })
+      .catch(function(){});
+  }
+
+  // Only start polling if there are pending pills on the page
+  if(getPendingIds().length > 0){
+    pollTimer = setInterval(poll, POLL_INTERVAL);
+  }
+})();
+</script>
+
 {% endblock %}

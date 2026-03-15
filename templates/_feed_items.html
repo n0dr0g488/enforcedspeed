@@ -65,7 +65,7 @@
           {% set st = (r.ocr_status or '') %}
           {% set vs = (r.verification_status or '') %}
           {% if pk.startswith('pending:') or st in ['pending','processing'] %}
-            <span class="pill pill-photo pill-photo-processing">Photo …</span>
+            <span class="pill pill-photo pill-photo-processing" data-poll-id="{{ r.id }}">Photo …</span>
           {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
             <span class="pill pill-photo pill-photo-fail">Photo !</span>
           {% elif st == 'verified' or vs == 'verified' %}

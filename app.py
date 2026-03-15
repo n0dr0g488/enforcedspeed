@@ -6771,6 +6771,41 @@ GROUP BY UPPER(TRIM(stusps));
         return jsonify(suggestions[:5])
 
 
+    @app.get("/api/tickets/photo_status")
+    def api_tickets_photo_status():
+        """Return current photo verification status for a list of report IDs.
+        Used by the feed to auto-update 'Photo ...' pills without a full page refresh.
+        Query param: ids=1,2,3
+        """
+        raw = (request.args.get("ids") or "").strip()
+        if not raw:
+            return jsonify({"ok": True, "statuses": {}})
+        try:
+            ids = [int(x) for x in raw.split(",") if x.strip().isdigit()][:50]
+        except Exception:
+            return jsonify({"ok": False}), 400
+        if not ids:
+            return jsonify({"ok": True, "statuses": {}})
+        try:
+            rows = db.session.query(
+                SpeedReport.id,
+                SpeedReport.ocr_status,
+                SpeedReport.verification_status,
+                SpeedReport.ai_confidence,
+                SpeedReport.ai_model,
+            ).filter(SpeedReport.id.in_(ids)).all()
+        except Exception:
+            return jsonify({"ok": False}), 500
+        statuses = {}
+        for r in rows:
+            statuses[str(r.id)] = {
+                "ocr_status": r.ocr_status or "",
+                "verification_status": r.verification_status or "",
+                "ai_confidence": float(r.ai_confidence) if r.ai_confidence is not None else None,
+                "ai_model": r.ai_model or "",
+            }
+        return jsonify({"ok": True, "statuses": statuses})
+
     @app.get("/api/tickets")
     def api_tickets():
         try:

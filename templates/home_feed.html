@@ -1557,10 +1557,9 @@ function startAutoLoad(){
           // Find the pill and replace it
           var pill = document.querySelector('.pill-photo-processing[data-poll-id="' + id + '"]');
           if(!pill) return;
-          var html = pillHtml(ocr === 'verified' ? 'verified' : 'fail', s.ai_confidence);
-          var tmp = document.createElement('span');
-          tmp.innerHTML = html;
-          pill.parentNode.replaceChild(tmp.firstChild, pill);
+          // Reload the page so all data attributes (info button etc.) reflect final state
+          window.location.reload();
+          clearInterval(pollTimer);
         });
         // Stop if nothing left to poll
         if(getPendingIds().length === 0) clearInterval(pollTimer);

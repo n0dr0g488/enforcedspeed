@@ -7386,11 +7386,13 @@ GROUP BY UPPER(TRIM(stusps));
 
         Query params:
           - geoid: optional (county GEOID). If omitted, returns a default US preview map.
+          - state: optional (2-letter state code). If provided without geoid, returns state-level preview.
           - pin_lat, pin_lng: optional floats (only used when geoid is provided)
           - center_on_pin: optional (1/0). When 1 and a pin is provided, center the map on the pin.
           - w, h: optional ints (default 640x640)
         """
         geoid = (request.args.get("geoid") or "").strip()
+        state_code = (request.args.get("state") or "").strip().upper()
 
         try:
             w = int(request.args.get("w", "640"))
@@ -7497,7 +7499,43 @@ GROUP BY UPPER(TRIM(stusps));
                 outside_points=outside_pts
             )
         else:
-            upstream = us_static_map_url(width=w, height=h)
+            # State-level preview if state code provided
+            if state_code and len(state_code) == 2:
+                try:
+                    bounds = get_bounds_for_state(state_code)
+                    if bounds:
+                        min_lat, min_lng, max_lat, max_lng = bounds
+                        center_lat = (min_lat + max_lat) / 2
+                        center_lng = (min_lng + max_lng) / 2
+                        # Calculate zoom from lat/lng span
+                        lat_span = max_lat - min_lat
+                        lng_span = max_lng - min_lng
+                        span = max(lat_span, lng_span)
+                        if span > 15: zoom = 5
+                        elif span > 8: zoom = 6
+                        elif span > 4: zoom = 7
+                        else: zoom = 8
+                        try:
+                            from flask import current_app
+                            key = (current_app.config.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
+                        except Exception:
+                            key = (os.environ.get('GOOGLE_MAPS_SERVER_KEY') or '').strip()
+                        if key:
+                            params = {
+                                'size': f"{w}x{h}", 'scale': '2', 'maptype': 'roadmap',
+                                'center': f"{center_lat},{center_lng}", 'zoom': str(zoom),
+                                'style': ['feature:poi|visibility:off', 'feature:transit|visibility:off'],
+                                'key': key,
+                            }
+                            upstream = 'https://maps.googleapis.com/maps/api/staticmap?' + urllib.parse.urlencode(params, doseq=True)
+                        else:
+                            upstream = us_static_map_url(width=w, height=h)
+                    else:
+                        upstream = us_static_map_url(width=w, height=h)
+                except Exception:
+                    upstream = us_static_map_url(width=w, height=h)
+            else:
+                upstream = us_static_map_url(width=w, height=h)
 
 
         # Debug helper: return the upstream Google Static Maps URL (and marker/icon details)

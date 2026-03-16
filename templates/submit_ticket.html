@@ -89,36 +89,47 @@
 
   <div class="sg-span-12 submit-divider-text"><span>Optional items below</span></div>
 
-  {# ── AI Photo Verification ── #}
+  {# ── Two-column optional section: AI Photo left | Map Pin right ── #}
   <div class="sg-span-12">
-    <div style="font-weight:600; font-size:15px; margin-bottom:4px;">AI Photo Verification</div>
-    <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px;">Upload a photo of your ticket and our AI will verify the speeds. Your photo is analyzed by Google Gemini AI and never stored.</div>
-    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-      <button type="button" id="photoBtn" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        Upload photo
-      </button>
-      <span id="photoNameText" class="submit-status" style="font-size:13px; color:#6b7280;">No photo selected</span>
+    <div style="display:grid; grid-template-columns:1fr 1px 1fr; gap:0 20px; align-items:start;">
+
+      {# Left: AI Photo Verification #}
+      <div style="padding-right:4px;">
+        <div style="font-weight:600; font-size:15px; margin-bottom:4px;">AI Photo Verification</div>
+        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px;">Upload a photo of your ticket and our AI will verify the speeds. Your photo is analyzed by Google Gemini AI and never stored.</div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" id="photoBtn" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Upload photo
+          </button>
+          <span id="photoNameText" class="submit-status" style="font-size:13px; color:#6b7280;">No photo selected</span>
+        </div>
+        <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none;">
+        <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">After submission, AI will verify your photo. Result appears as a pill on your ticket in the feed.</div>
+      </div>
+
+      {# Soft divider #}
+      <div style="background:#e5e7eb; width:1px; align-self:stretch; margin-top:4px;"></div>
+
+      {# Right: Map pin #}
+      <div style="padding-left:4px;">
+        <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Map pin</div>
+        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px;">Pin the exact location where you were ticketed on the map.</div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" id="togglePin" class="es-btn" style="flex-shrink:0;">Set location</button>
+          <button type="button" id="clearPin" class="es-btn es-btn--danger" style="display:none; flex-shrink:0;">Clear</button>
+          <span id="pinStatusText" class="submit-status" style="font-size:13px; color:#6b7280;">No pin set</span>
+          <span id="pinPill" class="pill pill-photo pill-pin" style="display:none;">Pin ✓</span>
+        </div>
+      </div>
+
     </div>
-    <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none;">
-    <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">After submission, AI will verify your photo. Result appears as a pill on your ticket in the feed.</div>
   </div>
 
-  {# ── Map pin ── #}
-  <div class="sg-span-12">
-    <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Map pin</div>
-    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-      <button type="button" id="togglePin" class="es-btn" style="flex-shrink:0;">Set location</button>
-      <button type="button" id="clearPin" class="es-btn es-btn--danger" style="display:none; flex-shrink:0;">Clear</button>
-      <span id="pinStatusText" class="submit-status" style="font-size:13px; color:#6b7280;">No pin set</span>
-      <span id="pinPill" class="pill pill-photo pill-pin" style="display:none;">Pin ✓</span>
-    </div>
-  </div>
-
-  <div class="sg-span-12" id="pinBox" style="margin-top:2px;">
+  <div class="sg-span-12" id="pinBox" style="margin-top:8px;">
     <div id="pinPreview" style="position:relative;">
       <img id="pinPreviewImg" alt="County preview" src="/api/county_staticmap?w=640&h=640" style="width:100%; max-width:720px; border-radius:12px; border:1px solid #e5e7eb;" />
-      <div id="noPinMsg" style="display:none; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;">
+      <div id="noPinMsg" style="position:absolute; inset:0; align-items:center; justify-content:center; pointer-events:none; display:none;">
         <div style="background:rgba(0,0,0,0.55); color:#fff; border-radius:10px; padding:10px 18px; font-size:13px; font-weight:500; text-align:center; max-width:320px; line-height:1.4;">No location pin set — ticket will be attributed to county only</div>
       </div>
     </div>
@@ -532,50 +543,41 @@
     const geoid = (countyGeoid.value || '').trim();
     const lat = (latHidden.value||'').trim();
     const lng = (lngHidden.value||'').trim();
+    const st = (stHidden ? stHidden.value || '' : '').trim();
 
-    // Preview: show once a county is selected. If a pin is set, include it and center on it.
-    if (geoid) {
-      if (pinBox) pinBox.style.display = 'block';
-      if (pinPreview && pinPreviewImg) {
-        pinPreview.style.display = 'block';
-        const w = 640;
-        const h = 640;
-        const cb = Date.now();
-        let src = `/api/county_staticmap?geoid=${encodeURIComponent(geoid)}&w=${w}&h=${h}&_=${cb}`;
-        if (lat && lng) {
-          src = `/api/county_staticmap?geoid=${encodeURIComponent(geoid)}&pin_lat=${encodeURIComponent(lat)}&pin_lng=${encodeURIComponent(lng)}&center_on_pin=1&w=${w}&h=${h}&_=${cb}`;
-        }
-        pinPreviewImg.src = src;
+    // Preview map
+    if (pinBox) pinBox.style.display = 'block';
+    if (pinPreview && pinPreviewImg) {
+      pinPreview.style.display = 'block';
+      const w = 640, h = 640, cb = Date.now();
+      let src;
+      if (geoid) {
+        src = lat && lng
+          ? `/api/county_staticmap?geoid=${encodeURIComponent(geoid)}&pin_lat=${encodeURIComponent(lat)}&pin_lng=${encodeURIComponent(lng)}&center_on_pin=1&w=${w}&h=${h}&_=${cb}`
+          : `/api/county_staticmap?geoid=${encodeURIComponent(geoid)}&w=${w}&h=${h}&_=${cb}`;
+      } else if (st) {
+        src = `/api/county_staticmap?state=${encodeURIComponent(st)}&w=${w}&h=${h}&_=${cb}`;
+      } else {
+        src = `/api/county_staticmap?w=${w}&h=${h}&_=${cb}`;
       }
-    } else {
-      if (pinBox) pinBox.style.display = 'block';
-      if (pinPreview && pinPreviewImg) {
-        pinPreview.style.display = 'block';
-        const w = 640;
-        const h = 640;
-        pinPreviewImg.src = `/api/county_staticmap?w=${w}&h=${h}&_=${Date.now()}`;
-      }
+      pinPreviewImg.src = src;
     }
 
-    // Status + clear button
+    // Status text + clear button
     if (lat && lng) {
-      const statusEl = pinStatusText || pinStatus;
-      if (statusEl) statusEl.textContent = `Pin set: ${lat}, ${lng}`;
-      if (clearPinBtn) clearPinBtn.style.display = 'inline-block';
+      if (pinStatusText) pinStatusText.textContent = `Pin set: ${lat}, ${lng}`;
+      if (clearPinBtn) clearPinBtn.style.display = 'inline-flex';
     } else {
-      const statusEl = pinStatusText || pinStatus;
-      if (statusEl) statusEl.textContent = 'No pin set';
+      if (pinStatusText) pinStatusText.textContent = 'No pin set';
       if (clearPinBtn) clearPinBtn.style.display = 'none';
     }
 
-    // Pin pill (only after pin set)
+    // Pin pill
     if (pinPill) pinPill.style.display = (lat && lng) ? 'inline-block' : 'none';
-    // No-pin overlay on preview map
+    // No-pin overlay — only show when county selected but no pin
     const noPinMsg = document.getElementById('noPinMsg');
-    if (noPinMsg) noPinMsg.style.display = (lat && lng || !geoid) ? 'none' : 'flex';
+    if (noPinMsg) noPinMsg.style.display = (geoid && !lat) ? 'flex' : 'none';
   }
-
-  if (clearPinBtn) {
     clearPinBtn.addEventListener('click', () => {
       clearPinAll();
     });

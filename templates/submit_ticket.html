@@ -583,6 +583,8 @@
     const noPinMsg = document.getElementById('noPinMsg');
     if (noPinMsg) noPinMsg.style.display = (geoid && !lat) ? 'flex' : 'none';
   }
+
+  if (clearPinBtn) {
     clearPinBtn.addEventListener('click', () => {
       clearPinAll();
     });

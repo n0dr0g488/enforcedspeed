@@ -32,7 +32,7 @@ from r2_utils import get_bytes, delete_object
 _CONFIDENCE_THRESHOLD = 0.60
 
 # Gemini model
-_GEMINI_MODEL = "gemini-2.0-flash"
+_GEMINI_MODEL = "models/gemini-2.5-flash"
 
 # Tolerance: AI can misread a digit
 _SPEED_TOLERANCE = 2
@@ -55,10 +55,7 @@ def _gemini_verify_image(
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set")
 
-    client = genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(api_version="v1"),
-    )
+    client = genai.Client(api_key=api_key)
 
     # Encode image as inline bytes part
     # Detect mime type from magic bytes

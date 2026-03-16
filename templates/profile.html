@@ -147,6 +147,71 @@
       <div class="profile-section">
         <div class="profile-section-title">Security</div>
         <a href="{{ url_for('change_password') }}" class="prof-btn">Change password</a>
+
+        {% if is_admin %}
+        <div style="margin-top:18px; padding-top:14px; border-top:1px solid #f3f4f6;">
+          <div style="font-size:13px; font-weight:600; color:#374151; margin-bottom:10px;">Admin accounts</div>
+          <div id="adminList" style="margin-bottom:12px; font-size:13px; color:#6b7280;">Loading…</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input id="adminEmailInput" type="email" placeholder="Add email address" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; min-width:220px;">
+            <button type="button" id="adminAddBtn" class="prof-btn prof-btn-primary" style="height:34px;">Add admin</button>
+          </div>
+          <div id="adminMsg" style="font-size:12px; color:#6b7280; margin-top:6px;"></div>
+        </div>
+
+        <script>
+        (function(){
+          const listEl = document.getElementById('adminList');
+          const input = document.getElementById('adminEmailInput');
+          const addBtn = document.getElementById('adminAddBtn');
+          const msg = document.getElementById('adminMsg');
+
+          function setMsg(t, err){ if(msg){ msg.textContent = t; msg.style.color = err ? '#dc2626' : '#6b7280'; } }
+
+          function loadAdmins(){
+            fetch('/api/admin/list', {credentials:'same-origin'})
+              .then(r=>r.json()).then(data=>{
+                if(!data.ok){ listEl.textContent = 'Could not load admin list.'; return; }
+                if(!listEl) return;
+                const all = [];
+                // Env admins (read-only)
+                (data.env_admins||[]).forEach(e=>{
+                  all.push(`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;">
+                    <span style="flex:1;font-size:13px;">${e}</span>
+                    <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">env var</span>
+                  </div>`);
+                });
+                // DB admins (removable)
+                (data.db_admins||[]).forEach(a=>{
+                  all.push(`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;">
+                    <span style="flex:1;font-size:13px;">${a.email}</span>
+                    <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">added ${a.created_at}</span>
+                    <button type="button" onclick="removeAdmin('${a.email}')" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;padding:0 2px;">Remove</button>
+                  </div>`);
+                });
+                listEl.innerHTML = all.length ? all.join('') : '<span style="color:#9ca3af;">No DB admins yet.</span>';
+              }).catch(()=>{ listEl.textContent = 'Error loading list.'; });
+          }
+
+          window.removeAdmin = function(email){
+            if(!confirm(`Remove ${email} as admin?`)) return;
+            fetch('/api/admin/remove', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
+              .then(r=>r.json()).then(d=>{ if(d.ok){ setMsg('Removed.'); loadAdmins(); } else { setMsg(d.error||'Error', true); } });
+          };
+
+          if(addBtn && input){
+            addBtn.addEventListener('click', ()=>{
+              const email = (input.value||'').trim().toLowerCase();
+              if(!email || !email.includes('@')){ setMsg('Enter a valid email.', true); return; }
+              fetch('/api/admin/add', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
+                .then(r=>r.json()).then(d=>{ if(d.ok){ input.value=''; setMsg('Admin added.'); loadAdmins(); } else { setMsg(d.error||'Error', true); } });
+            });
+          }
+
+          loadAdmins();
+        })();
+        </script>
+        {% endif %}
       </div>
       {% endif %}
 

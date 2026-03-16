@@ -72,9 +72,9 @@
             {% set conf = r.ai_confidence if r.ai_confidence is not none else 1.0 %}
             {% set conf_pct = (conf * 100)|int %}
             {% if conf >= 0.85 %}
-              <span class="pill pill-photo pill-photo-ok pill-ai-high">Ticket Photo AI Verified · {{ conf_pct }}%</span>
+              <span class="pill pill-photo pill-photo-ok pill-ai-high">AI Ticket Photo Verified · {{ conf_pct }}% confidence</span>
             {% else %}
-              <span class="pill pill-photo pill-photo-ok pill-ai-mid" title="AI verified (moderate confidence)">Ticket Photo AI Verified · {{ conf_pct }}%</span>
+              <span class="pill pill-photo pill-photo-ok pill-ai-mid" title="AI verified (moderate confidence)">AI Ticket Photo Verified · {{ conf_pct }}% confidence</span>
             {% endif %}
           {% else %}
             <span class="pill pill-photo pill-photo-fail">Photo !</span>

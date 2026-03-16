@@ -335,3 +335,18 @@ class FollowedState(db.Model):
 
     def __repr__(self):
         return f"<FollowedState user={self.user_id} state={self.state_code}>"
+
+
+class AdminUser(db.Model):
+    """DB-managed admin list (v607). Supplements ADMIN_EMAILS env var.
+    The hardcoded super-admin email is always admin and cannot be removed via UI.
+    """
+    __tablename__ = "admin_users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    added_by = db.Column(db.String(255), nullable=True)  # email of who added them
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<AdminUser email={self.email}>"

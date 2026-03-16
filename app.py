@@ -220,7 +220,7 @@ from forms import (
     CSRFOnlyForm,
     ProfileDefaultFiltersForm,
 )
-from models import db, SpeedReport, User, Like, Comment, FollowedCounty, FollowedState, normalize_road, state_code_from_value
+from models import db, SpeedReport, User, Like, Comment, FollowedCounty, FollowedState, AdminUser, normalize_road, state_code_from_value
 
 
 # -----------------------------------------------------------------------------
@@ -323,6 +323,15 @@ def ensure_schema_patches() -> None:
         _ensure_col(conn, "speed_reports", "ai_confidence", "ai_confidence DOUBLE PRECISION")
         _ensure_col(conn, "speed_reports", "ai_model", "ai_model TEXT")
         _ensure_col(conn, "speed_reports", "ocr_job_id", "ocr_job_id TEXT")
+        # --- admin_users table (v607) ---
+        conn.exec_driver_sql("""
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                added_by VARCHAR(255),
+                created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """)
 
 from queue_utils import get_queue
 from r2_utils import put_bytes, delete_object
@@ -2337,6 +2346,8 @@ GROUP BY UPPER(TRIM(stusps));
             system_avatars=system_avatars(),
             selected_avatar_key=selected_avatar_key,
             defaults_form=defaults_form,
+            is_admin=is_admin_user(current_user),
+            is_owner=current_user.is_authenticated and current_user.id == u.id,
         )
 
     def strictness_rows(
@@ -5261,6 +5272,60 @@ GROUP BY UPPER(TRIM(stusps));
         })
 
 
+    # --- Admin management (v607) ---
+    _SUPER_ADMIN_EMAIL = "enforcedspeed@gmail.com"  # hardcoded, can never be removed via UI
+
+    @app.get("/api/admin/list")
+    def api_admin_list():
+        """Return current admin list (env + DB). Super-admin only."""
+        if not current_user.is_authenticated or not is_admin_user(current_user):
+            return jsonify({"ok": False}), 403
+        env_admins = sorted(_admin_email_set())
+        db_admins = [{"email": a.email, "added_by": a.added_by or "", "created_at": a.created_at.strftime("%b %d, %Y")} for a in AdminUser.query.order_by(AdminUser.created_at).all()]
+        return jsonify({"ok": True, "env_admins": env_admins, "db_admins": db_admins})
+
+    @app.post("/api/admin/add")
+    def api_admin_add():
+        """Add an email to the DB admin list. Super-admin only."""
+        if not current_user.is_authenticated or not is_admin_user(current_user):
+            return jsonify({"ok": False}), 403
+        email = (request.json or {}).get("email", "").strip().lower()
+        if not email or "@" not in email:
+            return jsonify({"ok": False, "error": "Invalid email"}), 400
+        existing = AdminUser.query.filter_by(email=email).first()
+        if existing:
+            return jsonify({"ok": False, "error": "Already an admin"}), 400
+        try:
+            db.session.add(AdminUser(email=email, added_by=current_user.email))
+            db.session.commit()
+            return jsonify({"ok": True})
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "DB error"}), 500
+
+    @app.post("/api/admin/remove")
+    def api_admin_remove():
+        """Remove an email from the DB admin list. Cannot remove super-admin or env admins."""
+        if not current_user.is_authenticated or not is_admin_user(current_user):
+            return jsonify({"ok": False}), 403
+        email = (request.json or {}).get("email", "").strip().lower()
+        if email == _SUPER_ADMIN_EMAIL:
+            return jsonify({"ok": False, "error": "Cannot remove super-admin"}), 400
+        env_set = set(e.strip().lower() for e in (os.environ.get("ADMIN_EMAILS") or "").split(",") if e.strip())
+        if email in env_set:
+            return jsonify({"ok": False, "error": "Cannot remove env-var admin via UI — remove from Render env vars"}), 400
+        rec = AdminUser.query.filter_by(email=email).first()
+        if not rec:
+            return jsonify({"ok": False, "error": "Not found"}), 404
+        try:
+            db.session.delete(rec)
+            db.session.commit()
+            return jsonify({"ok": True})
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "DB error"}), 500
+
+
     @app.post("/api/profile/photo/remove")
     def api_profile_photo_remove():
         """Remove the current user's profile photo (revert to system avatar)."""
@@ -5438,11 +5503,15 @@ GROUP BY UPPER(TRIM(stusps));
         try:
             if not user or not getattr(user, "is_authenticated", False):
                 return False
-            admin_emails = _admin_email_set()
-            if not admin_emails:
-                return False
             email = (getattr(user, "email", "") or "").strip().lower()
-            return bool(email and email in admin_emails)
+            if not email:
+                return False
+            # Check env var + hardcoded
+            admin_emails = _admin_email_set()
+            if email in admin_emails:
+                return True
+            # Check DB table
+            return bool(AdminUser.query.filter_by(email=email).first())
         except Exception:
             return False
 
@@ -5651,19 +5720,20 @@ GROUP BY UPPER(TRIM(stusps));
             flash("County is required.", "error")
             return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
 
-        # Enforce 2 tickets per calendar month (non-admin)
+        # Enforce 2 tickets per calendar month (non-admin).
+        # AI-verified tickets (ocr_status='verified') are exempt and don't count toward the limit.
         if current_user.is_authenticated and not is_admin_user(current_user):
-            from datetime import datetime
             now = datetime.utcnow()
             month_start = datetime(now.year, now.month, 1)
-            submitted_this_month = (
+            unverified_this_month = (
                 db.session.query(SpeedReport)
                 .filter(SpeedReport.user_id == current_user.id)
                 .filter(SpeedReport.created_at >= month_start)
+                .filter(SpeedReport.ocr_status != "verified")
                 .count()
             )
-            if submitted_this_month >= 2:
-                flash("Limit reached: 2 tickets per month.", "error")
+            if unverified_this_month >= 2:
+                flash("You've reached the limit of 2 unverified tickets per month. Upload a photo for AI verification to post more.", "error")
                 return render_template("submit_ticket.html", form=form, states=STATE_PAIRS, default_st=default_st, maps_api_key=maps_api_key), 400
 
         # Fetch canonical county record (also enforces county belongs to state)

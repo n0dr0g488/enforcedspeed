@@ -53,9 +53,9 @@
 
     <div class="ticket-ocr">
       <div class="ticket-ocr-pills">
-        {# Pin pill: only when the user has a refined pin. (Pin left) #}
-        {% if r.location_source in ['user_pin','user_pin_snapped'] %}
-          <span class="pill pill-photo pill-photo-ok">Pin ✓</span>
+        {# No pin note: subtle, only when ticket has no pin #}
+        {% if _pin_lat is none %}
+          <span class="subtle" style="font-size:11px; color:#9ca3af;">No location pin</span>
         {% endif %}
 
         {# Photo pill with status #}
@@ -70,10 +70,11 @@
             <span class="pill pill-photo pill-photo-fail">Photo !</span>
           {% elif st == 'verified' or vs == 'verified' %}
             {% set conf = r.ai_confidence if r.ai_confidence is not none else 1.0 %}
+            {% set conf_pct = (conf * 100)|int %}
             {% if conf >= 0.85 %}
-              <span class="pill pill-photo pill-photo-ok pill-ai-high">Photo AI ✓</span>
+              <span class="pill pill-photo pill-photo-ok pill-ai-high">Ticket Photo AI Verified · {{ conf_pct }}%</span>
             {% else %}
-              <span class="pill pill-photo pill-photo-ok pill-ai-mid" title="AI verified (moderate confidence)">Photo AI ✓</span>
+              <span class="pill pill-photo pill-photo-ok pill-ai-mid" title="AI verified (moderate confidence)">Ticket Photo AI Verified · {{ conf_pct }}%</span>
             {% endif %}
           {% else %}
             <span class="pill pill-photo pill-photo-fail">Photo !</span>

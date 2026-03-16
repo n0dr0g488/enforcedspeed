@@ -18,7 +18,6 @@ No response text beyond the structured JSON fields is stored.
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import re
@@ -33,7 +32,7 @@ from r2_utils import get_bytes, delete_object
 _CONFIDENCE_THRESHOLD = 0.60
 
 # Gemini model
-_GEMINI_MODEL = "gemini-1.5-flash-latest"
+_GEMINI_MODEL = "gemini-1.5-flash-001"
 
 # Tolerance: AI can misread a digit
 _SPEED_TOLERANCE = 2
@@ -49,30 +48,16 @@ def _gemini_verify_image(
     Returns:
         (is_ticket, posted_speed, ticketed_speed, confidence, reason)
     """
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set")
 
-    # Explicitly configure with api_key only.
-    # We temporarily unset ADC env vars so google-generativeai doesn't
-    # silently fall back to the service account (which lacks Gemini access).
-    _saved_adc = os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
-    _saved_creds = os.environ.pop("GOOGLE_CREDENTIALS_JSON", None)
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(_GEMINI_MODEL)
-    finally:
-        # Always restore so other Google services (Vision, Maps) keep working
-        if _saved_adc is not None:
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _saved_adc
-        if _saved_creds is not None:
-            os.environ["GOOGLE_CREDENTIALS_JSON"] = _saved_creds
+    client = genai.Client(api_key=api_key)
 
-    # Encode image as base64 for inline sending
-    b64 = base64.b64encode(img_bytes).decode("utf-8")
-
+    # Encode image as inline bytes part
     # Detect mime type from magic bytes
     mime = "image/jpeg"
     if img_bytes[:4] == b'\x89PNG':
@@ -103,8 +88,11 @@ Rules:
 - If you cannot find speed values, set them to null
 - Never guess speeds — only extract what is clearly visible"""
 
-    image_part = {"mime_type": mime, "data": b64}
-    response = model.generate_content([prompt, image_part])
+    image_part = types.Part.from_bytes(data=img_bytes, mime_type=mime)
+    response = client.models.generate_content(
+        model=_GEMINI_MODEL,
+        contents=[prompt, image_part],
+    )
 
     raw = (response.text or "").strip()
 

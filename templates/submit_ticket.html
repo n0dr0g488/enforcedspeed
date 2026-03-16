@@ -45,7 +45,7 @@
 
   #submitInlineMap {
     width: 100%;
-    height: 340px;
+    height: 480px;
     border-radius: 12px;
     border: 1px solid #e5e7eb;
     overflow: hidden;
@@ -116,12 +116,16 @@
       {# Left: Map pin #}
       <div style="padding-right:4px; margin-top:0;">
         <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Map pin</div>
-        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px; min-height:54px;">Click anywhere on the map below to drop a pin. Hover counties to see their names. Click a county to zoom in.</div>
+        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px; min-height:54px;">Select your county then click <strong>Set pin</strong> or click directly on the map. Hover counties to see names.</div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" id="setPinBtn" class="es-btn" style="display:none; flex-shrink:0; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Set pin
+          </button>
           <button type="button" id="clearPin" class="es-btn es-btn--danger" style="display:none; flex-shrink:0;">Clear pin</button>
-          <span id="pinStatusText" class="submit-status" style="font-size:13px; color:#6b7280;">Click the map to set a pin</span>
+          <span id="pinStatusText" class="submit-status" style="font-size:13px; color:#6b7280;">Select a county first</span>
         </div>
-        <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">Your pin will appear as a red marker on your ticket in the feed.</div>
+        <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">Your pin appears as a red marker on your ticket in the feed.</div>
       </div>
 
       {# Soft divider #}
@@ -229,14 +233,22 @@
     const lat = (latHidden.value||'').trim();
     const lng = (lngHidden.value||'').trim();
     const geoid = (countyGeoid.value||'').trim();
+    const setPinBtn = document.getElementById('setPinBtn');
     if (lat && lng) {
       if (pinStatusText) pinStatusText.textContent = `Pin set: ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
       if (clearPinBtn) clearPinBtn.style.display = 'inline-flex';
+      if (setPinBtn) setPinBtn.style.display = 'none';
       if (noPinMsg) noPinMsg.style.display = 'none';
-    } else {
-      if (pinStatusText) pinStatusText.textContent = 'Click the map to set a pin';
+    } else if (geoid) {
+      if (pinStatusText) pinStatusText.textContent = 'Click map or Set pin to place marker';
       if (clearPinBtn) clearPinBtn.style.display = 'none';
-      if (noPinMsg) noPinMsg.style.display = geoid ? 'block' : 'none';
+      if (setPinBtn) setPinBtn.style.display = 'inline-flex';
+      if (noPinMsg) noPinMsg.style.display = 'block';
+    } else {
+      if (pinStatusText) pinStatusText.textContent = 'Select a county first';
+      if (clearPinBtn) clearPinBtn.style.display = 'none';
+      if (setPinBtn) setPinBtn.style.display = 'none';
+      if (noPinMsg) noPinMsg.style.display = 'none';
     }
   }
 
@@ -444,12 +456,26 @@
       streetViewControl: false,
       fullscreenControl: false,
       mapTypeControl: false,
-      gestureHandling: 'cooperative',
+      gestureHandling: 'greedy',
       styles: [
         {featureType:'poi', stylers:[{visibility:'off'}]},
         {featureType:'transit', stylers:[{visibility:'off'}]},
       ],
     });
+
+    // Set pin button — drops pin at county centroid or map center
+    const setPinBtn = document.getElementById('setPinBtn');
+    if (setPinBtn) {
+      setPinBtn.addEventListener('click', () => {
+        const geoid = (countyGeoid.value||'').trim();
+        if (!geoid || !submitMap) return;
+        // Use stored centroid or map center
+        const center = submitMap.getCenter();
+        if (center) {
+          setPin(center.lat().toFixed(6), center.lng().toFixed(6));
+        }
+      });
+    }
 
     // Click map to place pin
     submitMap.addListener('click', (e) => {
@@ -576,7 +602,7 @@
         const geom = f.getGeometry();
         if (geom) processGeom(geom, bounds);
       });
-      if (!bounds.isEmpty()) submitMap.fitBounds(bounds, {top:20, right:20, bottom:20, left:20});
+      if (!bounds.isEmpty()) submitMap.fitBounds(bounds, {top:16, right:16, bottom:16, left:16});
 
     } catch(e) {}
   }
@@ -610,7 +636,7 @@
         const geom = f.getGeometry();
         if (geom) processGeom(geom, bounds);
       });
-      if (!bounds.isEmpty()) submitMap.fitBounds(bounds, {top:40, right:40, bottom:40, left:40});
+      if (!bounds.isEmpty()) submitMap.fitBounds(bounds, {top:24, right:24, bottom:24, left:24});
 
     } catch(e) {}
   }

@@ -1375,6 +1375,7 @@ function startAutoLoad(){
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
+            gestureHandling: 'greedy',
           });
           marker = new google.maps.Marker({ position: center, map: map, draggable: true });
           map.addListener('click', function(e){

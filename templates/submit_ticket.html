@@ -89,32 +89,14 @@
 
   <div class="sg-span-12 submit-divider-text"><span>Optional items below</span></div>
 
-  {# ── Two-column optional section: AI Photo left | Map Pin right ── #}
+  {# ── Two-column optional section: Map Pin left | AI Photo right ── #}
   <div class="sg-span-12">
     <div style="display:grid; grid-template-columns:1fr 1px 1fr; gap:0 20px; align-items:start;">
 
-      {# Left: AI Photo Verification #}
-      <div style="padding-right:4px;">
-        <div style="font-weight:600; font-size:15px; margin-bottom:4px;">AI Photo Verification</div>
-        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px;">Upload a photo of your ticket and our AI will verify the speeds. Your photo is analyzed by Google Gemini AI and never stored.</div>
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button type="button" id="photoBtn" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Upload photo
-          </button>
-          <span id="photoNameText" class="submit-status" style="font-size:13px; color:#6b7280;">No photo selected</span>
-        </div>
-        <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none;">
-        <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">After submission, AI will verify your photo. Result appears as a pill on your ticket in the feed.</div>
-      </div>
-
-      {# Soft divider #}
-      <div style="background:#e5e7eb; width:1px; align-self:stretch; margin-top:4px;"></div>
-
-      {# Right: Map pin #}
-      <div style="padding-left:4px;">
+      {# Left: Map pin #}
+      <div style="padding-right:4px; margin-top:0;">
         <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Map pin</div>
-        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px;">Drop a pin near where you were ticketed. Even an approximate spot helps other drivers visualize enforcement patterns in the area.</div>
+        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px; min-height:54px;">Drop a pin near where you were ticketed. Even an approximate spot helps other drivers visualize enforcement patterns in the area.</div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <button type="button" id="togglePin" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -125,6 +107,24 @@
           <span id="pinPill" class="pill pill-photo pill-pin" style="display:none;">Pin ✓</span>
         </div>
         <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">Your pin will appear on the map preview below and as a red marker on your ticket in the feed.</div>
+      </div>
+
+      {# Soft divider #}
+      <div style="background:#e5e7eb; width:1px; align-self:stretch;"></div>
+
+      {# Right: AI Photo Verification #}
+      <div style="padding-left:4px; margin-top:0;">
+        <div style="font-weight:600; font-size:15px; margin-bottom:4px;">AI Photo Verification</div>
+        <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px; min-height:54px;">Upload a photo of your ticket and our AI will verify the speeds. Your photo is analyzed by Google Gemini AI and never stored.</div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <button type="button" id="photoBtn" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Upload photo
+          </button>
+          <span id="photoNameText" class="submit-status" style="font-size:13px; color:#6b7280;">No photo selected</span>
+        </div>
+        <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none;">
+        <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">After submission, AI will verify your photo. Result appears as a pill on your ticket in the feed.</div>
       </div>
 
     </div>

@@ -91,23 +91,17 @@
 
   {# ── AI Photo Verification ── #}
   <div class="sg-span-12">
-    <div class="es-label-row" style="align-items:flex-start;">
-      <div class="es-label-left">
-        <div style="font-weight:600; font-size:15px;">AI Photo Verification</div>
-        <div style="font-size:12px; color:#6b7280; margin-top:2px; line-height:1.4;">Upload a photo of your ticket and our AI will verify the speeds.<br>Your photo is analyzed by Google Gemini AI and never stored.</div>
-      </div>
-      <div class="es-label-right" style="padding-top:2px;">
-        <button type="button" id="photoBtn" class="es-btn" style="display:inline-flex; align-items:center; gap:6px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Upload photo
-        </button>
-      </div>
+    <div style="font-weight:600; font-size:15px; margin-bottom:4px;">AI Photo Verification</div>
+    <div style="font-size:12px; color:#6b7280; line-height:1.5; margin-bottom:10px;">Upload a photo of your ticket and our AI will verify the speeds. Your photo is analyzed by Google Gemini AI and never stored.</div>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <button type="button" id="photoBtn" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Upload photo
+      </button>
+      <span id="photoNameText" class="submit-status" style="font-size:13px; color:#6b7280;">No photo selected</span>
     </div>
     <input type="file" id="photoInput" name="photo" accept="image/*" style="display:none;">
-    <div id="photoName" class="submit-statusline" style="margin-top:4px;">
-      <span id="photoNameText" class="submit-status">No photo selected</span>
-    </div>
-    <div style="font-size:11px; color:#9ca3af; margin-top:6px; line-height:1.4;">After submission, AI will verify your photo. Result appears as a pill on your ticket in the feed.</div>
+    <div style="font-size:11px; color:#9ca3af; margin-top:8px; line-height:1.5;">After submission, AI will verify your photo. Result appears as a pill on your ticket in the feed.</div>
   </div>
 
   {# ── Map pin ── #}

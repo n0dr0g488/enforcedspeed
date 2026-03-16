@@ -230,7 +230,8 @@ class SpeedReport(db.Model):
 
     # AI verification fields (v583)
     ai_confidence = db.Column(db.Float, nullable=True)   # 0.0–1.0 from Gemini
-    ai_model = db.Column(db.String(60), nullable=True)   # e.g. 'gemini-1.5-flash'
+    ai_model = db.Column(db.String(60), nullable=True)   # e.g. 'gemini-1.5-flash-latest'
+    ocr_job_id = db.Column(db.String(100), nullable=True)  # RQ job ID
 
     verified_at = db.Column(db.DateTime, nullable=True)
     verified_by = db.Column(db.Integer, nullable=True)

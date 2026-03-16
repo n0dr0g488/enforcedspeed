@@ -1552,7 +1552,8 @@ function startAutoLoad(){
         Object.keys(data.statuses).forEach(function(id){
           var s = data.statuses[id];
           var ocr = s.ocr_status || '';
-          if(ocr === 'processing' || ocr === 'pending') return; // still running
+          var vs = s.verification_status || '';
+          if(ocr === 'processing' || ocr === 'pending' || vs === 'submitted') return; // still running
           // Find the pill and replace it
           var pill = document.querySelector('.pill-photo-processing[data-poll-id="' + id + '"]');
           if(!pill) return;

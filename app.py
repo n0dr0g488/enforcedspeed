@@ -322,6 +322,7 @@ def ensure_schema_patches() -> None:
         # --- speed_reports: AI verification fields (v583) ---
         _ensure_col(conn, "speed_reports", "ai_confidence", "ai_confidence DOUBLE PRECISION")
         _ensure_col(conn, "speed_reports", "ai_model", "ai_model TEXT")
+        _ensure_col(conn, "speed_reports", "ocr_job_id", "ocr_job_id TEXT")
 
 from queue_utils import get_queue
 from r2_utils import put_bytes, delete_object

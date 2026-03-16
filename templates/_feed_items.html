@@ -138,8 +138,19 @@
     {% if _pin_lat is not none %}
       <img class="ticket-pin-overlay" src="/static/img/pins/pin_selected_red.png" data-pin-lat="{{ _pin_lat }}" data-pin-lng="{{ _pin_lng }}" alt="">
     {% endif %}
+    {# No-location overlay when ticket has no pin — shown for owner and visitors #}
+    {% if _pin_lat is none %}
+      <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;">
+        <div style="background:rgba(0,0,0,0.6); color:#fff; border-radius:10px; padding:8px 16px; font-size:12px; font-weight:500; text-align:center; max-width:260px; line-height:1.5; pointer-events:auto;">
+          No location set — attributed to county only.
+          {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
+          <br><span style="font-size:11px; opacity:0.85;">Use the button below to add a pin.</span>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
     {% if current_user.is_authenticated and r.user_id and (r.user_id == current_user.id) %}
-      <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">Refine pin</button>
+      <button type="button" class="ticket-pin-refine" data-report-id="{{ r.id }}" data-lat="{{ r.lat }}" data-lng="{{ r.lng }}" data-county-geoid="{{ r.county_geoid }}" data-county-name="{{ r.county_name }}" data-county-state="{{ r.county_state }}">{% if _pin_lat is none %}Set location pin{% else %}Refine pin{% endif %}</button>
     {% endif %}
     {% set map_focus_url = county_focus_url or state_focus_url %}
     {% if map_focus_url %}

@@ -948,6 +948,11 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     z_star = min(zoom_lng, zoom_lat)
     z_star = max(0.0, min(float(z_star), 18.0))
 
+    # When centering on a pin, zoom in closer to show the pin area rather than
+    # the whole county. Add 2 zoom levels, capped at 13 (city-street level).
+    if center_on_pin and pin_lat is not None and pin_lng is not None:
+        z_star = min(z_star + 2.0, 13.0)
+
     zoom_int = int(round(z_star))
 
     def _public_base_url() -> str:

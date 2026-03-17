@@ -2,9 +2,11 @@
 {% block content %}
 
 <style>
-  .profile-section{ margin-top:20px; padding-top:18px; border-top:1px solid #f3f4f6; }
+  .profile-section{ margin-top:20px; padding-top:18px; border-top:none; }
   .profile-section:first-of-type{ border-top:none; margin-top:14px; padding-top:0; }
-  .profile-section-title{ font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px; margin:0 0 12px; }
+  .profile-section-title{ display:flex; align-items:center; gap:10px; margin:0 0 14px; }
+  .profile-section-title::before,.profile-section-title::after{ content:""; flex:1; height:1px; background:#eef2f7; border-radius:999px; }
+  .profile-section-title span{ color:#9ca3af; font-size:12px; font-weight:600; letter-spacing:1px; text-transform:uppercase; white-space:nowrap; }
 
   .prof-btn{
     display:inline-flex; align-items:center; justify-content:center;
@@ -145,7 +147,7 @@
       {# ── Security (owner only) ── #}
       {% if is_owner %}
       <div class="profile-section">
-        <div class="profile-section-title">Security</div>
+        <div class="profile-section-title"><span>Security</span></div>
         <a href="{{ url_for('change_password') }}" class="prof-btn">Change password</a>
 
         {% if is_admin %}
@@ -218,7 +220,7 @@
       {# ── Avatar (owner only) ── #}
       {% if is_owner %}
       <div class="profile-section">
-        <div class="profile-section-title">Avatar</div>
+        <div class="profile-section-title"><span>Avatar</span></div>
 
         <form id="esAvatarForm" method="post" action="{{ url_for('profile', username=profile_user.username) }}" style="display:none;">
           {{ avatar_form.csrf_token }}
@@ -297,7 +299,7 @@
       {# ── Vehicle (owner) ── #}
       {% if is_owner %}
       <div class="profile-section">
-        <div class="profile-section-title">Vehicle</div>
+        <div class="profile-section-title"><span>Vehicle</span></div>
 
         {% set has_car_info = profile_user.car_make or profile_user.car_model or profile_user.car_year %}
 
@@ -356,7 +358,7 @@
       {% elif profile_user.car_photo_1 or profile_user.car_photo_2 or profile_user.car_photo_3 or profile_user.car_make %}
       {# Visitor view #}
       <div class="profile-section">
-        <div class="profile-section-title">Vehicle</div>
+        <div class="profile-section-title"><span>Vehicle</span></div>
         {% if profile_user.car_make or profile_user.car_model or profile_user.car_year %}
           <div style="font-size:14px; color:#111827; margin-bottom:8px;">
             {% if profile_user.car_year %}{{ profile_user.car_year }}{% endif %}
@@ -379,7 +381,7 @@
 
       {# ── Tickets ── #}
       <div class="profile-section">
-        <div class="profile-section-title">Tickets ({{ ticket_count }})</div>
+        <div class="profile-section-title"><span>Tickets ({{ ticket_count }})</span></div>
 
         {% if reports %}
           {% for r in reports %}

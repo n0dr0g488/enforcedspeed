@@ -54,7 +54,7 @@
 
           <div class="rail-section" style="border-top:0;">
             <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
-              <div style="font-size:13px; font-weight:600; color:#111827;">Following</div>
+              <div style="font-size:14px; font-weight:500; color:#111827;">Following</div>
             </div>
 
             <div style="margin-top:10px;">
@@ -98,7 +98,7 @@
           {# Suggested nearby counties #}
           {% if suggested_counties and suggested_counties|length > 0 %}
           <div class="rail-section" id="suggestedCountiesSection">
-            <div style="font-size:13px; font-weight:600; color:#111827;">Suggested</div>
+            <div style="font-size:14px; font-weight:500; color:#111827;">Suggested</div>
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
               {% for sc in suggested_counties %}
                 <div class="suggested-county-row" data-geoid="{{ sc.geoid }}" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
@@ -147,7 +147,7 @@
 
           {# Posting #}
           <div class="rail-section">
-            <div style="font-size:13px; font-weight:600; color:#111827;">Posting</div>
+            <div style="font-size:14px; font-weight:500; color:#111827;">Posting</div>
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
               {% if recent_users and recent_users|length > 0 %}
                 {% for ru in recent_users %}
@@ -1177,7 +1177,7 @@ function startAutoLoad(){
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-size:13px; font-weight:600; color:#111827;">Trending</div>
+      <div style="font-size:14px; font-weight:500; color:#111827;">Trending</div>
     </div>
   </div>
 

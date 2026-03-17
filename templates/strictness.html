@@ -47,12 +47,12 @@
       {# Page title — matches Submit/Following format #}
       <div style="margin-bottom:28px; text-align:center;">
         <h1 style="margin:0;">Statistics</h1>
-        <div class="subtle" style="margin-top:6px; font-size:14px;">EnforcedSpeed™ by zone, enforcement heat map, and county rankings — all based on user-reported ticket data.</div>
+        <div class="subtle" style="margin-top:6px; font-size:14px;">Ticket submissions by zone, enforcement heat map, and county rankings.</div>
       </div>
 
       {# ── EnforcedSpeed by Zone ── #}
       {% if summary and summary.enforced_speeds %}
-      <div style="margin-bottom:16px;">
+      <div style="margin-bottom:8px;">
         <div class="es-speed-grid">
           {% for es in summary.enforced_speeds %}
           <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">

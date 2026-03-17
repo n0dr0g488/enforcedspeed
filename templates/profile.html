@@ -147,7 +147,6 @@
       {# ── Security (owner only) ── #}
       {% if is_owner %}
       <div class="profile-section">
-        <div class="profile-section-title"><span>Security</span></div>
         <a href="{{ url_for('change_password') }}" class="prof-btn">Change password</a>
 
         {% if is_admin %}

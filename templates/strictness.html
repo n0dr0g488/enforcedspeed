@@ -4,12 +4,9 @@
 <style>
   .stats-page { max-width: 960px; margin: 0 auto; padding: 12px 16px 60px; }
 
-  /* EnforcedSpeed zone cards */
-  .es-section { margin-bottom: 28px; }
-  .es-section-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 4px; }
-  .es-section-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; line-height: 1.4; }
-  .es-speed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-  .es-speed-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
+  /* Zone cards */
+  .es-speed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .es-speed-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
   .es-speed-card.no-data { opacity: 0.45; }
   .es-speed-zone { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
   .es-speed-val { font-size: 28px; font-weight: 800; color: #e07070; line-height: 1.1; margin-top: 4px; }
@@ -18,9 +15,6 @@
   .es-speed-detail { font-size: 11px; color: #9ca3af; margin-top: 6px; }
 
   /* Heatmap */
-  .heatmap-section { margin-bottom: 28px; }
-  .heatmap-title { font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 4px; }
-  .heatmap-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; }
   .heatmap-wrap { display: flex; justify-content: center; }
   .heatmap-grid { display: grid; gap: 3px; max-width: 660px; width: 100%; }
   .heatmap-cell { aspect-ratio: 1; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: #fff; cursor: pointer; position: relative; transition: transform 0.1s; text-decoration: none; }
@@ -31,14 +25,10 @@
   .heatmap-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 11px; color: #6b7280; }
   .heatmap-legend-bar { height: 10px; width: 140px; border-radius: 5px; background: linear-gradient(to right, #6366f1, #60a5fa, #a3e635, #fbbf24, #f87171); }
 
-  /* Section */
-  .stats-section { margin-bottom: 24px; }
-  .stats-section-title { font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 12px; }
-
   /* Tables */
-  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .stats-table th { text-align: left; font-size: 10px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; padding: 7px 10px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
-  .stats-table td { padding: 6px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+  .stats-table td { padding: 7px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; }
   .stats-table tr:last-child td { border-bottom: 0; }
   .stats-table .t-num { font-weight: 700; color: #9ca3af; width: 24px; text-align: center; font-size: 11px; }
   .stats-table .t-name a { color: #374151; text-decoration: none; font-weight: 500; }
@@ -50,53 +40,58 @@
   .stats-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 700px) { .stats-cols { grid-template-columns: 1fr; } }
 
-  .stats-disclaimer { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 30px; line-height: 1.5; max-width: 600px; margin-left: auto; margin-right: auto; }
+  .card-section-title { font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 4px; }
+  .card-section-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; line-height: 1.5; }
+  .stats-disclaimer { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 4px; line-height: 1.5; }
 </style>
 
 <div class="stats-page">
 
-  <div style="text-align:center; margin-bottom: 20px;">
-    <div style="font-size: 22px; font-weight: 700; color: #111827;">Statistics</div>
-    <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">Speeding ticket enforcement data across the United States</div>
+  {# Page header #}
+  <div style="text-align:center; margin-bottom:16px;">
+    <div style="font-size:22px; font-weight:700; color:#111827;">Statistics</div>
+    <div style="font-size:13px; color:#6b7280; margin-top:4px;">Speeding ticket enforcement data across the United States</div>
   </div>
 
-  {# ═══ ENFORCEDSPEED BY ZONE ═══ #}
+  {# ── EnforcedSpeed by Zone ── #}
   {% if summary and summary.enforced_speeds %}
-  <div class="es-section">
-    <div class="es-section-title">EnforcedSpeed™ by Zone</div>
-    <div class="es-section-sub">
-      The EnforcedSpeed™ is the ticketed speed at which 90% of reported tickets occur in each speed zone — the point where enforcement is observed to begin based on user-reported data.
-    </div>
-    <div class="es-speed-grid">
-      {% for es in summary.enforced_speeds %}
-      <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
-        <div class="es-speed-zone">{{ es.posted }} mph zone</div>
-        {% if es.has_data %}
-          <div class="es-speed-val">{{ es.enforced }} <span>mph</span></div>
-          <div class="es-speed-detail">+{{ es.p10_over }} over · {{ es.tickets }} tickets</div>
-        {% else %}
-          <div class="es-speed-val empty">—</div>
-          <div class="es-speed-detail">Needs more data</div>
-        {% endif %}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+      <div class="card-section-title">EnforcedSpeed™ by Zone</div>
+      <div class="card-section-sub">The speed at which 90% of reported tickets occur in each zone — where enforcement is observed to begin based on user data.</div>
+      <div class="es-speed-grid">
+        {% for es in summary.enforced_speeds %}
+        <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
+          <div class="es-speed-zone">{{ es.posted }} mph zone</div>
+          {% if es.has_data %}
+            <div class="es-speed-val">{{ es.enforced }} <span>mph</span></div>
+            <div class="es-speed-detail">+{{ es.p10_over }} over · {{ es.tickets }} tickets</div>
+          {% else %}
+            <div class="es-speed-val empty">—</div>
+            <div class="es-speed-detail">Needs more data</div>
+          {% endif %}
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
   </div>
   {% endif %}
 
-  {# ═══ STATE HEATMAP ═══ #}
+  {# ── State Heatmap ── #}
   {% if summary and summary.state_stats %}
-  <div class="heatmap-section">
-    <div class="heatmap-title">Enforcement by State</div>
-    <div class="heatmap-sub">Average overage on reported tickets · Warmer colors indicate stricter enforcement (lower overage threshold)</div>
-    <div class="heatmap-wrap">
-      <div class="heatmap-grid" id="stateHeatmap"></div>
-    </div>
-    <div class="heatmap-legend">
-      <span>More lenient</span>
-      <div class="heatmap-legend-bar"></div>
-      <span>Stricter</span>
-      <span style="margin-left:14px; color:#d1d5db;">■</span> <span>No data</span>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+      <div class="card-section-title">Enforcement by State</div>
+      <div class="card-section-sub">Average overage on reported tickets. Warmer colors indicate stricter enforcement. Click a state to explore its map.</div>
+      <div class="heatmap-wrap">
+        <div class="heatmap-grid" id="stateHeatmap"></div>
+      </div>
+      <div class="heatmap-legend">
+        <span>More lenient</span>
+        <div class="heatmap-legend-bar"></div>
+        <span>Stricter</span>
+        <span style="margin-left:14px; color:#d1d5db;">■</span> <span>No data</span>
+      </div>
     </div>
   </div>
 
@@ -125,11 +120,9 @@
     var mx = vals.length ? Math.max.apply(null, vals) : 15;
     if(mx - mn < 1) { mn -= 1; mx += 1; }
 
-    // Cool-to-warm: blue (lenient/high overage) → yellow → red (strict/low overage)
     function heatColor(avg) {
-      var t = 1 - ((avg - mn) / (mx - mn)); // invert: low avg = strict = warm
+      var t = 1 - ((avg - mn) / (mx - mn));
       t = Math.max(0, Math.min(1, t));
-      // 5-stop gradient: indigo → blue → lime → amber → soft coral
       var r, g, b;
       if (t < 0.25) {
         var p = t / 0.25;
@@ -197,44 +190,48 @@
   </script>
   {% endif %}
 
-  {# ═══ COUNTY RANKINGS ═══ #}
-  <div class="stats-cols">
-    <div class="stats-section">
-      <div class="stats-section-title">Strictest Counties</div>
-      <table class="stats-table">
-        <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
-        <tbody>
-          {% for r in most_strict[:15] %}
-          <tr>
-            <td class="t-num">{{ loop.index }}</td>
-            <td class="t-name"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="t-state">{{ r.state }}</span></td>
-            <td class="t-over">+{{ '%.0f'|format(r.median_overage) }}</td>
-            <td class="t-count">{{ r.tickets }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+  {# ── County Rankings ── #}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+      <div class="stats-cols">
+        <div>
+          <div class="card-section-title" style="margin-bottom:10px;">Strictest Counties</div>
+          <table class="stats-table">
+            <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
+            <tbody>
+              {% for r in most_strict[:15] %}
+              <tr>
+                <td class="t-num">{{ loop.index }}</td>
+                <td class="t-name"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="t-state">{{ r.state }}</span></td>
+                <td class="t-over">+{{ '%.0f'|format(r.median_overage) }}</td>
+                <td class="t-count">{{ r.tickets }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
 
-    <div class="stats-section">
-      <div class="stats-section-title">Most Lenient Counties</div>
-      <table class="stats-table">
-        <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
-        <tbody>
-          {% for r in least_strict[:15] %}
-          <tr>
-            <td class="t-num">{{ loop.index }}</td>
-            <td class="t-name"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="t-state">{{ r.state }}</span></td>
-            <td class="t-over">+{{ '%.0f'|format(r.median_overage) }}</td>
-            <td class="t-count">{{ r.tickets }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+        <div>
+          <div class="card-section-title" style="margin-bottom:10px;">Most Lenient Counties</div>
+          <table class="stats-table">
+            <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
+            <tbody>
+              {% for r in least_strict[:15] %}
+              <tr>
+                <td class="t-num">{{ loop.index }}</td>
+                <td class="t-name"><a href="{{ url_for('map_view', state=r.state, county_geoid=r.county_geoid) }}">{{ r.county_name }}</a> <span class="t-state">{{ r.state }}</span></td>
+                <td class="t-over">+{{ '%.0f'|format(r.median_overage) }}</td>
+                <td class="t-count">{{ r.tickets }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" style="color:#6b7280; text-align:center; padding:16px;">Not enough data yet</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 

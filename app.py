@@ -220,7 +220,7 @@ from forms import (
     CSRFOnlyForm,
     ProfileDefaultFiltersForm,
 )
-from models import db, SpeedReport, User, Like, Comment, FollowedCounty, FollowedState, AdminUser, RevokedToken, normalize_road, state_code_from_value
+from models import db, SpeedReport, User, Like, Comment, FollowedCounty, FollowedState, AdminUser, RevokedToken, DeviceToken, normalize_road, state_code_from_value
 
 
 # -----------------------------------------------------------------------------
@@ -343,6 +343,21 @@ def ensure_schema_patches() -> None:
         """)
         conn.exec_driver_sql("""
             CREATE INDEX IF NOT EXISTS ix_revoked_tokens_jti ON revoked_tokens(jti)
+        """)
+        # --- device_tokens table (v624) ---
+        conn.exec_driver_sql("""
+            CREATE TABLE IF NOT EXISTS device_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token VARCHAR(512) NOT NULL,
+                platform VARCHAR(16) NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                CONSTRAINT uq_device_token_user_token UNIQUE (user_id, token)
+            )
+        """)
+        conn.exec_driver_sql("""
+            CREATE INDEX IF NOT EXISTS ix_device_tokens_user_id ON device_tokens(user_id)
         """)
 
 from queue_utils import get_queue
@@ -8239,6 +8254,73 @@ GROUP BY UPPER(TRIM(stusps));
         # Issue a fresh JWT so they're immediately logged in after reset
         new_jwt = _jwt_encode(u)
         return jsonify({"ok": True, "token": new_jwt, "user": _user_public(u)}), 200
+
+
+    @app.post("/api/device-tokens")
+    @api_login_required
+    def api_device_token_register():
+        """Register a push notification device token for the authenticated user.
+
+        Body: {"token": "<apns-or-fcm-token>", "platform": "ios" | "android"}
+
+        Upserts — safe to call on every app launch. Updates updated_at so stale
+        tokens can be detected (token not updated in >90 days = likely uninstalled).
+        """
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"error": "auth_required"}), 401
+
+        data = request.get_json(silent=True) or {}
+        token = (data.get("token") or "").strip()
+        platform = (data.get("platform") or "").strip().lower()
+
+        if not token:
+            return jsonify({"error": "token_required"}), 400
+        if platform not in ("ios", "android"):
+            return jsonify({"error": "platform_must_be_ios_or_android"}), 400
+
+        existing = DeviceToken.query.filter_by(user_id=u.id, token=token).first()
+        if existing:
+            existing.updated_at = datetime.utcnow()
+            existing.platform = platform
+        else:
+            db.session.add(DeviceToken(user_id=u.id, token=token, platform=platform))
+
+        try:
+            db.session.commit()
+            return jsonify({"ok": True}), 200
+        except Exception:
+            db.session.rollback()
+            return jsonify({"error": "db_error"}), 500
+
+
+    @app.delete("/api/device-tokens")
+    @api_login_required
+    def api_device_token_unregister():
+        """Unregister a push notification device token (e.g. on logout or permission revoked).
+
+        Body: {"token": "<apns-or-fcm-token>"}
+        """
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"error": "auth_required"}), 401
+
+        data = request.get_json(silent=True) or {}
+        token = (data.get("token") or "").strip()
+
+        if not token:
+            return jsonify({"error": "token_required"}), 400
+
+        rec = DeviceToken.query.filter_by(user_id=u.id, token=token).first()
+        if rec:
+            try:
+                db.session.delete(rec)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                return jsonify({"error": "db_error"}), 500
+
+        return jsonify({"ok": True}), 200
 
 
     @app.get("/api/me")

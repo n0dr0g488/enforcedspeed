@@ -366,3 +366,27 @@ class RevokedToken(db.Model):
 
     def __repr__(self):
         return f"<RevokedToken jti={self.jti}>"
+
+
+class DeviceToken(db.Model):
+    """Push notification device tokens for mobile (v624).
+    Stores APNs (iOS) and FCM (Android) tokens per user device.
+    A user can have multiple devices. Tokens are upserted on app launch.
+    """
+    __tablename__ = "device_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    token = db.Column(db.String(512), nullable=False)
+    platform = db.Column(db.String(16), nullable=False)  # 'ios' or 'android'
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "token", name="uq_device_token_user_token"),
+    )
+
+    user = db.relationship("User", backref=db.backref("device_tokens", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f"<DeviceToken user={self.user_id} platform={self.platform}>"

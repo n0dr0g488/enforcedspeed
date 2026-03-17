@@ -54,7 +54,7 @@
 
           <div class="rail-section" style="border-top:0;">
             <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
-              <div style="font-size:11px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Following</div>
+              <div style="font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Following</div>
             </div>
 
             <div style="margin-top:10px;">
@@ -69,7 +69,7 @@
                 <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
                   {% for item in following_panel_items %}
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                      <a href="{{ item.url }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
+                      <a href="{{ item.url }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
                         {{ item.label }}
                       </a>
                       <div style="display:flex; align-items:center; gap:4px; font-size:12px; font-variant-numeric:tabular-nums;">
@@ -98,7 +98,7 @@
           {# Suggested nearby counties #}
           {% if suggested_counties and suggested_counties|length > 0 %}
           <div class="rail-section" id="suggestedCountiesSection">
-            <div style="font-size:11px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Suggested</div>
+            <div style="font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Suggested</div>
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
               {% for sc in suggested_counties %}
                 <div class="suggested-county-row" data-geoid="{{ sc.geoid }}" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
@@ -147,7 +147,7 @@
 
           {# Posting #}
           <div class="rail-section">
-            <div style="font-size:11px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Posting</div>
+            <div style="font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Posting</div>
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
               {% if recent_users and recent_users|length > 0 %}
                 {% for ru in recent_users %}
@@ -1177,7 +1177,7 @@ function startAutoLoad(){
         <div class="rail-section">
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px;">
     <div style="display:flex; flex-direction:column; line-height:1.1;">
-      <div style="font-size:11px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Trending</div>
+      <div style="font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:0.7px;">Trending</div>
     </div>
   </div>
 
@@ -1193,7 +1193,7 @@ function startAutoLoad(){
       <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
         {% for c in trending_counties %}
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <a href="{{ url_for('map_view', county=c.geoid) }}" class="subtle" style="flex:1; text-decoration:none; font-weight:500; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
+            <a href="{{ url_for('map_view', county=c.geoid) }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
               {{ c.label }}, {{ c.st }}
             </a>
 

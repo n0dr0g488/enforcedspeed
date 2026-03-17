@@ -44,13 +44,15 @@
   <div class="card">
     <div class="card-body">
 
-      {# Page title as divider #}
-      <div class="submit-divider-text" style="margin-bottom:20px;"><span>Statistics</span></div>
+      {# Page title #}
+      <div style="text-align:center; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid #eef2f7;">
+        <div style="font-size:20px; font-weight:700; color:#111827;">Statistics</div>
+      </div>
 
       {# ── EnforcedSpeed by Zone ── #}
       {% if summary and summary.enforced_speeds %}
       <div style="margin-bottom:24px;">
-        <div class="submit-divider-text" style="margin-bottom:14px;"><span>EnforcedSpeed™ by Zone</span></div>
+        <div class="es-divider-title" style="margin-bottom:14px;"><span>EnforcedSpeed™ by Zone</span></div>
         <div class="es-speed-grid">
           {% for es in summary.enforced_speeds %}
           <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
@@ -71,7 +73,7 @@
       {# ── Enforcement by State ── #}
       {% if summary and summary.state_stats %}
       <div style="margin-bottom:24px;">
-        <div class="submit-divider-text" style="margin-bottom:14px;"><span>Enforcement by State</span></div>
+        <div class="es-divider-title" style="margin-bottom:14px;"><span>Enforcement by State</span></div>
         <div id="choroWrap" style="width:100%; position:relative;">
           <svg id="choroplethSvg" style="width:100%; display:block;"></svg>
           <div id="choroTooltip" style="display:none; position:fixed; z-index:100; background:rgba(0,0,0,0.78); color:#fff; padding:5px 11px; border-radius:7px; font-size:12px; font-weight:500; pointer-events:none; white-space:nowrap;"></div>
@@ -220,7 +222,7 @@
   {% endif %}
 
   {# ── County Rankings ── #}
-      <div class="submit-divider-text" style="margin-bottom:14px;"><span>County Rankings</span></div>
+      <div class="es-divider-title" style="margin-bottom:14px;"><span>County Rankings</span></div>
       <div class="stats-cols">
         <div>
           <div class="card-section-title" style="margin-bottom:10px;">Strictest Counties</div>

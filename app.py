@@ -638,8 +638,9 @@ def county_center_zoom(geoid: str, width: int = 640, height: int = 640):
 
     zoom_lng = math.log2((avail_w * 360.0) / (lng_diff * 256.0))
     zoom_lat = math.log2((avail_h * 2.0 * math.pi) / (y_diff * 256.0))
-    z = min(zoom_lng, zoom_lat)
-    z = max(0.0, min(z, 18.0))
+    # Use max so the county fills the frame on its narrower axis (slight clipping on longer axis is fine)
+    z = max(zoom_lng, zoom_lat)
+    z = max(0.0, min(z, 15.0))
     zoom_int = int(round(z))
 
     return (center_lat, center_lng, zoom_int)
@@ -935,8 +936,6 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     lng_max = float(max_lng)
     lng_diff = max(abs(lng_max - lng_min), 1e-9)
 
-    # Keep zoom consistent (based on the county bbox), even when centering on a user pin.
-    # This avoids zooming out when the pin is near the edge of the county.
     y_diff = max(abs(y_max - y_min), 1e-9)
 
     # Apply padding percentage.
@@ -945,13 +944,9 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
 
     zoom_lng = math.log2((float(avail_w) * 360.0) / (lng_diff * 256.0))
     zoom_lat = math.log2((float(avail_h) * 2.0 * math.pi) / (y_diff * 256.0))
-    z_star = min(zoom_lng, zoom_lat)
-    z_star = max(0.0, min(float(z_star), 18.0))
-
-    # When centering on a pin, zoom in closer to show the pin area rather than
-    # the whole county. Add 2 zoom levels, capped at 13 (city-street level).
-    if center_on_pin and pin_lat is not None and pin_lng is not None:
-        z_star = min(z_star + 2.0, 13.0)
+    # Use max so county fills the frame on its narrower axis (slight clipping on longer axis is fine)
+    z_star = max(zoom_lng, zoom_lat)
+    z_star = max(0.0, min(float(z_star), 15.0))
 
     zoom_int = int(round(z_star))
 

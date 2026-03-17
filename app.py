@@ -623,8 +623,8 @@ def county_center_zoom(geoid: str, width: int = 640, height: int = 640):
         return (None, None, None)
     min_lat, min_lng, max_lat, max_lng, _poly = info
 
-    pad_px = 24
-    pad_pct = 0.12
+    pad_px = 20
+    pad_pct = 0.06
     y_min = _mercator_y(float(min_lat))
     y_max = _mercator_y(float(max_lat))
     y_center = (y_min + y_max) / 2.0
@@ -640,7 +640,7 @@ def county_center_zoom(geoid: str, width: int = 640, height: int = 640):
     zoom_lat = math.log2((avail_h * 2.0 * math.pi) / (y_diff * 256.0))
     z = min(zoom_lng, zoom_lat)
     z = max(0.0, min(z, 18.0))
-    zoom_int = int(math.floor(z))
+    zoom_int = int(round(z))
 
     return (center_lat, center_lng, zoom_int)
 
@@ -910,8 +910,8 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
 
     # Compute center (Mercator midpoint) + a continuous fit zoom (Web Mercator math).
     # Static Maps `zoom` is integer-only: we use the best integer zoom with a small padding factor.
-    pad_px = 24
-    pad_pct = 0.12  # ~12% extra span for consistent breathing room
+    pad_px = 20
+    pad_pct = 0.06  # ~6% breathing room — tight enough to fill the frame
 
     # BBox in Mercator space
     y_min = _mercator_y(float(min_lat))
@@ -948,7 +948,7 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
     z_star = min(zoom_lng, zoom_lat)
     z_star = max(0.0, min(float(z_star), 18.0))
 
-    zoom_int = int(math.floor(z_star))
+    zoom_int = int(round(z_star))
 
     def _public_base_url() -> str:
         """Return a public-facing base URL (scheme+host) suitable for Google fetching assets.

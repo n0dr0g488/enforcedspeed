@@ -192,7 +192,7 @@
   <div style="max-width:900px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 25px 60px rgba(0,0,0,.25);">
     <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #e5e7eb;">
       <div>
-        <div style="font-weight:800; font-size:1.05rem;">Place a pin</div>
+        <div style="font-weight:700; font-size:1.05rem;">Place a pin</div>
         <div id="pinCountyLabel" style="margin-top:2px; color:#6b7280; font-size:.9rem;"></div>
       </div>
       <button type="button" id="pinClose" style="border:1px solid #e5e7eb; background:#fff; border-radius:12px; padding:8px 10px; font-weight:600;">✕</button>
@@ -204,7 +204,7 @@
     </div>
     <div style="display:flex; gap:10px; justify-content:flex-end; padding:14px 16px; border-top:1px solid #e5e7eb; background:#fafafa;">
       <button type="button" id="pinCancel" style="border:1px solid #e5e7eb; background:#fff; border-radius:12px; padding:10px 12px; font-weight:600;">Cancel</button>
-      <button type="button" id="pinUse" style="border:1px solid #d1d5db; background:#111827; color:#fff; border-radius:12px; padding:10px 12px; font-weight:800;">Use this pin</button>
+      <button type="button" id="pinUse" style="border:1px solid #d1d5db; background:#111827; color:#fff; border-radius:12px; padding:10px 12px; font-weight:700;">Use this pin</button>
     </div>
   </div>
 </div>
@@ -317,7 +317,7 @@
     lastStateItems.slice(0,50).forEach(it=>{
       const row=document.createElement('button'); row.type='button';
       row.style.cssText='display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:transparent;cursor:pointer;';
-      row.innerHTML=`<div style="font-weight:800;">${it.code}</div><div style="color:#6b7280;font-size:.9rem;">${it.name}</div>`;
+      row.innerHTML=`<div style="font-weight:700;">${it.code}</div><div style="color:#6b7280;font-size:.9rem;">${it.name}</div>`;
       row.addEventListener('click',()=>{setState(it.code,{clearCounty:true});clearStateDropdown();countyInput.focus();});
       row.addEventListener('mouseenter',()=>row.style.background='#f9fafb');
       row.addEventListener('mouseleave',()=>row.style.background='transparent');

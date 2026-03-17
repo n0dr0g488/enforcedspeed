@@ -9,7 +9,7 @@
   .es-speed-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
   .es-speed-card.no-data { opacity: 0.45; }
   .es-speed-zone { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
-  .es-speed-val { font-size: 28px; font-weight: 800; color: #e07070; line-height: 1.1; margin-top: 4px; }
+  .es-speed-val { font-size: 28px; font-weight: 700; color: #e07070; line-height: 1.1; margin-top: 4px; }
   .es-speed-val span { font-size: 13px; font-weight: 500; color: #6b7280; }
   .es-speed-val.empty { color: #d1d5db; font-size: 22px; }
   .es-speed-detail { font-size: 11px; color: #9ca3af; margin-top: 6px; }
@@ -41,9 +41,11 @@
 <div class="stats-page">
 
   {# Page header #}
-  <div style="text-align:center; margin-bottom:16px;">
-    <div style="font-size:22px; font-weight:700; color:#111827;">Statistics</div>
-    <div style="font-size:13px; color:#6b7280; margin-top:4px;">Speeding ticket enforcement data across the United States</div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-body" style="text-align:center; padding-top:20px; padding-bottom:20px;">
+      <div style="font-size:22px; font-weight:700; color:#111827;">Statistics</div>
+      <div style="font-size:13px; color:#6b7280; margin-top:4px;">Speeding ticket enforcement data across the United States</div>
+    </div>
   </div>
 
   {# ── EnforcedSpeed by Zone ── #}

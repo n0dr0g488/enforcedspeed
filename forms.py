@@ -194,7 +194,7 @@ class RegisterForm(FlaskForm):
 
 class LoginForm(FlaskForm):
     email = StringField("Username or Email", validators=[DataRequired(), Length(max=255)])
-    password = PasswordField("New password", validators=[DataRequired()])
+    password = PasswordField("Password", validators=[DataRequired()])
     submit = SubmitField("Log In")
 
 

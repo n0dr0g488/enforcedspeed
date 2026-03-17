@@ -350,3 +350,19 @@ class AdminUser(db.Model):
 
     def __repr__(self):
         return f"<AdminUser email={self.email}>"
+
+
+class RevokedToken(db.Model):
+    """JWT token blocklist for mobile logout (v623).
+    Stores jti (JWT ID) of revoked tokens so they can't be reused after logout.
+    Expired entries can be pruned periodically — any token past exp is invalid anyway.
+    """
+    __tablename__ = "revoked_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    jti = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    revoked_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)  # mirrors JWT exp for pruning
+
+    def __repr__(self):
+        return f"<RevokedToken jti={self.jti}>"

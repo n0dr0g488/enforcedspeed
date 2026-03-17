@@ -220,7 +220,7 @@ from forms import (
     CSRFOnlyForm,
     ProfileDefaultFiltersForm,
 )
-from models import db, SpeedReport, User, Like, Comment, FollowedCounty, FollowedState, AdminUser, normalize_road, state_code_from_value
+from models import db, SpeedReport, User, Like, Comment, FollowedCounty, FollowedState, AdminUser, RevokedToken, normalize_road, state_code_from_value
 
 
 # -----------------------------------------------------------------------------
@@ -331,6 +331,18 @@ def ensure_schema_patches() -> None:
                 added_by VARCHAR(255),
                 created_at TIMESTAMP NOT NULL DEFAULT NOW()
             )
+        """)
+        # --- revoked_tokens table (v623) ---
+        conn.exec_driver_sql("""
+            CREATE TABLE IF NOT EXISTS revoked_tokens (
+                id SERIAL PRIMARY KEY,
+                jti VARCHAR(64) NOT NULL UNIQUE,
+                revoked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                expires_at TIMESTAMP
+            )
+        """)
+        conn.exec_driver_sql("""
+            CREATE INDEX IF NOT EXISTS ix_revoked_tokens_jti ON revoked_tokens(jti)
         """)
 
 from queue_utils import get_queue
@@ -1572,23 +1584,29 @@ GROUP BY UPPER(TRIM(stusps));
         return secret or "dev-insecure-secret"
 
     def _jwt_encode(user: User) -> str:
+        import uuid as _uuid
         now = datetime.now(timezone.utc)
         payload = {
             "sub": str(user.id),
             "username": user.username,
             "email": user.email,
+            "jti": str(_uuid.uuid4()),
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(days=30)).timestamp()),
         }
         token = jwt.encode(payload, _jwt_secret(), algorithm="HS256")
-        # PyJWT may return bytes in older versions; normalize to str.
         return token.decode("utf-8") if isinstance(token, (bytes, bytearray)) else str(token)
 
     def _jwt_decode(token: str) -> dict | None:
         if not token:
             return None
         try:
-            return jwt.decode(token, _jwt_secret(), algorithms=["HS256"], leeway=30)
+            data = jwt.decode(token, _jwt_secret(), algorithms=["HS256"], leeway=30)
+            # Check blocklist
+            jti = data.get("jti")
+            if jti and RevokedToken.query.filter_by(jti=jti).first():
+                return None
+            return data
         except ExpiredSignatureError:
             return None
         except InvalidTokenError:
@@ -8130,6 +8148,97 @@ GROUP BY UPPER(TRIM(stusps));
 
         token = _jwt_encode(u)
         return jsonify({"token": token, "user": _user_public(u)}), 200
+
+
+    @app.post("/api/auth/refresh")
+    @api_login_required
+    def api_auth_refresh():
+        """Issue a fresh JWT for an authenticated user.
+        Call this before the current token expires to stay logged in.
+        The old token remains valid until its own expiry — call /logout to revoke it.
+        """
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"error": "auth_required"}), 401
+        new_token = _jwt_encode(u)
+        return jsonify({"token": new_token, "user": _user_public(u)}), 200
+
+
+    @app.post("/api/auth/logout")
+    @api_login_required
+    def api_auth_logout():
+        """Revoke the current JWT by adding its jti to the blocklist."""
+        auth = (request.headers.get("Authorization") or "").strip()
+        if auth.lower().startswith("bearer "):
+            raw_token = auth.split(" ", 1)[1].strip()
+            try:
+                # Decode without blocklist check since we're revoking it now
+                data = jwt.decode(raw_token, _jwt_secret(), algorithms=["HS256"], leeway=30)
+                jti = data.get("jti")
+                exp = data.get("exp")
+                if jti and not RevokedToken.query.filter_by(jti=jti).first():
+                    expires_at = None
+                    if exp:
+                        try:
+                            expires_at = datetime.utcfromtimestamp(int(exp))
+                        except Exception:
+                            pass
+                    db.session.add(RevokedToken(jti=jti, expires_at=expires_at))
+                    db.session.commit()
+            except Exception:
+                pass
+        return jsonify({"ok": True}), 200
+
+
+    @app.post("/api/auth/forgot-password")
+    def api_auth_forgot_password():
+        """Send a password reset email. JSON API version for mobile.
+        Body: {"email": "user@example.com"}
+        Always returns 200 to avoid email enumeration.
+        """
+        data = request.get_json(silent=True) or {}
+        email = (data.get("email") or "").strip().lower()
+        if email:
+            u = User.query.filter_by(email=email).first()
+            if u:
+                try:
+                    _send_password_reset_email(u)
+                except Exception:
+                    pass
+        return jsonify({"ok": True, "message": "If that email exists, a reset link has been sent."}), 200
+
+
+    @app.post("/api/auth/reset-password")
+    def api_auth_reset_password():
+        """Reset password via token. JSON API version for mobile.
+        Body: {"token": "...", "password": "newpassword"}
+        """
+        data = request.get_json(silent=True) or {}
+        token = (data.get("token") or "").strip()
+        new_password = (data.get("password") or "")
+
+        if not token or not new_password:
+            return jsonify({"error": "token_and_password_required"}), 400
+        if len(new_password) < 8:
+            return jsonify({"error": "password_min_8"}), 400
+
+        s = _password_reset_serializer()
+        try:
+            payload = s.loads(token, salt="password-reset", max_age=3600)
+        except SignatureExpired:
+            return jsonify({"error": "token_expired"}), 400
+        except BadSignature:
+            return jsonify({"error": "token_invalid"}), 400
+
+        u = User.query.get(payload.get("uid"))
+        if not u:
+            return jsonify({"error": "user_not_found"}), 404
+
+        u.set_password(new_password)
+        db.session.commit()
+        # Issue a fresh JWT so they're immediately logged in after reset
+        new_jwt = _jwt_encode(u)
+        return jsonify({"ok": True, "token": new_jwt, "user": _user_public(u)}), 200
 
 
     @app.get("/api/me")

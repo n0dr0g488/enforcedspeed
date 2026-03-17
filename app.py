@@ -638,9 +638,9 @@ def county_center_zoom(geoid: str, width: int = 640, height: int = 640):
 
     zoom_lng = math.log2((avail_w * 360.0) / (lng_diff * 256.0))
     zoom_lat = math.log2((avail_h * 2.0 * math.pi) / (y_diff * 256.0))
-    # Use max so the county fills the frame on its narrower axis (slight clipping on longer axis is fine)
-    z = max(zoom_lng, zoom_lat)
-    z = max(0.0, min(z, 15.0))
+    # min ensures full county is always visible; round picks nearest zoom level
+    z = min(zoom_lng, zoom_lat)
+    z = max(0.0, min(z, 18.0))
     zoom_int = int(round(z))
 
     return (center_lat, center_lng, zoom_int)
@@ -944,9 +944,9 @@ def county_static_map_url(county_geoid: str | None, pin_lat: float | None = None
 
     zoom_lng = math.log2((float(avail_w) * 360.0) / (lng_diff * 256.0))
     zoom_lat = math.log2((float(avail_h) * 2.0 * math.pi) / (y_diff * 256.0))
-    # Use max so county fills the frame on its narrower axis (slight clipping on longer axis is fine)
-    z_star = max(zoom_lng, zoom_lat)
-    z_star = max(0.0, min(float(z_star), 15.0))
+    # min ensures full county is always visible; round picks nearest zoom level
+    z_star = min(zoom_lng, zoom_lat)
+    z_star = max(0.0, min(float(z_star), 18.0))
 
     zoom_int = int(round(z_star))
 

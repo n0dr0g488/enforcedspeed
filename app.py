@@ -5685,12 +5685,25 @@ GROUP BY UPPER(TRIM(stusps));
             default_st = ""
         if default_st:
             form.state.data = default_st
+
+        # Nearby counties via IP geolocation — shown as quick-select suggestions
+        nearby_counties = []
+        try:
+            geo = _geolocate_from_ip()
+            if geo.get("lat") and geo.get("lng"):
+                nearby_counties = _find_nearest_counties(
+                    float(geo["lat"]), float(geo["lng"]), limit=3
+                )
+        except Exception:
+            nearby_counties = []
+
         return render_template(
             "submit_ticket.html",
             form=form,
             states=STATE_PAIRS,
             default_st=default_st,
             maps_api_key=maps_api_key,
+            nearby_counties=nearby_counties,
         )
 
 

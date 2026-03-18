@@ -151,8 +151,11 @@
   </div>
 
   <div class="sg-span-3" style="display:flex; align-items:flex-end; justify-content:flex-end; gap:8px;">
-    <a href="{{ url_for('home') }}" class="es-btn" style="height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0 14px; font-weight:500; text-decoration:none; box-sizing:border-box;">Cancel</a>
-    <button type="submit" class="es-btn" style="height:44px; font-weight:600; flex:1; box-sizing:border-box;">Submit</button>
+    <a href="{{ url_for('home') }}" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0; text-decoration:none;">Cancel</a>
+    <button type="submit" class="es-btn" style="display:inline-flex; align-items:center; gap:6px; flex-shrink:0; font-weight:600;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Post ticket
+    </button>
   </div>
 
 </div>
@@ -248,8 +251,14 @@
   const nearbyModal = document.getElementById('nearbyModal');
   const nearbyDismiss = document.getElementById('nearbyDismiss');
 
+  // Hide modal immediately if already dismissed this session
+  if (nearbyModal && sessionStorage.getItem('es_nearby_dismissed')) {
+    nearbyModal.style.display = 'none';
+  }
+
   function dismissNearby(){
     if (nearbyModal) nearbyModal.style.display = 'none';
+    try { sessionStorage.setItem('es_nearby_dismissed', '1'); } catch(e) {}
   }
 
   if (nearbyDismiss) nearbyDismiss.addEventListener('click', dismissNearby);

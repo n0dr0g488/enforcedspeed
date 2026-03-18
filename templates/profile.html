@@ -147,68 +147,65 @@
       {# ── Security (owner only) ── #}
       {% if is_owner %}
       <div class="profile-section">
-        <a href="{{ url_for('change_password') }}" class="prof-btn">Change password</a>
-
-        {% if is_admin %}
-        <div style="margin-top:18px; padding-top:14px; border-top:1px solid #f3f4f6;">
-          <div style="font-size:13px; font-weight:600; color:#374151; margin-bottom:10px;">Admin accounts</div>
-          <div id="adminList" style="margin-bottom:12px; font-size:13px; color:#6b7280;">Loading…</div>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <input id="adminEmailInput" type="email" placeholder="Add email address" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; min-width:220px;">
-            <button type="button" id="adminAddBtn" class="prof-btn prof-btn-primary" style="height:34px;">Add admin</button>
-          </div>
-          <div id="adminMsg" style="font-size:12px; color:#6b7280; margin-top:6px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a href="{{ url_for('change_password') }}" class="prof-btn">Change password</a>
+          {% if is_admin %}
+          <button type="button" class="prof-btn" id="adminAccountsBtn">Admin accounts</button>
+          {% endif %}
         </div>
 
+        {% if is_admin %}
+        <div id="adminModal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); padding:24px; align-items:center; justify-content:center;">
+          <div style="background:#fff; border-radius:16px; padding:24px; max-width:480px; width:100%; box-shadow:0 25px 60px rgba(0,0,0,.25);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+              <div style="font-size:16px; font-weight:600; color:#111827;">Admin accounts</div>
+              <button type="button" id="adminModalClose" style="border:1px solid #e5e7eb; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:13px;">✕</button>
+            </div>
+            <div id="adminList" style="margin-bottom:12px; font-size:13px; color:#6b7280;">Loading…</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid #f3f4f6;">
+              <input id="adminEmailInput" type="email" placeholder="Add email address" style="flex:1; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; min-width:180px;">
+              <button type="button" id="adminAddBtn" class="prof-btn prof-btn-primary">Add admin</button>
+            </div>
+            <div id="adminMsg" style="font-size:12px; color:#6b7280; margin-top:6px;"></div>
+          </div>
+        </div>
         <script>
         (function(){
+          const btn = document.getElementById('adminAccountsBtn');
+          const modal = document.getElementById('adminModal');
+          const closeBtn = document.getElementById('adminModalClose');
           const listEl = document.getElementById('adminList');
           const input = document.getElementById('adminEmailInput');
           const addBtn = document.getElementById('adminAddBtn');
           const msg = document.getElementById('adminMsg');
-
-          function setMsg(t, err){ if(msg){ msg.textContent = t; msg.style.color = err ? '#dc2626' : '#6b7280'; } }
-
+          function setMsg(t,err){ if(msg){ msg.textContent=t; msg.style.color=err?'#dc2626':'#6b7280'; } }
+          function openModal(){ modal.style.display='flex'; document.body.style.overflow='hidden'; loadAdmins(); }
+          function closeModal(){ modal.style.display='none'; document.body.style.overflow=''; }
+          if(btn) btn.addEventListener('click', openModal);
+          if(closeBtn) closeBtn.addEventListener('click', closeModal);
+          if(modal) modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
           function loadAdmins(){
-            fetch('/api/admin/list', {credentials:'same-origin'})
-              .then(r=>r.json()).then(data=>{
-                if(!data.ok){ listEl.textContent = 'Could not load admin list.'; return; }
-                if(!listEl) return;
-                const all = [];
-                // Env admins (read-only)
-                (data.env_admins||[]).forEach(e=>{
-                  all.push(`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;">
-                    <span style="flex:1;font-size:13px;">${e}</span>
-                    <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">env var</span>
-                  </div>`);
-                });
-                // DB admins (removable)
-                (data.db_admins||[]).forEach(a=>{
-                  all.push(`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;">
-                    <span style="flex:1;font-size:13px;">${a.email}</span>
-                    <span style="font-size:11px;color:#9ca3af;white-space:nowrap;">added ${a.created_at}</span>
-                    <button type="button" onclick="removeAdmin('${a.email}')" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;padding:0 2px;">Remove</button>
-                  </div>`);
-                });
-                listEl.innerHTML = all.length ? all.join('') : '<span style="color:#9ca3af;">No DB admins yet.</span>';
-              }).catch(()=>{ listEl.textContent = 'Error loading list.'; });
+            fetch('/api/admin/list',{credentials:'same-origin'}).then(r=>r.json()).then(data=>{
+              if(!data.ok){ listEl.textContent='Could not load admin list.'; return; }
+              const all=[];
+              (data.env_admins||[]).forEach(e=>{ all.push(`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;"><span style="flex:1;font-size:13px;">${e}</span><span style="font-size:11px;color:#9ca3af;">env var</span></div>`); });
+              (data.db_admins||[]).forEach(a=>{ all.push(`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6;"><span style="flex:1;font-size:13px;">${a.email}</span><span style="font-size:11px;color:#9ca3af;">added ${a.created_at}</span><button type="button" onclick="removeAdmin('${a.email}')" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;">Remove</button></div>`); });
+              listEl.innerHTML = all.length ? all.join('') : '<span style="color:#9ca3af;">No DB admins yet.</span>';
+            }).catch(()=>{ listEl.textContent='Error loading list.'; });
           }
-
           window.removeAdmin = function(email){
             if(!confirm(`Remove ${email} as admin?`)) return;
-            fetch('/api/admin/remove', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
-              .then(r=>r.json()).then(d=>{ if(d.ok){ setMsg('Removed.'); loadAdmins(); } else { setMsg(d.error||'Error', true); } });
+            fetch('/api/admin/remove',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
+              .then(r=>r.json()).then(d=>{ if(d.ok){ setMsg('Removed.'); loadAdmins(); } else { setMsg(d.error||'Error',true); } });
           };
-
           if(addBtn && input){
-            addBtn.addEventListener('click', ()=>{
-              const email = (input.value||'').trim().toLowerCase();
-              if(!email || !email.includes('@')){ setMsg('Enter a valid email.', true); return; }
-              fetch('/api/admin/add', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
-                .then(r=>r.json()).then(d=>{ if(d.ok){ input.value=''; setMsg('Admin added.'); loadAdmins(); } else { setMsg(d.error||'Error', true); } });
+            addBtn.addEventListener('click',()=>{
+              const email=(input.value||'').trim().toLowerCase();
+              if(!email||!email.includes('@')){ setMsg('Enter a valid email.',true); return; }
+              fetch('/api/admin/add',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})})
+                .then(r=>r.json()).then(d=>{ if(d.ok){ input.value=''; setMsg('Admin added.'); loadAdmins(); } else { setMsg(d.error||'Error',true); } });
             });
           }
-
           loadAdmins();
         })();
         </script>

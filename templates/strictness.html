@@ -5,17 +5,18 @@
   .stats-page { max-width: 960px; margin: 0 auto; padding: 12px 16px 60px; }
 
   /* Zone cards */
-  .es-speed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-  .es-speed-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; text-align: center; }
+  .es-speed-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  @media (max-width: 700px) { .es-speed-grid { grid-template-columns: repeat(3, 1fr); } }
+  .es-speed-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 8px; text-align: center; }
   .es-speed-card.no-data { opacity: 0.45; }
-  .es-speed-zone { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
-  .es-speed-val { font-size: 28px; font-weight: 700; color: #e07070; line-height: 1.1; margin-top: 4px; }
-  .es-speed-val span { font-size: 13px; font-weight: 500; color: #6b7280; }
-  .es-speed-val.empty { color: #d1d5db; font-size: 22px; }
-  .es-speed-detail { font-size: 11px; color: #9ca3af; margin-top: 6px; }
+  .es-speed-zone { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; }
+  .es-speed-val { font-size: 24px; font-weight: 700; color: #e07070; line-height: 1.1; margin-top: 4px; }
+  .es-speed-val span { font-size: 12px; font-weight: 500; color: #6b7280; }
+  .es-speed-val.empty { color: #d1d5db; font-size: 20px; }
+  .es-speed-detail { font-size: 10px; color: #9ca3af; margin-top: 4px; }
 
   /* Heatmap legend */
-  .heatmap-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; font-size: 11px; color: #6b7280; }
+  .heatmap-legend { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #6b7280; }
   .heatmap-legend-bar { height: 10px; width: 140px; border-radius: 5px; background: linear-gradient(to right, #6366f1, #60a5fa, #a3e635, #fbbf24, #f87171); }
 
   /* Tables */
@@ -32,28 +33,32 @@
 
   .stats-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 700px) { .stats-cols { grid-template-columns: 1fr; } }
-
-  .card-section-title { font-size: 15px; font-weight: 600; color: #111827; margin-bottom: 4px; }
-  .card-section-sub { font-size: 12px; color: #6b7280; margin-bottom: 14px; line-height: 1.5; }
   .stats-disclaimer { font-size: 11px; color: #9ca3af; text-align: center; margin-top: 4px; line-height: 1.5; }
+
+  /* State indicator badge */
+  .state-badge { display: inline-flex; align-items: center; gap: 6px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 10px; cursor: pointer; transition: background 0.15s; }
+  .state-badge.active { background: #eaf2ff; border-color: #93c5fd; color: #1d4ed8; }
+  .state-badge .clear-btn { font-size: 11px; color: #9ca3af; margin-left: 2px; }
+  .state-badge .clear-btn:hover { color: #dc2626; }
+
+  /* Loading shimmer on zone cards */
+  .es-speed-card.loading { opacity: 0.5; pointer-events: none; }
 </style>
 
 <div class="stats-page">
-
-  {# Single card #}
   <div class="card">
     <div class="card-body">
 
-      {# Page title — matches Submit/Following format #}
-      <div style="margin-bottom:28px; text-align:center;">
+      {# Page title #}
+      <div style="margin-bottom:20px; text-align:center;">
         <h1 style="margin:0;">Statistics</h1>
         <div class="subtle" style="margin-top:6px; font-size:14px;">Ticket submissions by zone, enforcement heat map, and county rankings.</div>
       </div>
 
-      {# ── EnforcedSpeed by Zone ── #}
+      {# Zone buckets #}
       {% if summary and summary.enforced_speeds %}
-      <div style="margin-bottom:8px;">
-        <div class="es-speed-grid">
+      <div id="zoneSection" style="margin-bottom:16px;">
+        <div class="es-speed-grid" id="zoneGrid">
           {% for es in summary.enforced_speeds %}
           <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
             <div class="es-speed-zone">{{ es.posted }} mph zone</div>
@@ -70,26 +75,35 @@
       </div>
       {% endif %}
 
-      {# ── Enforcement by State ── #}
+      {# Choropleth map #}
       {% if summary and summary.state_stats %}
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:16px;">
+
+        {# State indicator + legend above map #}
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+          <div id="stateBadge" class="state-badge">
+            <span id="stateBadgeText">ALL STATES</span>
+          </div>
+          <div class="heatmap-legend" style="margin-bottom:0;">
+            <span>More lenient</span>
+            <div class="heatmap-legend-bar"></div>
+            <span>Stricter</span>
+            <span style="margin-left:8px; color:#d1d5db;">■</span> <span>No data</span>
+          </div>
+        </div>
+
         <div id="choroWrap" style="width:100%; position:relative;">
           <svg id="choroplethSvg" style="width:100%; display:block;"></svg>
           <div id="choroTooltip" style="display:none; position:fixed; z-index:100; background:rgba(0,0,0,0.78); color:#fff; padding:5px 11px; border-radius:7px; font-size:12px; font-weight:500; pointer-events:none; white-space:nowrap;"></div>
-        </div>
-        <div class="heatmap-legend">
-          <span>More lenient</span>
-          <div class="heatmap-legend-bar"></div>
-          <span>Stricter</span>
-          <span style="margin-left:14px; color:#d1d5db;">■</span> <span>No data</span>
         </div>
       </div>
 
   <script>
   (function(){
     var stats = {{ summary.state_stats | tojson }};
+    var selectedState = null;
+    var statePaths = {}; // abbr → path element
 
-    // FIPS → state abbreviation
     var fipsToAbbr = {
       '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT',
       '10':'DE','11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL',
@@ -99,6 +113,19 @@
       '39':'OH','40':'OK','41':'OR','42':'PA','44':'RI','45':'SC','46':'SD',
       '47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA','54':'WV',
       '55':'WI','56':'WY'
+    };
+
+    var abbrToName = {
+      'AL':'Alabama','AK':'Alaska','AZ':'Arizona','AR':'Arkansas','CA':'California',
+      'CO':'Colorado','CT':'Connecticut','DE':'Delaware','FL':'Florida','GA':'Georgia',
+      'HI':'Hawaii','ID':'Idaho','IL':'Illinois','IN':'Indiana','IA':'Iowa',
+      'KS':'Kansas','KY':'Kentucky','LA':'Louisiana','ME':'Maine','MD':'Maryland',
+      'MA':'Massachusetts','MI':'Michigan','MN':'Minnesota','MS':'Mississippi','MO':'Missouri',
+      'MT':'Montana','NE':'Nebraska','NV':'Nevada','NH':'New Hampshire','NJ':'New Jersey',
+      'NM':'New Mexico','NY':'New York','NC':'North Carolina','ND':'North Dakota','OH':'Ohio',
+      'OK':'Oklahoma','OR':'Oregon','PA':'Pennsylvania','RI':'Rhode Island','SC':'South Carolina',
+      'SD':'South Dakota','TN':'Tennessee','TX':'Texas','UT':'Utah','VT':'Vermont',
+      'VA':'Virginia','WA':'Washington','WV':'West Virginia','WI':'Wisconsin','WY':'Wyoming','DC':'DC'
     };
 
     var vals = Object.values(stats).map(function(s){ return s.avg; });
@@ -116,6 +143,103 @@
       else{ var p=(t-0.75)/0.25; r=Math.round(251+(248-251)*p); g=Math.round(191+(113-191)*p); b=Math.round(36+(113-36)*p); }
       return 'rgb('+r+','+g+','+b+')';
     }
+
+    function updateBadge(abbr){
+      var badge = document.getElementById('stateBadge');
+      var text = document.getElementById('stateBadgeText');
+      if(!abbr){
+        badge.className = 'state-badge';
+        text.textContent = 'ALL STATES';
+        badge.title = 'Click a state to filter';
+      } else {
+        badge.className = 'state-badge active';
+        text.textContent = (abbrToName[abbr] || abbr) + ' ✕';
+        badge.title = 'Click to clear selection';
+      }
+    }
+
+    function updateZoneGrid(speeds){
+      var grid = document.getElementById('zoneGrid');
+      if(!grid) return;
+      var html = '';
+      speeds.forEach(function(es){
+        var noData = !es.has_data;
+        html += '<div class="es-speed-card'+(noData?' no-data':'')+'">';
+        html += '<div class="es-speed-zone">'+es.posted+' mph zone</div>';
+        if(es.has_data){
+          html += '<div class="es-speed-val">'+es.enforced+' <span>mph</span></div>';
+          html += '<div class="es-speed-detail">+'+es.p10_over+' over · '+es.tickets+' tickets</div>';
+        } else {
+          html += '<div class="es-speed-val empty">—</div>';
+          html += '<div class="es-speed-detail">Needs more data</div>';
+        }
+        html += '</div>';
+      });
+      grid.innerHTML = html;
+    }
+
+    function updateTable(tbodyId, rows, isStrict){
+      var tbody = document.getElementById(tbodyId);
+      if(!tbody) return;
+      if(!rows || rows.length === 0){
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#6b7280;text-align:center;padding:16px;">Not enough data yet</td></tr>';
+        return;
+      }
+      var html = '';
+      rows.forEach(function(r, i){
+        var url = '/map?state='+encodeURIComponent(r.state)+'&county='+encodeURIComponent(r.county_geoid);
+        html += '<tr>';
+        html += '<td class="t-num">'+(i+1)+'</td>';
+        html += '<td class="t-name"><a href="'+url+'">'+r.county_name+'</a> <span class="t-state">'+r.state+'</span></td>';
+        html += '<td class="t-over">+'+r.median_overage+'</td>';
+        html += '<td class="t-count">'+r.tickets+'</td>';
+        html += '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+
+    function fetchStats(abbr){
+      var url = '/api/stats' + (abbr ? '?state='+encodeURIComponent(abbr) : '');
+      var grid = document.getElementById('zoneGrid');
+      if(grid) grid.querySelectorAll('.es-speed-card').forEach(function(c){ c.classList.add('loading'); });
+      fetch(url).then(function(r){ return r.json(); }).then(function(data){
+        if(!data.ok) return;
+        updateZoneGrid(data.enforced_speeds);
+        updateTable('strictTbody', data.most_strict, true);
+        updateTable('lenientTbody', data.least_strict, false);
+      }).catch(function(){});
+    }
+
+    function selectState(abbr){
+      // Deselect previous
+      if(selectedState && statePaths[selectedState]){
+        var prev = statePaths[selectedState];
+        var s = stats[selectedState];
+        prev.setAttribute('stroke', '#fff');
+        prev.setAttribute('stroke-width', '0.5');
+        prev.setAttribute('fill', s ? heatColor(s.avg) : '#e5e7eb');
+      }
+      if(abbr === selectedState){
+        // Clicking same state deselects
+        selectedState = null;
+        updateBadge(null);
+        fetchStats(null);
+        return;
+      }
+      selectedState = abbr;
+      // Highlight selected
+      if(statePaths[abbr]){
+        statePaths[abbr].setAttribute('stroke', '#1e293b');
+        statePaths[abbr].setAttribute('stroke-width', '2.5');
+      }
+      updateBadge(abbr);
+      fetchStats(abbr);
+    }
+
+    // Badge click to clear
+    document.getElementById('stateBadge').addEventListener('click', function(){
+      if(selectedState) selectState(selectedState); // toggle off
+    });
 
     function loadScript(src, cb){
       var s = document.createElement('script');
@@ -135,13 +259,11 @@
       var projection = d3.geoAlbersUsa().fitSize([W, H], {type:'Sphere'});
       var path = d3.geoPath().projection(projection);
 
-      // Load TopoJSON
       fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
         .then(function(r){ return r.json(); })
         .then(function(us){
           var features = topojson.feature(us, us.objects.states).features;
 
-          // Draw state paths
           features.forEach(function(feature){
             var fips = String(feature.id).padStart(2,'0');
             var abbr = fipsToAbbr[fips];
@@ -152,13 +274,16 @@
             p.setAttribute('fill', s ? heatColor(s.avg) : '#e5e7eb');
             p.setAttribute('stroke', '#fff');
             p.setAttribute('stroke-width', '0.5');
-            p.style.cursor = s ? 'pointer' : 'default';
+            p.style.cursor = 'pointer';
             p.style.transition = 'opacity 0.15s';
 
             if(abbr){
+              statePaths[abbr] = p;
               p.addEventListener('mouseenter', function(e){
-                p.setAttribute('stroke-width','1.5');
-                p.setAttribute('stroke','#1e293b');
+                if(abbr !== selectedState){
+                  p.setAttribute('stroke-width','1.5');
+                  p.setAttribute('stroke','#1e293b');
+                }
                 if(tooltip){
                   tooltip.style.display = 'block';
                   tooltip.textContent = s
@@ -170,20 +295,18 @@
                 if(tooltip){ tooltip.style.left=(e.clientX+14)+'px'; tooltip.style.top=(e.clientY-10)+'px'; }
               });
               p.addEventListener('mouseleave', function(){
-                p.setAttribute('stroke-width','0.5');
-                p.setAttribute('stroke','#fff');
+                if(abbr !== selectedState){
+                  p.setAttribute('stroke-width','0.5');
+                  p.setAttribute('stroke','#fff');
+                }
                 if(tooltip) tooltip.style.display='none';
               });
-              if(s){
-                p.addEventListener('click', function(){
-                  window.location.href = '/map?state='+encodeURIComponent(abbr);
-                });
-              }
+              p.addEventListener('click', function(){ selectState(abbr); });
             }
             svg.appendChild(p);
           });
 
-          // Draw state abbreviation labels
+          // Labels
           features.forEach(function(feature){
             var fips = String(feature.id).padStart(2,'0');
             var abbr = fipsToAbbr[fips];
@@ -191,7 +314,6 @@
             var centroid = path.centroid(feature);
             if(!centroid || isNaN(centroid[0])) return;
             var s = stats[abbr];
-
             var t = document.createElementNS('http://www.w3.org/2000/svg','text');
             t.setAttribute('x', centroid[0]);
             t.setAttribute('y', centroid[1]+1);
@@ -220,13 +342,13 @@
   </script>
   {% endif %}
 
-  {# ── County Rankings ── #}
-      <div class="stats-cols">
+      {# County Rankings #}
+      <div class="stats-cols" style="margin-top:20px;">
         <div>
           <div style="text-align:center; font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Strictest Counties</div>
           <table class="stats-table">
             <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
-            <tbody>
+            <tbody id="strictTbody">
               {% for r in most_strict[:15] %}
               <tr>
                 <td class="t-num">{{ loop.index }}</td>
@@ -245,7 +367,7 @@
           <div style="text-align:center; font-size:12px; font-weight:600; color:#111827; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Most Lenient Counties</div>
           <table class="stats-table">
             <thead><tr><th style="width:24px;">#</th><th>County</th><th style="text-align:right;">Overage</th><th style="text-align:right;">Tix</th></tr></thead>
-            <tbody>
+            <tbody id="lenientTbody">
               {% for r in least_strict[:15] %}
               <tr>
                 <td class="t-num">{{ loop.index }}</td>

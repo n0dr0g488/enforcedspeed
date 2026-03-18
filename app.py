@@ -8323,6 +8323,83 @@ GROUP BY UPPER(TRIM(stusps));
         return jsonify({"ok": True}), 200
 
 
+    @app.get("/api/stats")
+    def api_stats():
+        """Return zone buckets + county rankings for statistics page.
+        Optional ?state=XX to filter by state. No state = USA-wide.
+        """
+        state = (request.args.get("state") or "").strip().upper() or None
+        if state and not re.fullmatch(r'[A-Z]{2}', state):
+            state = None
+
+        try:
+            # Zone buckets
+            q = db.session.query(
+                SpeedReport.posted_speed,
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("overage"),
+            ).filter(
+                SpeedReport.is_deleted.is_(False),
+                SpeedReport.posted_speed.isnot(None),
+                SpeedReport.ticketed_speed.isnot(None),
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed) > 0,
+            )
+            if state:
+                q = q.filter(func.upper(SpeedReport.state) == state)
+
+            es_groups = {}
+            for row in q.all():
+                ps = int(row.posted_speed)
+                ov = int(row.overage)
+                if ps not in es_groups:
+                    es_groups[ps] = []
+                es_groups[ps].append(ov)
+
+            enforced_speeds = []
+            for ps in [25, 35, 45, 55, 65, 70]:
+                ovs = sorted(es_groups.get(ps, []))
+                if len(ovs) >= 3:
+                    idx = max(0, int(len(ovs) * 0.10))
+                    enforced_speeds.append({
+                        "posted": ps,
+                        "enforced": ps + ovs[idx],
+                        "p10_over": ovs[idx],
+                        "tickets": len(ovs),
+                        "has_data": True,
+                    })
+                else:
+                    enforced_speeds.append({
+                        "posted": ps,
+                        "enforced": None,
+                        "p10_over": None,
+                        "tickets": len(ovs),
+                        "has_data": False,
+                    })
+
+            # County rankings
+            rows_data = strictness_rows(
+                limit=15,
+                state_filter=state,
+                deleted_mode="hide",
+            )
+            def _row(r):
+                return {
+                    "county_name": r.county_name,
+                    "state": r.state,
+                    "county_geoid": r.county_geoid,
+                    "median_overage": round(float(r.median_overage), 0),
+                    "tickets": r.tickets,
+                }
+            return jsonify({
+                "ok": True,
+                "state": state,
+                "enforced_speeds": enforced_speeds,
+                "most_strict": [_row(r) for r in rows_data.get("most_strict", [])],
+                "least_strict": [_row(r) for r in rows_data.get("least_strict", [])],
+            })
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+
     @app.get("/api/me")
     @api_login_required
     def api_me():

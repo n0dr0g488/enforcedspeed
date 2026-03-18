@@ -162,13 +162,13 @@
   .map-zoom-btn:disabled{ opacity: .45; cursor: default; transform: none; }
 
   /* Right panel cards */
-  .map-right{ height: 100%; overflow: auto; padding-left: 0; min-height: 0; }
+  .map-right{ height: 100%; overflow: auto; padding: 12px 12px 12px 0; min-height: 0; box-sizing: border-box; }
   .map-right{ scrollbar-width: none; -ms-overflow-style: none; }
   .map-right::-webkit-scrollbar{ width: 0; height: 0; }
 
   .map-right .card { border-radius: 9px; }
   .map-right .mini-ticket { padding: 12px; }
-  .map-right .mini-ticket .mini-title { font-weight: 600; margin: 0 0 4px 0; }
+  .map-right .mini-ticket .mini-title { font-size:14px; font-weight:500; color:#111827; margin: 0 0 4px 0; }
   .map-right .mini-ticket .mini-sub { font-size: 13px; opacity: .85; }
   .map-right .stat-card { padding: 12px; margin-top: 12px; }
   .map-right .stat-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #e5e7eb; }
@@ -177,7 +177,7 @@
   .map-right .stat-row:has(+ .stat-section-divider) { border-bottom: 0; }
   .map-right .stat-k { opacity: .8; }
   .map-right .stat-v { font-weight: 600; white-space: nowrap; }
-  .map-right .stat-title { font-weight: 600; margin: 0; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+  .map-right .stat-title { font-size:14px; font-weight:500; color:#111827; margin: 0; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
   .map-right .stat-section-divider { margin-top: 10px; padding-top: 4px; }
   .map-right .speed-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
   .map-right .speed-table th, .map-right .speed-table td { padding: 6px 0; border-top: 1px solid #e5e7eb; }
@@ -434,7 +434,7 @@
           <div class="stat-row"><div class="stat-k">Last 1 year</div><div class="stat-v">{{ region_stats.total_365 }}</div></div>
 
           <div class="stat-section-divider">
-            <div style="font-weight:600;">Overage</div>
+            <div style="font-size:14px; font-weight:500; color:#111827;">Overage</div>
           </div>
           <table class="speed-table" aria-label="Average overage by posted speed">
             <thead>

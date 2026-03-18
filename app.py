@@ -2015,6 +2015,124 @@ GROUP BY UPPER(TRIM(stusps));
             db.session.rollback()
             raise
 
+    @app.route("/complete-post", methods=["GET", "POST"], endpoint="complete_post")
+    def complete_post():
+        """Guest landed here after trying to post a ticket without an account.
+        Shows a combined log-in / quick-register form. On success, posts the saved ticket.
+        """
+        if current_user.is_authenticated:
+            # Already logged in — try to post saved ticket immediately
+            return _post_guest_ticket_and_redirect()
+
+        from forms import LoginForm, RegistrationForm
+        login_form = LoginForm(prefix="login")
+        reg_form = RegistrationForm(prefix="reg")
+
+        error = None
+        mode = request.form.get("mode")  # "login" or "register"
+
+        if request.method == "POST":
+            if mode == "login":
+                identifier = (request.form.get("login-email") or "").strip()
+                password = (request.form.get("login-password") or "")
+                u = None
+                if "@" in identifier:
+                    u = User.query.filter_by(email=identifier.lower()).first()
+                if not u:
+                    u = User.query.filter(func.lower(User.username) == func.lower(identifier)).first()
+                if u and u.check_password(password):
+                    login_user(u)
+                    return _post_guest_ticket_and_redirect()
+                else:
+                    error = "Incorrect email/username or password."
+
+            elif mode == "register":
+                email = (request.form.get("reg-email") or "").strip().lower()
+                username = (request.form.get("reg-username") or "").strip()
+                password = (request.form.get("reg-password") or "")
+                if not email or "@" not in email:
+                    error = "Enter a valid email."
+                elif not username or len(username) < 3:
+                    error = "Username must be at least 3 characters."
+                elif len(password) < 8:
+                    error = "Password must be at least 8 characters."
+                elif User.query.filter_by(email=email).first():
+                    error = "That email is already registered. Try logging in."
+                elif User.query.filter(func.lower(User.username) == func.lower(username)).first():
+                    error = "That username is taken."
+                else:
+                    u = User(email=email, username=username)
+                    u.set_password(password)
+                    try:
+                        manifest = _load_system_avatar_manifest()
+                        if manifest:
+                            u.avatar_key = random.choice(manifest)["key"]
+                    except Exception:
+                        pass
+                    db.session.add(u)
+                    db.session.commit()
+                    login_user(u)
+                    return _post_guest_ticket_and_redirect()
+
+        ticket = session.get("guest_ticket") or {}
+        return render_template("complete_post.html", ticket=ticket, error=error)
+
+
+    def _post_guest_ticket_and_redirect():
+        """Post the guest_ticket saved in session for the now-authenticated user."""
+        ticket = session.pop("guest_ticket", None)
+        if not ticket:
+            return redirect(url_for("home"))
+
+        try:
+            st = (ticket.get("state") or "").strip().upper()
+            county_geoid = (ticket.get("county_geoid") or "").strip()
+            road = (ticket.get("road") or "").strip()
+            posted = ticket.get("posted_speed")
+            ticketed = ticket.get("ticketed_speed")
+            caption = (ticket.get("caption") or "").strip()
+            lat = ticket.get("lat")
+            lng = ticket.get("lng")
+
+            if not st or not county_geoid or not posted or not ticketed:
+                flash("Your ticket details were incomplete. Please try again.", "error")
+                return redirect(url_for("submit"))
+
+            county_row = db.session.execute(
+                text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"),
+                {"g": county_geoid}
+            ).mappings().first()
+            county_name = county_row["namelsad"] if county_row else ""
+
+            report = SpeedReport(
+                user_id=current_user.id,
+                state=st,
+                county_geoid=county_geoid,
+                county_name=county_name,
+                road_name=road or None,
+                posted_speed=int(float(posted)),
+                ticketed_speed=int(float(ticketed)),
+                caption=caption or None,
+            )
+            if lat and lng:
+                try:
+                    report.lat = float(lat)
+                    report.lng = float(lng)
+                    report.location_source = "user_pin"
+                except Exception:
+                    pass
+
+            db.session.add(report)
+            db.session.commit()
+            flash("Ticket posted!", "success")
+        except Exception:
+            db.session.rollback()
+            flash("Something went wrong posting your ticket. Please try again.", "error")
+            return redirect(url_for("submit"))
+
+        return redirect(url_for("home"))
+
+
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if current_user.is_authenticated:
@@ -5705,7 +5823,6 @@ GROUP BY UPPER(TRIM(stusps));
     # Register /submit and related routes on the app instance
 
     @app.get("/submit", endpoint="submit")
-    @login_required
     def submit_get():
         """Single-page submit. County required. Pin optional."""
         form = SubmitTicketForm()
@@ -5741,9 +5858,23 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.post("/submit")
-    @login_required
     def submit_post():
         form = SubmitTicketForm()
+
+        # Guest flow: if not logged in, save form data to session and redirect to auth
+        if not current_user.is_authenticated:
+            session['guest_ticket'] = {
+                'state': (request.form.get('state') or '').strip(),
+                'county_geoid': (request.form.get('county_geoid') or '').strip(),
+                'county_label': (request.form.get('county_label') or '').strip(),
+                'road': (request.form.get('road') or '').strip(),
+                'posted_speed': (request.form.get('posted_speed') or '').strip(),
+                'ticketed_speed': (request.form.get('ticketed_speed') or '').strip(),
+                'caption': (request.form.get('caption') or '').strip(),
+                'lat': (request.form.get('lat') or '').strip(),
+                'lng': (request.form.get('lng') or '').strip(),
+            }
+            return redirect(url_for('complete_post'))
 
         maps_api_key = app.config.get("GOOGLE_MAPS_API_KEY") or ""
 

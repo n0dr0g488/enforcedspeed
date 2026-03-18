@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="wrap" style="max-width:480px; margin:0 auto; padding:16px 16px 60px;">
+  <div class="card">
+    <div class="card-body">
+
+      <div style="text-align:center; margin-bottom:20px;">
+        <h1 style="margin:0;">Almost there</h1>
+        <div class="subtle" style="margin-top:6px; font-size:14px;">Log in or create a free account to post your ticket.</div>
+      </div>
+
+      {# Ticket summary #}
+      {% if ticket and ticket.state %}
+      <div style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:20px; font-size:13px; color:#374151;">
+        <div style="font-weight:600; margin-bottom:4px;">Your ticket</div>
+        <div>{{ ticket.state }}{% if ticket.county_label %} · {{ ticket.county_label }}{% endif %}{% if ticket.road %} · {{ ticket.road }}{% endif %}</div>
+        {% if ticket.posted_speed and ticket.ticketed_speed %}
+        <div style="margin-top:4px;">Posted {{ ticket.posted_speed }} mph · Ticketed {{ ticket.ticketed_speed }} mph</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if error %}
+      <div style="background:#fff1f2; border:1px solid #fecaca; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:13px; color:#991b1b;">{{ error }}</div>
+      {% endif %}
+
+      {# Tabs #}
+      <div style="display:flex; border-bottom:1px solid #e5e7eb; margin-bottom:18px;" id="authTabs">
+        <button type="button" onclick="switchTab('login')" id="tabLogin"
+          style="flex:1; padding:10px; font-size:14px; font-weight:600; border:none; background:none; cursor:pointer; border-bottom:2px solid #1877f2; color:#1877f2;">
+          Log in
+        </button>
+        <button type="button" onclick="switchTab('register')" id="tabRegister"
+          style="flex:1; padding:10px; font-size:14px; font-weight:600; border:none; background:none; cursor:pointer; border-bottom:2px solid transparent; color:#6b7280;">
+          Create account
+        </button>
+      </div>
+
+      {# Login form #}
+      <form method="POST" id="loginForm">
+        <input type="hidden" name="mode" value="login">
+        <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">Email or username</label>
+        <input type="text" name="login-email" required autocomplete="email"
+          style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; margin-bottom:12px; font-family:inherit;">
+        <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">Password</label>
+        <input type="password" name="login-password" required autocomplete="current-password"
+          style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; margin-bottom:16px; font-family:inherit;">
+        <button type="submit" style="width:100%; padding:12px; background:#111827; color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;">
+          Log in and post ticket
+        </button>
+        <div style="text-align:center; margin-top:10px;">
+          <a href="{{ url_for('forgot_password') }}" style="font-size:13px; color:#6b7280;">Forgot password?</a>
+        </div>
+      </form>
+
+      {# Register form #}
+      <form method="POST" id="registerForm" style="display:none;">
+        <input type="hidden" name="mode" value="register">
+        <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">Email</label>
+        <input type="email" name="reg-email" required autocomplete="email"
+          style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; margin-bottom:12px; font-family:inherit;">
+        <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">Username</label>
+        <input type="text" name="reg-username" required autocomplete="username" minlength="3" maxlength="20"
+          style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; margin-bottom:12px; font-family:inherit;">
+        <label style="display:block; font-size:13px; font-weight:500; color:#374151; margin-bottom:6px;">Password</label>
+        <input type="password" name="reg-password" required autocomplete="new-password" minlength="8"
+          style="width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; box-sizing:border-box; margin-bottom:16px; font-family:inherit;">
+        <button type="submit" style="width:100%; padding:12px; background:#111827; color:#fff; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit;">
+          Create account and post ticket
+        </button>
+      </form>
+
+      <div style="text-align:center; margin-top:16px;">
+        <a href="{{ url_for('submit') }}" style="font-size:13px; color:#6b7280;">← Edit my ticket</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  var loginForm = document.getElementById('loginForm');
+  var regForm = document.getElementById('registerForm');
+  var tabLogin = document.getElementById('tabLogin');
+  var tabRegister = document.getElementById('tabRegister');
+  if(tab === 'login') {
+    loginForm.style.display = '';
+    regForm.style.display = 'none';
+    tabLogin.style.borderBottomColor = '#1877f2';
+    tabLogin.style.color = '#1877f2';
+    tabRegister.style.borderBottomColor = 'transparent';
+    tabRegister.style.color = '#6b7280';
+  } else {
+    loginForm.style.display = 'none';
+    regForm.style.display = '';
+    tabRegister.style.borderBottomColor = '#1877f2';
+    tabRegister.style.color = '#1877f2';
+    tabLogin.style.borderBottomColor = 'transparent';
+    tabLogin.style.color = '#6b7280';
+  }
+}
+{% if error and request.form.get('mode') == 'register' %}
+switchTab('register');
+{% endif %}
+</script>
+
+{% endblock %}

@@ -10,6 +10,9 @@
       <div style="margin-bottom:14px; text-align:center;">
         <h1 style="margin:0;">Submit Ticket</h1>
         <div class="subtle" style="margin-top:6px; font-size:14px;">Received a speeding ticket? Post to see how you compare.</div>
+        {% if not current_user.is_authenticated %}
+        <div style="margin-top:8px; font-size:12px; color:#9ca3af;">You'll be asked to log in or create a free account when you post.</div>
+        {% endif %}
       </div>
 
 <form method="POST" enctype="multipart/form-data" novalidate>
@@ -146,7 +149,7 @@
   <div class="sg-span-12" style="display:flex; align-items:center; gap:10px;">
     <input type="text" name="caption" maxlength="500" value="{{ form.caption.data or '' }}"
       placeholder="Caption — what do you think about this ticket?"
-      style="flex:1; padding:10px 12px; border:1px solid #d1d5db; border-radius:12px; box-sizing:border-box; font-size:13px; font-family:inherit; outline:none;">
+      style="flex:1; padding:10px 12px; border:1px solid #d1d5db; border-radius:12px; box-sizing:border-box; font-size:13px; font-family:inherit; outline:none; line-height:1;">
     <a href="{{ url_for('home') }}" class="es-btn" style="flex-shrink:0; text-decoration:none; white-space:nowrap; box-shadow:none;">Cancel</a>
     <button type="submit" class="es-btn" style="flex-shrink:0; font-weight:600; white-space:nowrap; box-shadow:none;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>

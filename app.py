@@ -8344,7 +8344,7 @@ GROUP BY UPPER(TRIM(stusps));
                 (SpeedReport.ticketed_speed - SpeedReport.posted_speed) > 0,
             )
             if state:
-                q = q.filter(func.upper(SpeedReport.state) == state)
+                q = q.filter(SpeedReport.state.ilike(f"{state}%"))
 
             es_groups = {}
             for row in q.all():

@@ -80,16 +80,16 @@
       <div style="margin-bottom:16px;">
 
         {# State indicator + legend above map #}
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; justify-content:center; margin-bottom:6px;">
           <div id="stateBadge" class="state-badge">
             <span id="stateBadgeText">ALL STATES</span>
           </div>
-          <div class="heatmap-legend" style="margin-bottom:0;">
-            <span>More lenient</span>
-            <div class="heatmap-legend-bar"></div>
-            <span>Stricter</span>
-            <span style="margin-left:8px; color:#d1d5db;">■</span> <span>No data</span>
-          </div>
+        </div>
+        <div class="heatmap-legend" style="margin-bottom:10px;">
+          <span>More lenient</span>
+          <div class="heatmap-legend-bar"></div>
+          <span>Stricter</span>
+          <span style="margin-left:8px; color:#d1d5db;">■</span> <span>No data</span>
         </div>
 
         <div id="choroWrap" style="width:100%; position:relative;">
@@ -198,16 +198,26 @@
       tbody.innerHTML = html;
     }
 
+    var _fetchController = null;
     function fetchStats(abbr){
       var url = '/api/stats' + (abbr ? '?state='+encodeURIComponent(abbr) : '');
+      // Cancel any in-flight fetch
+      if(_fetchController){ try{ _fetchController.abort(); }catch(e){} }
+      _fetchController = new AbortController();
+      var signal = _fetchController.signal;
       var grid = document.getElementById('zoneGrid');
       if(grid) grid.querySelectorAll('.es-speed-card').forEach(function(c){ c.classList.add('loading'); });
-      fetch(url).then(function(r){ return r.json(); }).then(function(data){
-        if(!data.ok) return;
-        updateZoneGrid(data.enforced_speeds);
-        updateTable('strictTbody', data.most_strict, true);
-        updateTable('lenientTbody', data.least_strict, false);
-      }).catch(function(){});
+      fetch(url, {signal: signal})
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          _fetchController = null;
+          if(!data.ok) return;
+          updateZoneGrid(data.enforced_speeds);
+          updateTable('strictTbody', data.most_strict, true);
+          updateTable('lenientTbody', data.least_strict, false);
+        }).catch(function(e){
+          if(e.name !== 'AbortError') console.error('Stats fetch error:', e);
+        });
     }
 
     function selectState(abbr){

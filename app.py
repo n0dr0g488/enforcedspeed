@@ -2894,7 +2894,7 @@ GROUP BY UPPER(TRIM(stusps));
             common_zones = [25, 35, 45, 55, 65, 70]
             for ps in common_zones:
                 ovs = sorted(es_groups.get(ps, []))
-                if len(ovs) >= 3:
+                if len(ovs) >= 1:
                     idx = max(0, int(len(ovs) * 0.10))
                     p10 = ovs[idx]
                     avg_ov = round(sum(ovs) / len(ovs), 1)
@@ -8357,7 +8357,7 @@ GROUP BY UPPER(TRIM(stusps));
             enforced_speeds = []
             for ps in [25, 35, 45, 55, 65, 70]:
                 ovs = sorted(es_groups.get(ps, []))
-                if len(ovs) >= 3:
+                if len(ovs) >= 1:
                     idx = max(0, int(len(ovs) * 0.10))
                     enforced_speeds.append({
                         "posted": ps,
@@ -8383,11 +8383,11 @@ GROUP BY UPPER(TRIM(stusps));
             )
             def _row(r):
                 return {
-                    "county_name": r.county_name,
-                    "state": r.state,
-                    "county_geoid": r.county_geoid,
-                    "median_overage": round(float(r.median_overage), 0),
-                    "tickets": r.tickets,
+                    "county_name": r.get("county_name", ""),
+                    "state": r.get("state", ""),
+                    "county_geoid": r.get("county_geoid", ""),
+                    "median_overage": round(float(r.get("median_overage") or 0), 0),
+                    "tickets": r.get("tickets", 0),
                 }
             return jsonify({
                 "ok": True,

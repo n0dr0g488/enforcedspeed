@@ -6389,11 +6389,22 @@ GROUP BY UPPER(TRIM(stusps));
 
     @app.get("/api/nearby-counties")
     def api_nearby_counties():
-        """Return 3 nearest counties to the caller's IP location.
-        Used by mobile app submit screen for quick county suggestions.
+        """Return 3 nearest counties to the caller's GPS or IP location.
+        Optional query params: lat, lng (from device GPS — more accurate than IP).
         Returns: { ok: true, counties: [{geoid, name, state, dist_m}] }
         """
         try:
+            lat = request.args.get("lat")
+            lng = request.args.get("lng")
+            if lat and lng:
+                try:
+                    lat_f = float(lat)
+                    lng_f = float(lng)
+                    nearest = _find_nearest_counties(lat_f, lng_f, limit=3)
+                    return jsonify({"ok": True, "counties": nearest})
+                except Exception:
+                    pass
+            # Fall back to IP geolocation
             geo = _geolocate_from_ip()
             if not geo.get("lat") or not geo.get("lng"):
                 return jsonify({"ok": True, "counties": []})
@@ -7265,6 +7276,9 @@ GROUP BY UPPER(TRIM(stusps));
         road_in = str(first('road', 'road_name') or '').strip()
 
         location_hint = str(first('location_hint', 'locationHint', 'city_name', 'cityName', 'city') or '').strip() or None
+        county_geoid_in = str(first('county_geoid', 'countyGeoid') or '').strip() or None
+        caption_in = str(first('caption') or '').strip() or None
+        photo_data_in = str(first('photo_data', 'photoData') or '').strip() or None  # base64 from mobile
 
         posted_in = first('posted_speed', 'postedMph', 'posted_mph', 'posted')
         cited_in = first('cited_speed', 'ticketed_speed', 'ticketedMph', 'ticketed_mph', 'cited')
@@ -7340,6 +7354,18 @@ GROUP BY UPPER(TRIM(stusps));
 
         api_u = _api_user_from_request()
 
+        # Resolve county name from geoid if provided
+        county_name_resolved = None
+        if county_geoid_in:
+            try:
+                crow = db.session.execute(
+                    text("SELECT namelsad FROM counties WHERE geoid = :g LIMIT 1"),
+                    {"g": county_geoid_in}
+                ).mappings().first()
+                if crow:
+                    county_name_resolved = crow.get("namelsad")
+            except Exception:
+                pass
 
         report = SpeedReport(
             state=state_value,
@@ -7347,7 +7373,9 @@ GROUP BY UPPER(TRIM(stusps));
             posted_speed=posted_speed,
             ticketed_speed=cited_speed,
             overage=max(0, cited_speed - posted_speed),
-            caption=None,
+            caption=caption_in,
+            county_geoid=county_geoid_in,
+            county_name=county_name_resolved,
             user_id=(api_u.id if api_u else None),
             location_hint=location_hint,
         )
@@ -7367,6 +7395,20 @@ GROUP BY UPPER(TRIM(stusps));
         db.session.commit()
 
         # Optional file upload (image/PDF) -> quarantine in R2 + async OCR verification.
+        # Handle base64 photo from mobile app
+        if photo_data_in and not file_obj:
+            try:
+                import base64
+                img_bytes = base64.b64decode(photo_data_in)
+                from io import BytesIO as _BytesIO
+                class _FakeFile:
+                    filename = 'mobile_upload.jpg'
+                    content_type = 'image/jpeg'
+                    def read(self): return img_bytes
+                file_obj = _FakeFile()
+            except Exception:
+                file_obj = None
+
         if file_obj and getattr(file_obj, "filename", ""):
             try:
                 def _normalize_upload_to_jpeg_bytes_api(raw_bytes: bytes, filename: str | None, content_type: str | None) -> bytes:

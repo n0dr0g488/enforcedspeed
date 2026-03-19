@@ -2024,7 +2024,7 @@ GROUP BY UPPER(TRIM(stusps));
             # Already logged in — try to post saved ticket immediately
             return _post_guest_ticket_and_redirect()
 
-        from forms import LoginForm, RegisterForm        login_form = LoginForm(prefix="login")
+        login_form = LoginForm(prefix="login")
         reg_form = RegisterForm(prefix="reg")
 
         error = None

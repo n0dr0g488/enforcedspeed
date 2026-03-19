@@ -6387,6 +6387,22 @@ GROUP BY UPPER(TRIM(stusps));
 
 
 
+    @app.get("/api/nearby-counties")
+    def api_nearby_counties():
+        """Return 3 nearest counties to the caller's IP location.
+        Used by mobile app submit screen for quick county suggestions.
+        Returns: { ok: true, counties: [{geoid, name, state, dist_m}] }
+        """
+        try:
+            geo = _geolocate_from_ip()
+            if not geo.get("lat") or not geo.get("lng"):
+                return jsonify({"ok": True, "counties": []})
+            nearest = _find_nearest_counties(float(geo["lat"]), float(geo["lng"]), limit=3)
+            return jsonify({"ok": True, "counties": nearest})
+        except Exception:
+            return jsonify({"ok": True, "counties": []})
+
+
     @app.get("/api/county/<geoid>")
     def api_county(geoid: str):
         """Lookup a single county by GEOID."""

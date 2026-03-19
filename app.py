@@ -7345,7 +7345,7 @@ GROUP BY UPPER(TRIM(stusps));
             return jsonify({'error': 'lng must be between -180 and 180'}), 400
 
         # Road is preferred, but allow pin-only submissions (road OR lat/lng required).
-        road_in = _normalize_road_label(road_in) or road_in
+        road_in = normalize_road(road_in, code) or road_in
 
         if not road_in or len(road_in) < 2:
             if lat is None or lng is None:

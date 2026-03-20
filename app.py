@@ -7324,25 +7324,36 @@ GROUP BY UPPER(TRIM(stusps));
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "lat": r.lat,
                 "lng": r.lng,
-                "static_map_url": (
-                    url_for("api_staticmap", lat=r.lat, lng=r.lng, zoom=11, w=640, h=340, _external=True)
-                    if (r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())
-                    else None
-                ),
+                "county_name": r.county_name or None,
+                "county_geoid": r.county_geoid or None,
+                "caption": r.caption or None,
                 "verification_status": r.verification_status,
                 "ocr_status": r.ocr_status,
-
                 "username": (r.user.username if r.user else None),
                 "user_id": (r.user.id if r.user else None),
                 "user_ticket_posts_count": user_ticket_posts_counts.get(r.user_id, 0) if r.user_id else 0,
                 "is_anonymous": (False if r.user else True),
-
                 "likes_count": like_counts.get(r.id, 0),
                 "comments_count": comment_counts.get(r.id, 0),
                 "liked_by_me": (r.id in user_liked),
-
                 "photo_submitted": (r.photo_key is not None),
                 "photo_verified": (True if (r.photo_key is not None and (r.ocr_status == "verified" or r.verification_status == "verified")) else False),
+                "verification_confidence": float(r.ai_confidence) if getattr(r, "ai_confidence", None) is not None else None,
+                "map_image_url": (
+                    url_for("api_county_staticmap",
+                            geoid=r.county_geoid,
+                            pin_lat=r.lat,
+                            pin_lng=r.lng,
+                            center_on_pin="0",
+                            w=640, h=640,
+                            _external=True)
+                    if (r.county_geoid and get_google_maps_static_maps_key())
+                    else (
+                        url_for("api_staticmap", lat=r.lat, lng=r.lng, zoom=11, w=640, h=640, _external=True)
+                        if (r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())
+                        else None
+                    )
+                ),
             })
 
         return jsonify({

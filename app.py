@@ -7265,6 +7265,19 @@ GROUP BY UPPER(TRIM(stusps));
         comment_counts: Dict[int, int] = {}
         user_liked: set[int] = set()
         user_ticket_posts_counts: Dict[int, int] = {}
+        county_ticket_counts: Dict[str, int] = {}
+
+        # County ticket counts for display (e.g. "Wyandotte County (12)")
+        county_geoids = list({r.county_geoid for r in reports if r.county_geoid})
+        if county_geoids:
+            rows = (
+                db.session.query(SpeedReport.county_geoid, func.count(SpeedReport.id))
+                .filter(SpeedReport.county_geoid.in_(county_geoids))
+                .filter(SpeedReport.is_deleted.is_(False))
+                .group_by(SpeedReport.county_geoid)
+                .all()
+            )
+            county_ticket_counts = {geoid: int(c) for geoid, c in rows if geoid}
 
         if report_ids:
             rows = (
@@ -7326,6 +7339,7 @@ GROUP BY UPPER(TRIM(stusps));
                 "lng": r.lng,
                 "county_name": r.county_name or None,
                 "county_geoid": r.county_geoid or None,
+                "county_ticket_count": county_ticket_counts.get(r.county_geoid, 0) if r.county_geoid else 0,
                 "caption": r.caption or None,
                 "verification_status": r.verification_status,
                 "ocr_status": r.ocr_status,
@@ -7934,11 +7948,12 @@ GROUP BY UPPER(TRIM(stusps));
                                (current_app.config.get("STATIC_PIN_BASE_URL") or "").strip()).rstrip("/")
                     if not (pin_base and pin_base.startswith("http")):
                         pin_base = f"{request.host_url.rstrip('/')}/static/img/pins"
-                    icon_url = f"{pin_base}/pin_inside_deepred_static.png"
+                    # Use the larger non-static pin for better visibility on mobile
+                    icon_url = f"{pin_base}/pin_inside_deepred.png"
                     encoded_icon = urllib.parse.quote(icon_url, safe="")
                     pin_param = f"markers=icon:{encoded_icon}%7C{pin_lat:.6f},{pin_lng:.6f}"
                 except Exception:
-                    pin_param = f"markers=color:red%7C{pin_lat:.6f},{pin_lng:.6f}"
+                    pin_param = f"markers=color:red%7Csize:mid%7C{pin_lat:.6f},{pin_lng:.6f}"
                 upstream = upstream + "&" + pin_param
         else:
             # State-level preview if state code provided

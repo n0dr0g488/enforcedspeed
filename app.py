@@ -7068,6 +7068,7 @@ GROUP BY UPPER(TRIM(stusps));
                     "lat": r.lat,
                     "lng": r.lng,
                     "state": normalize_state_group(r.state),
+                    "state_code": (normalize_state_group(r.state) or "").split(" - ")[0].strip()[:2].upper(),
                     "road": r.road_name,
                     "posted": r.posted_speed,
                     "ticketed": r.ticketed_speed,
@@ -7076,6 +7077,7 @@ GROUP BY UPPER(TRIM(stusps));
                     "avatar": _avatar,
                     "car": _car,
                     "county": _county_name,
+                    "county_geoid": getattr(r, "county_geoid", None) or None,
                     "inside_focus": bool(inside_focus),
                 }
             )
@@ -7345,6 +7347,7 @@ GROUP BY UPPER(TRIM(stusps));
                 "ocr_status": r.ocr_status,
                 "username": (r.user.username if r.user else None),
                 "user_id": (r.user.id if r.user else None),
+                "avatar_url": (user_avatar_url(r.user, "sm") if r.user else None),
                 "user_ticket_posts_count": user_ticket_posts_counts.get(r.user_id, 0) if r.user_id else 0,
                 "is_anonymous": (False if r.user else True),
                 "likes_count": like_counts.get(r.id, 0),
@@ -7948,10 +7951,10 @@ GROUP BY UPPER(TRIM(stusps));
                                (current_app.config.get("STATIC_PIN_BASE_URL") or "").strip()).rstrip("/")
                     if not (pin_base and pin_base.startswith("http")):
                         pin_base = f"{request.host_url.rstrip('/')}/static/img/pins"
-                    # Use the larger non-static pin for better visibility on mobile
+                    # Use the larger pin with scale for mobile visibility
                     icon_url = f"{pin_base}/pin_inside_deepred.png"
                     encoded_icon = urllib.parse.quote(icon_url, safe="")
-                    pin_param = f"markers=icon:{encoded_icon}%7C{pin_lat:.6f},{pin_lng:.6f}"
+                    pin_param = f"markers=scale:2%7Cicon:{encoded_icon}%7C{pin_lat:.6f},{pin_lng:.6f}"
                 except Exception:
                     pin_param = f"markers=color:red%7Csize:mid%7C{pin_lat:.6f},{pin_lng:.6f}"
                 upstream = upstream + "&" + pin_param

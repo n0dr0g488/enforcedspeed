@@ -5074,7 +5074,113 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     # --- Follow counties (map Follow/Following pill) ---
-    @app.get("/api/follow_status")
+    @app.get("/api/following")
+    def api_following_list():
+        """Return all counties and states followed by the current user.
+        Used by mobile app to populate the chip scroll bar.
+        Requires Bearer token auth.
+        """
+        u = _api_user_from_request()
+        if not u:
+            return jsonify({"ok": True, "counties": [], "states": []})
+        try:
+            county_rows = db.session.query(
+                FollowedCounty.county_geoid,
+            ).filter(FollowedCounty.user_id == u.id).all()
+
+            geoids = [r[0] for r in county_rows if r[0]]
+            counties = []
+            if geoids:
+                rows = db.session.execute(
+                    text("""
+                        SELECT geoid, namelsad, stusps
+                        FROM counties
+                        WHERE geoid = ANY(:geoids)
+                        ORDER BY namelsad ASC
+                    """),
+                    {"geoids": geoids}
+                ).mappings().all()
+                counties = [{"geoid": r["geoid"], "name": r["namelsad"], "stusps": r["stusps"]} for r in rows]
+
+            state_rows = db.session.query(
+                FollowedState.state_code,
+            ).filter(FollowedState.user_id == u.id).all()
+            states = [r[0] for r in state_rows if r[0]]
+
+            return jsonify({"ok": True, "counties": counties, "states": states})
+        except Exception:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            return jsonify({"ok": True, "counties": [], "states": []})
+
+
+    @app.post("/api/following/follow")
+    @api_login_required
+    def api_following_follow():
+        """Follow a county or entire state via JWT auth (mobile).
+        Body: {"geoid": "51153"} or {"geoids": ["51153"]} or {"state": "VA"}
+        """
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        data = request.get_json(silent=True) or {}
+
+        # Follow entire state
+        state = str(data.get("state") or "").strip().upper()
+        if state and re.fullmatch(r"[A-Z]{2}", state):
+            try:
+                FollowedState.__table__.create(db.engine, checkfirst=True)
+                existing = FollowedState.query.filter_by(user_id=u.id, state_code=state).first()
+                if not existing:
+                    db.session.add(FollowedState(user_id=u.id, state_code=state))
+                    db.session.commit()
+                return jsonify({"ok": True})
+            except Exception:
+                db.session.rollback()
+                return jsonify({"ok": False, "error": "db_error"}), 500
+
+        # Follow individual counties
+        geoids = data.get("geoids") or ([data["geoid"]] if data.get("geoid") else [])
+        if not geoids:
+            return jsonify({"ok": False, "error": "geoid or state required"}), 400
+        try:
+            FollowedCounty.__table__.create(db.engine, checkfirst=True)
+            for geoid in geoids:
+                geoid = str(geoid).strip()
+                if not re.fullmatch(r"\d{5}", geoid):
+                    continue
+                existing = FollowedCounty.query.filter_by(user_id=u.id, county_geoid=geoid).first()
+                if not existing:
+                    db.session.add(FollowedCounty(user_id=u.id, county_geoid=geoid))
+            db.session.commit()
+            return jsonify({"ok": True})
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+
+
+    @app.post("/api/following/unfollow")
+    @api_login_required
+    def api_following_unfollow():
+        """Unfollow a county via JWT auth (mobile).
+        Body: {"geoid": "51153"}
+        """
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        data = request.get_json(silent=True) or {}
+        geoid = str(data.get("geoid") or "").strip()
+        if not re.fullmatch(r"\d{5}", geoid):
+            return jsonify({"ok": False, "error": "invalid_geoid"}), 400
+        try:
+            FollowedCounty.query.filter_by(user_id=u.id, county_geoid=geoid).delete()
+            db.session.commit()
+            return jsonify({"ok": True})
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
     def api_follow_status():
         """Return whether the current user follows a county.
 

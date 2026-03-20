@@ -7345,6 +7345,7 @@ GROUP BY UPPER(TRIM(stusps));
                             pin_lat=r.lat,
                             pin_lng=r.lng,
                             center_on_pin="0",
+                            show_pin="1",
                             w=640, h=640,
                             _external=True)
                     if (r.county_geoid and get_google_maps_static_maps_key())
@@ -7908,6 +7909,8 @@ GROUP BY UPPER(TRIM(stusps));
                     inside_pts = []
                     outside_pts = []
 
+            show_pin = (request.args.get("show_pin") == "1")
+
             upstream = county_static_map_url(
                 geoid,
                 pin_lat,
@@ -7919,6 +7922,12 @@ GROUP BY UPPER(TRIM(stusps));
                 inside_points=inside_pts,
                 outside_points=outside_pts
             )
+
+            # Mobile clients can't overlay a JS pin, so append a standard red marker to the URL
+            if show_pin and pin_lat is not None and pin_lng is not None and upstream:
+                key = get_google_maps_static_maps_key()
+                pin_param = f"markers=color:red%7C{pin_lat:.6f},{pin_lng:.6f}"
+                upstream = upstream + "&" + pin_param
         else:
             # State-level preview if state code provided
             if state_code and len(state_code) == 2:

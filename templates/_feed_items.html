@@ -36,9 +36,9 @@
               <span class="ticket-submeta-sep">·</span>
               <span class="ticket-submeta-item">
                 {% if county_focus_url %}
-                  <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }} ({{ county_ticket_counts.get(r.county_geoid, 0) }})</a>
+                  <a class="ticket-county-link" href="{{ county_focus_url }}">{{ r.county_name }}</a>
                 {% else %}
-                  {{ r.county_name or '—' }} ({{ county_ticket_counts.get(r.county_geoid, 0) }})
+                  {{ r.county_name or '—' }}
                 {% endif %}
               </span>
               <span class="ticket-submeta-sep">·</span>
@@ -58,43 +58,51 @@
           <span class="subtle" style="font-size:11px; color:#9ca3af;">No location pin</span>
         {% endif %}
 
-        {# Photo pill with status #}
+        {# Photo pill with status — green verified / yellow unverified, clickable for details #}
         {% set has_photo = (r.photo_key is not none) %}
         {% if has_photo %}
           {% set pk = (r.photo_key|string) %}
           {% set st = (r.ocr_status or '') %}
           {% set vs = (r.verification_status or '') %}
-          {% if pk.startswith('pending:') or st in ['pending','processing'] or vs == 'submitted' %}
-            <span class="pill pill-photo pill-photo-processing" data-poll-id="{{ r.id }}">Photo …</span>
-          {% elif pk.startswith('failed:') or st in ['failed','not_verified','no_text','ocr_error','ocr_exception'] %}
-            <span class="pill pill-photo pill-photo-fail">Photo !</span>
-          {% elif st == 'verified' or vs == 'verified' %}
-            {% set conf = r.ai_confidence if r.ai_confidence is not none else 1.0 %}
-            {% set conf_pct = (conf * 100)|int %}
-            {% if conf >= 0.85 %}
-              <span class="pill pill-photo pill-photo-ok pill-ai-high">AI Ticket Photo Verified · {{ conf_pct }}% confidence</span>
-            {% else %}
-              <span class="pill pill-photo pill-photo-ok pill-ai-mid" title="AI verified (moderate confidence)">AI Ticket Photo Verified · {{ conf_pct }}% confidence</span>
-            {% endif %}
+          {% set is_verified = (st == 'verified' or vs == 'verified') %}
+          {% set conf = r.ai_confidence if r.ai_confidence is not none else None %}
+          {% set conf_pct = (conf * 100)|int if conf is not none else '' %}
+          {% if is_verified %}
+            <button type="button" class="pill pill-photo pill-verified-green ticket-pill-info"
+                    data-photo-key="{{ r.photo_key or '' }}"
+                    data-ocr-status="{{ r.ocr_status or '' }}"
+                    data-ocr-error="{{ r.ocr_error or '' }}"
+                    data-verification-status="{{ r.verification_status or '' }}"
+                    data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
+                    data-verify-reason="{{ r.verify_reason or '' }}"
+                    data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
+                    data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
+                    data-overage="{{ r.overage if r.overage is not none else '' }}"
+                    data-ai-confidence="{{ '%.2f'|format(r.ai_confidence) if r.ai_confidence is not none else '' }}"
+                    data-ai-model="{{ r.ai_model or '' }}"
+                    title="AI Verified — click for details">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l3.09 6.26L22 8.27l-5 4.87 1.18 6.88L12 16.77l-6.18 3.25L7 13.14 2 8.27l6.91-1.01L12 1z"/><path d="M9 12l2 2 4-4" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              AI Verified
+            </button>
           {% else %}
-            <span class="pill pill-photo pill-photo-fail">Photo !</span>
+            <button type="button" class="pill pill-photo pill-unverified-yellow ticket-pill-info"
+                    data-photo-key="{{ r.photo_key or '' }}"
+                    data-ocr-status="{{ r.ocr_status or '' }}"
+                    data-ocr-error="{{ r.ocr_error or '' }}"
+                    data-verification-status="{{ r.verification_status or '' }}"
+                    data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
+                    data-verify-reason="{{ r.verify_reason or '' }}"
+                    data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
+                    data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
+                    data-overage="{{ r.overage if r.overage is not none else '' }}"
+                    data-ai-confidence="{{ '%.2f'|format(r.ai_confidence) if r.ai_confidence is not none else '' }}"
+                    data-ai-model="{{ r.ai_model or '' }}"
+                    title="AI Unverified — click for details">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l3.09 6.26L22 8.27l-5 4.87 1.18 6.88L12 16.77l-6.18 3.25L7 13.14 2 8.27l6.91-1.01L12 1z"/></svg>
+              AI Unverified
+            </button>
           {% endif %}
         {% endif %}
-
-        {# Info icon (top-right) - click for verification details. (far right of pills row) #}
-        <button type="button" class="ticket-info" data-report-id="{{ r.id }}"
-                data-photo-key="{{ r.photo_key or '' }}"
-                data-ocr-status="{{ r.ocr_status or '' }}"
-                data-ocr-error="{{ r.ocr_error or '' }}"
-                data-verification-status="{{ r.verification_status or '' }}"
-                data-verify-attempts="{{ r.verify_attempts if r.verify_attempts is not none else '' }}"
-                data-verify-reason="{{ r.verify_reason or '' }}"
-                data-posted-speed="{{ r.posted_speed if r.posted_speed is not none else '' }}"
-                data-ticketed-speed="{{ r.ticketed_speed if r.ticketed_speed is not none else '' }}"
-                data-overage="{{ r.overage if r.overage is not none else '' }}"
-                data-ai-confidence="{{ '%.2f'|format(r.ai_confidence) if r.ai_confidence is not none else '' }}"
-                data-ai-model="{{ r.ai_model or '' }}"
-                title="Details">i</button>
       </div>
       <div class="ticket-date-right">
         <span class="js-localtime" data-utc="{{ r.created_at.isoformat() }}Z">{{ r.created_at.strftime("%b %d, %Y, %I:%M %p") }}</span>

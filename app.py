@@ -1384,8 +1384,8 @@ def create_app() -> Flask:
         base = base.rstrip("/")
         return base
 
-    def user_avatar_url(user, size: str = "sm") -> str:
-        """Return a URL for the user's avatar."""
+    def user_avatar_url(user, size: str = "sm", absolute: bool = False) -> str:
+        """Return a URL for the user's avatar. Pass absolute=True for API responses."""
         try:
             mode = (getattr(user, "avatar_mode", None) or "system").strip().lower()
             if mode == "photo":
@@ -1397,9 +1397,9 @@ def create_app() -> Flask:
                         return f"{base_url.rstrip('/')}/{base_key}{suffix}"
             raw = getattr(user, "avatar_key", None) if user else None
             key = normalize_avatar_key(raw)
-            return url_for("static", filename=f"img/avatars/{key}.png") + f"?v={_ES_VERSION}"
+            return url_for("static", filename=f"img/avatars/{key}.png", _external=absolute) + f"?v={_ES_VERSION}"
         except Exception:
-            return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png") + f"?v={_ES_VERSION}"
+            return url_for("static", filename=f"img/avatars/{_DEFAULT_SYSTEM_AVATAR_KEY}.png", _external=absolute) + f"?v={_ES_VERSION}"
 
     def user_avatar_is_photo(user) -> bool:
         try:
@@ -7056,7 +7056,7 @@ GROUP BY UPPER(TRIM(stusps));
             _avatar = ""
             _car = ""
             if _user:
-                _avatar = user_avatar_url(_user, "sm")
+                _avatar = user_avatar_url(_user, "sm", absolute=True)
                 _car_parts = [str(_user.car_year) if getattr(_user, "car_year", None) else "", getattr(_user, "car_make", "") or "", getattr(_user, "car_model", "") or ""]
                 _car = " ".join(pt for pt in _car_parts if pt).strip()
 
@@ -7319,6 +7319,12 @@ GROUP BY UPPER(TRIM(stusps));
                 )
                 user_liked = {rid for (rid,) in rows}
 
+        # Precompute map center/zoom per unique county geoid (for mobile pin overlay)
+        ccz_cache: dict = {}
+        for r in reports:
+            if r.county_geoid and r.county_geoid not in ccz_cache:
+                ccz_cache[r.county_geoid] = county_center_zoom(r.county_geoid, 640, 640)
+
         items = []
         for r in reports:
             items.append({
@@ -7347,7 +7353,7 @@ GROUP BY UPPER(TRIM(stusps));
                 "ocr_status": r.ocr_status,
                 "username": (r.user.username if r.user else None),
                 "user_id": (r.user.id if r.user else None),
-                "avatar_url": (user_avatar_url(r.user, "sm") if r.user else None),
+                "avatar_url": (user_avatar_url(r.user, "sm", absolute=True) if r.user else None),
                 "user_ticket_posts_count": user_ticket_posts_counts.get(r.user_id, 0) if r.user_id else 0,
                 "is_anonymous": (False if r.user else True),
                 "likes_count": like_counts.get(r.id, 0),
@@ -7362,7 +7368,6 @@ GROUP BY UPPER(TRIM(stusps));
                             pin_lat=r.lat,
                             pin_lng=r.lng,
                             center_on_pin="1",
-                            show_pin="1",
                             w=640, h=640,
                             _external=True)
                     if (r.county_geoid and r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())
@@ -7375,6 +7380,9 @@ GROUP BY UPPER(TRIM(stusps));
                         else None
                     )
                 ),
+                "map_center_lat": ccz_cache.get(r.county_geoid, (None, None, None))[0] if r.county_geoid else None,
+                "map_center_lng": ccz_cache.get(r.county_geoid, (None, None, None))[1] if r.county_geoid else None,
+                "map_zoom": ccz_cache.get(r.county_geoid, (None, None, None))[2] if r.county_geoid else None,
             })
 
         return jsonify({
@@ -7943,20 +7951,10 @@ GROUP BY UPPER(TRIM(stusps));
                 outside_points=outside_pts
             )
 
-            # Mobile clients can't overlay a JS pin, so append a custom red marker to the URL
+            # Mobile: use standard Google marker (scales correctly with scale=2 maps)
+            # Custom icons appear tiny because the map is already scale=2 (2x resolution)
             if show_pin and pin_lat is not None and pin_lng is not None and upstream:
-                try:
-                    from flask import current_app
-                    pin_base = ((os.environ.get("STATIC_PIN_BASE_URL") or "").strip() or
-                               (current_app.config.get("STATIC_PIN_BASE_URL") or "").strip()).rstrip("/")
-                    if not (pin_base and pin_base.startswith("http")):
-                        pin_base = f"{request.host_url.rstrip('/')}/static/img/pins"
-                    # Use the larger pin with scale for mobile visibility
-                    icon_url = f"{pin_base}/pin_inside_deepred.png"
-                    encoded_icon = urllib.parse.quote(icon_url, safe="")
-                    pin_param = f"markers=scale:2%7Cicon:{encoded_icon}%7C{pin_lat:.6f},{pin_lng:.6f}"
-                except Exception:
-                    pin_param = f"markers=color:red%7Csize:mid%7C{pin_lat:.6f},{pin_lng:.6f}"
+                pin_param = f"markers=color:0xCC2222%7Csize:mid%7C{pin_lat:.6f},{pin_lng:.6f}"
                 upstream = upstream + "&" + pin_param
         else:
             # State-level preview if state code provided

@@ -7368,6 +7368,8 @@ GROUP BY UPPER(TRIM(stusps));
                             pin_lat=r.lat,
                             pin_lng=r.lng,
                             center_on_pin="1",
+                            ctx="1",
+                            report_id=r.id,
                             w=640, h=640,
                             _external=True)
                     if (r.county_geoid and r.lat is not None and r.lng is not None and get_google_maps_static_maps_key())

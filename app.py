@@ -5164,13 +5164,26 @@ GROUP BY UPPER(TRIM(stusps));
     @app.post("/api/following/unfollow")
     @api_login_required
     def api_following_unfollow():
-        """Unfollow a county via JWT auth (mobile).
-        Body: {"geoid": "51153"}
+        """Unfollow a county or state via JWT auth (mobile).
+        Body: {"geoid": "51153"} or {"state": "VA"}
         """
         u = getattr(request, "_api_user", None)
         if not u:
             return jsonify({"ok": False, "error": "auth_required"}), 401
         data = request.get_json(silent=True) or {}
+
+        # Unfollow state
+        state = str(data.get("state") or "").strip().upper()
+        if state and re.fullmatch(r"[A-Z]{2}", state):
+            try:
+                FollowedState.query.filter_by(user_id=u.id, state_code=state).delete()
+                db.session.commit()
+                return jsonify({"ok": True})
+            except Exception:
+                db.session.rollback()
+                return jsonify({"ok": False, "error": "db_error"}), 500
+
+        # Unfollow county
         geoid = str(data.get("geoid") or "").strip()
         if not re.fullmatch(r"\d{5}", geoid):
             return jsonify({"ok": False, "error": "invalid_geoid"}), 400

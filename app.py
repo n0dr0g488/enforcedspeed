@@ -7217,17 +7217,20 @@ GROUP BY UPPER(TRIM(stusps));
 
         state = (request.args.get("state") or "").strip().upper()
         if state and len(state) != 2:
-            # Ignore invalid state filters (backward-compatible)
             state = ""
+
+        # County filter — single or comma-separated geoids
+        county_geoids_raw = (request.args.get("county_geoid") or request.args.get("geoids") or "").strip()
+        county_geoids = [g.strip() for g in county_geoids_raw.split(",") if re.fullmatch(r"\d{5}", g.strip())] if county_geoids_raw else []
 
         q = SpeedReport.query.options(joinedload(SpeedReport.user))
 
         # Hide soft-deleted tickets from public API feeds
         q = q.filter(SpeedReport.is_deleted.is_(False))
         if state:
-            # State is stored as raw user input (often like "KS" or "KS - Kansas").
-            # Filter by the first 2 letters to support both formats (backward-compatible).
             q = q.filter(func.upper(func.substr(func.trim(SpeedReport.state), 1, 2)) == state)
+        if county_geoids:
+            q = q.filter(SpeedReport.county_geoid.in_(county_geoids))
 
         reports = (
             q.order_by(SpeedReport.created_at.desc())

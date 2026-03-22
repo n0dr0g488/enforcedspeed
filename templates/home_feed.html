@@ -69,8 +69,9 @@
                 <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
                   {% for item in following_panel_items %}
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                      <a href="{{ item.url }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15; display:flex; gap:0;">
-                        <span style="width:28px; flex-shrink:0; display:inline-block;">{{ item.state }} –</span>
+                      <a href="{{ item.url }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15; display:inline-grid; grid-template-columns: 22px 10px 1fr; align-items:baseline;">
+                        <span>{{ item.state }}</span>
+                        <span style="text-align:center;">–</span>
                         <span>{% if item.type == 'state' %}All Counties{% else %}{{ item.label.split(' – ', 1)[1] if ' – ' in item.label else item.label }}{% endif %}</span>
                       </a>
                       <div style="display:flex; align-items:center; gap:4px; font-size:12px; font-variant-numeric:tabular-nums;">
@@ -103,8 +104,9 @@
             <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">
               {% for sc in suggested_counties %}
                 <div class="suggested-county-row" data-geoid="{{ sc.geoid }}" style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
-                  <span style="font-size:13px; font-weight:500; color:#374151; line-height:1.2; min-width:0; display:flex; gap:0;">
-                    <span style="width:28px; flex-shrink:0; display:inline-block;">{{ sc.state }} –</span>
+                  <span style="font-size:13px; font-weight:500; color:#374151; line-height:1.2; min-width:0; display:inline-grid; grid-template-columns: 22px 10px 1fr; align-items:baseline;">
+                    <span>{{ sc.state }}</span>
+                    <span style="text-align:center;">–</span>
                     <span>{{ sc.label.split(' – ', 1)[1] if ' – ' in sc.label else sc.label }}</span>
                   </span>
                   <button type="button" class="suggested-follow-btn" data-geoid="{{ sc.geoid }}"
@@ -1195,8 +1197,9 @@ function startAutoLoad(){
       <div style="margin-top:6px; display:flex; flex-direction:column; gap:8px;">
         {% for c in trending_counties %}
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <a href="{{ url_for('map_view', county=c.geoid) }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15; display:flex; gap:0;">
-              <span style="width:28px; flex-shrink:0; display:inline-block;">{{ c.st }} –</span>
+            <a href="{{ url_for('map_view', county=c.geoid) }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15; display:inline-grid; grid-template-columns: 22px 10px 1fr; align-items:baseline;">
+              <span>{{ c.st }}</span>
+              <span style="text-align:center;">–</span>
               <span>{{ c.label }}</span>
             </a>
 

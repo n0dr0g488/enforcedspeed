@@ -4239,7 +4239,7 @@ GROUP BY UPPER(TRIM(stusps));
                 except Exception:
                     c7 = c30 = c365 = 0
                     ovr = "—"
-                following_panel_items.append({"type": "state", "state": sc, "label": f"All Counties, {sc}", "url": url_for("map_view", state=sc), "c7": c7, "c30": c30, "c365": c365, "ovr": ovr})
+                following_panel_items.append({"type": "state", "state": sc, "label": f"{sc} – All Counties", "url": url_for("map_view", state=sc), "c7": c7, "c30": c30, "c365": c365, "ovr": ovr})
 
             for geoid in sorted(followed_county_geoids):
                 try:
@@ -4258,7 +4258,7 @@ GROUP BY UPPER(TRIM(stusps));
                         c365 = base.filter(SpeedReport.created_at >= d365).count()
                         ovrs = [r.ticketed_speed - r.posted_speed for r in base.filter(SpeedReport.created_at >= d365).all() if r.ticketed_speed and r.posted_speed]
                         ovr = f"+{int(median(ovrs))}mph" if ovrs else "—"
-                        following_panel_items.append({"type": "county", "state": st, "label": f"{label}, {st}", "url": url_for("map_view", county=geoid), "c7": c7, "c30": c30, "c365": c365, "ovr": ovr})
+                        following_panel_items.append({"type": "county", "state": st, "label": f"{st} – {label}", "url": url_for("map_view", county=geoid), "c7": c7, "c30": c30, "c365": c365, "ovr": ovr})
                 except Exception:
                     pass
         except Exception:
@@ -4323,7 +4323,7 @@ GROUP BY UPPER(TRIM(stusps));
                         continue
                     suggested_counties.append({
                         "geoid": nc["geoid"],
-                        "label": f"{nc['name']}, {nc['state']}",
+                        "label": f"{nc['state']} – {nc['name']}",
                         "state": nc["state"],
                     })
         except Exception:
@@ -4421,7 +4421,7 @@ GROUP BY UPPER(TRIM(stusps));
         if current_user.is_authenticated:
             for fs in followed_state_rows:
                 items.append({
-                    "display": f"{fs.state_code}, all counties",
+                    "display": f"{fs.state_code} – All Counties",
                     "state_sort": fs.state_code,
                     "label_sort": "",
                     "type": "state",
@@ -4443,7 +4443,7 @@ GROUP BY UPPER(TRIM(stusps));
                 except Exception:
                     pass
                 items.append({
-                    "display": f"{st}, {label}" if st else label,
+                    "display": f"{st} – {label}" if st else label,
                     "state_sort": st,
                     "label_sort": label,
                     "type": "county",
@@ -4475,7 +4475,7 @@ GROUP BY UPPER(TRIM(stusps));
                 except Exception:
                     pass
                 items.append({
-                    "display": f"{st}, {label}" if st else label,
+                    "display": f"{st} – {label}" if st else label,
                     "state_sort": st,
                     "label_sort": label,
                     "type": "county",
@@ -4523,7 +4523,7 @@ GROUP BY UPPER(TRIM(stusps));
                         continue
                     suggested_counties.append({
                         "geoid": nc["geoid"],
-                        "label": f"{nc['name']}, {nc['state']}",
+                        "label": f"{nc['state']} – {nc['name']}",
                         "state": nc["state"],
                     })
                     if len(suggested_counties) >= suggestion_limit:
@@ -5015,7 +5015,7 @@ GROUP BY UPPER(TRIM(stusps));
             try:
                 FollowedState.__table__.create(db.engine, checkfirst=True)
                 for fs in FollowedState.query.filter(FollowedState.user_id == current_user.id).order_by(FollowedState.state_code).all():
-                    map_following_items.append({"type": "state", "code": fs.state_code, "label": f"{fs.state_code}, all counties", "url": url_for("map_view", state=fs.state_code)})
+                    map_following_items.append({"type": "state", "code": fs.state_code, "label": f"{fs.state_code} – All Counties", "url": url_for("map_view", state=fs.state_code)})
                 for fc in FollowedCounty.query.filter(FollowedCounty.user_id == current_user.id).all():
                     try:
                         row = db.session.execute(text("SELECT namelsad, stusps FROM counties WHERE geoid = :g LIMIT 1"), {"g": fc.county_geoid}).mappings().first()

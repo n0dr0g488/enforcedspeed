@@ -193,7 +193,7 @@
           if(!d.ok || !d.counties) return;
           var html = '';
           d.counties.forEach(function(c){
-            var label = (c.namelsad || c.name) + ', ' + (c.stusps || st);
+            var label = (c.stusps || st) + ' \u2013 ' + (c.namelsad || c.name);
             countyMap[label] = c.geoid;
             html += '<option value="' + label + '">';
           });

@@ -1192,7 +1192,7 @@ function startAutoLoad(){
         {% for c in trending_counties %}
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
             <a href="{{ url_for('map_view', county=c.geoid) }}" style="flex:1; text-decoration:none; font-size:13px; font-weight:500; color:#374151; white-space:normal; overflow:visible; text-overflow:clip; min-width:0; line-height:1.15;">
-              {{ c.label }}, {{ c.st }}
+              {{ c.st }} – {{ c.label }}
             </a>
 
             <div style="display:flex; align-items:center; gap:4px; font-size:12px; font-variant-numeric:tabular-nums;">

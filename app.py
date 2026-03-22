@@ -7227,6 +7227,16 @@ GROUP BY UPPER(TRIM(stusps));
 
         # Hide soft-deleted tickets from public API feeds
         q = q.filter(SpeedReport.is_deleted.is_(False))
+
+        # mine=1 — filter to current user's tickets only
+        mine = request.args.get("mine") == "1"
+        if mine:
+            u = _api_user_from_request()
+            if u:
+                q = q.filter(SpeedReport.user_id == u.id)
+            else:
+                return jsonify({"ok": True, "items": [], "tickets": [], "offset": 0, "limit": limit})
+
         if state:
             q = q.filter(func.upper(func.substr(func.trim(SpeedReport.state), 1, 2)) == state)
         if county_geoids:
@@ -8154,6 +8164,10 @@ GROUP BY UPPER(TRIM(stusps));
             "email": u.email,
             "username": u.username,
             "created_at": u.created_at.isoformat() if getattr(u, "created_at", None) else None,
+            "avatar_url": user_avatar_url(u, "lg", absolute=True),
+            "car_make": getattr(u, "car_make", None),
+            "car_model": getattr(u, "car_model", None),
+            "car_year": getattr(u, "car_year", None),
         }
 
     @app.get("/api/home_minimap_staticmap")
@@ -8749,12 +8763,38 @@ GROUP BY UPPER(TRIM(stusps));
                     "median_overage": round(float(r.get("median_overage") or 0), 0),
                     "tickets": r.get("tickets", 0),
                 }
+            # State stats for choropleth
+            state_stats = {}
+            st_rows = q_base = db.session.query(
+                SpeedReport.state,
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed).label("overage"),
+            ).filter(
+                SpeedReport.is_deleted.is_(False),
+                SpeedReport.posted_speed.isnot(None),
+                SpeedReport.ticketed_speed.isnot(None),
+                (SpeedReport.ticketed_speed - SpeedReport.posted_speed) > 0,
+            ).all()
+            st_groups = {}
+            for row in st_rows:
+                sc = normalize_state_group(row.state)
+                if not sc or len(sc) != 2:
+                    continue
+                if sc not in st_groups:
+                    st_groups[sc] = []
+                st_groups[sc].append(int(row.overage))
+            for sc, ovs in st_groups.items():
+                ovs_sorted = sorted(ovs)
+                avg_ov = round(sum(ovs) / len(ovs), 1)
+                med_ov = ovs_sorted[len(ovs_sorted) // 2]
+                state_stats[sc] = {"avg": avg_ov, "median": med_ov, "tickets": len(ovs)}
+
             return jsonify({
                 "ok": True,
                 "state": state,
                 "enforced_speeds": enforced_speeds,
                 "most_strict": [_row(r) for r in rows_data.get("most_strict", [])],
                 "least_strict": [_row(r) for r in rows_data.get("least_strict", [])],
+                "state_stats": state_stats,
             })
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500

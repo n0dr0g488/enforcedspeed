@@ -57,9 +57,25 @@
 
       {# Zone buckets #}
       {% if summary and summary.enforced_speeds %}
+      {% set all_zones = summary.enforced_speeds %}
+      {% set with_data = all_zones | selectattr('tickets', 'gt', 0) | sort(attribute='tickets', reverse=true) | list %}
+      {% if with_data | length >= 6 %}
+        {% set top_zones = with_data[:6] | sort(attribute='posted') | list %}
+      {% else %}
+        {% set default_posted = [65, 55, 45, 35, 25, 70] %}
+        {% set top_zones = [] %}
+        {% for dp in default_posted %}
+          {% for z in all_zones %}
+            {% if z.posted == dp and z not in top_zones %}
+              {% set _ = top_zones.append(z) %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+        {% set top_zones = top_zones | sort(attribute='posted') | list %}
+      {% endif %}
       <div id="zoneSection" style="margin-bottom:16px;">
         <div class="es-speed-grid" id="zoneGrid">
-          {% for es in summary.enforced_speeds %}
+          {% for es in top_zones %}
           <div class="es-speed-card{% if not es.has_data %} no-data{% endif %}">
             <div class="es-speed-zone">{{ es.posted }} mph zone</div>
             {% if es.has_data %}
@@ -161,8 +177,20 @@
     function updateZoneGrid(speeds){
       var grid = document.getElementById('zoneGrid');
       if(!grid) return;
+      var withData = speeds.filter(function(z){ return z.tickets > 0; }).sort(function(a,b){ return b.tickets - a.tickets; });
+      var top;
+      if(withData.length >= 6){
+        top = withData.slice(0, 6).sort(function(a,b){ return a.posted - b.posted; });
+      } else {
+        var defaults = [65, 55, 45, 35, 25, 70];
+        var byPosted = {};
+        speeds.forEach(function(z){ byPosted[z.posted] = z; });
+        top = [];
+        defaults.forEach(function(d){ if(byPosted[d]) top.push(byPosted[d]); });
+        top.sort(function(a,b){ return a.posted - b.posted; });
+      }
       var html = '';
-      speeds.forEach(function(es){
+      top.forEach(function(es){
         var noData = !es.has_data;
         html += '<div class="es-speed-card'+(noData?' no-data':'')+'">';
         html += '<div class="es-speed-zone">'+es.posted+' mph zone</div>';

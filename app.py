@@ -5746,6 +5746,218 @@ GROUP BY UPPER(TRIM(stusps));
 
         return jsonify({"ok": True, "slot": slot})
 
+    # ── Mobile-friendly profile endpoints (JWT auth, no CSRF) ──
+
+    @app.get("/api/avatars")
+    def api_avatars():
+        """Return list of system avatars with full URLs."""
+        manifest = _load_system_avatar_manifest()
+        items = []
+        for it in manifest:
+            key = it.get("key", "")
+            items.append({
+                "key": key,
+                "label": it.get("label", ""),
+                "url": url_for("static", filename=f"img/avatars/{key}.png", _external=True),
+            })
+        return jsonify({"ok": True, "avatars": items})
+
+    @app.post("/api/mobile/profile/avatar")
+    @api_login_required
+    def api_mobile_set_avatar():
+        """Set system avatar (JWT auth, JSON body: { avatar_key: "a01" })."""
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        data = request.get_json(silent=True) or {}
+        key = normalize_avatar_key(data.get("avatar_key"))
+        try:
+            u.avatar_key = key
+            u.avatar_mode = "system"
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+        return jsonify({
+            "ok": True,
+            "avatar_key": key,
+            "avatar_url": url_for("static", filename=f"img/avatars/{key}.png", _external=True),
+            "user": _user_public(u),
+        })
+
+    @app.post("/api/mobile/profile/photo")
+    @api_login_required
+    def api_mobile_upload_photo():
+        """Upload custom avatar photo (JWT auth, multipart: photo field)."""
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        file_obj = request.files.get("photo")
+        if not file_obj:
+            return jsonify({"ok": False, "error": "no_file"}), 400
+        max_bytes = 25 * 1024 * 1024
+        try:
+            raw = file_obj.read()
+        except Exception:
+            raw = b""
+        if not raw or len(raw) > max_bytes:
+            return jsonify({"ok": False, "error": "too_large", "message": "Keep under 25 MB."}), 400
+        try:
+            im = Image.open(io.BytesIO(raw)).convert("RGB")
+            w, h = im.size
+            side = min(w, h)
+            left, top = int((w - side) / 2), int((h - side) / 2)
+            im = im.crop((left, top, left + side, top + side))
+            sizes = {"lg": 256, "md": 128, "sm": 64}
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_image"}), 400
+        # SafeSearch
+        try:
+            scan = im.copy()
+            scan.thumbnail((800, 800))
+            scan_buf = io.BytesIO()
+            scan.save(scan_buf, format="JPEG", quality=80, optimize=True)
+            from google.cloud import vision
+            client = vision.ImageAnnotatorClient()
+            resp = client.safe_search_detection(image=vision.Image(content=scan_buf.getvalue()))
+            ann = getattr(resp, "safe_search_annotation", None)
+            if ann and (int(ann.adult) >= int(vision.Likelihood.LIKELY) or int(ann.racy) >= int(vision.Likelihood.LIKELY)):
+                return jsonify({"ok": False, "error": "unsafe_image", "message": "Photo rejected."}), 400
+        except Exception:
+            return jsonify({"ok": False, "error": "scan_failed"}), 500
+        bucket = (os.environ.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip()
+        prefix = "profile_photos/"
+        base_key = f"{prefix}{u.id}/{uuid.uuid4().hex}"
+        for label, px in sizes.items():
+            thumb = im.copy()
+            thumb.thumbnail((px, px), Image.LANCZOS)
+            buf = io.BytesIO()
+            thumb.save(buf, format="JPEG", quality=85, optimize=True)
+            ok = put_bytes(bucket=bucket, key=f"{base_key}_{px}.jpg", data=buf.getvalue(), content_type="image/jpeg", cache_control="public, max-age=31536000, immutable")
+            if not ok:
+                return jsonify({"ok": False, "error": "upload_failed"}), 500
+        try:
+            u.photo_key = base_key
+            u.avatar_mode = "photo"
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+        return jsonify({"ok": True, "user": _user_public(u)})
+
+    @app.post("/api/mobile/profile/vehicle")
+    @api_login_required
+    def api_mobile_update_vehicle():
+        """Update car make/model/year (JWT auth, JSON body)."""
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        data = request.get_json(silent=True) or {}
+        def _clean(v):
+            return (v or "").strip()[:100] or None
+        u.car_make = _clean(data.get("car_make"))
+        u.car_model = _clean(data.get("car_model"))
+        try:
+            y = int(data.get("car_year") or 0)
+            u.car_year = y if 1900 <= y <= 2100 else None
+        except Exception:
+            u.car_year = None
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+        return jsonify({"ok": True, "user": _user_public(u)})
+
+    @app.post("/api/mobile/profile/car_photo")
+    @api_login_required
+    def api_mobile_car_photo_upload():
+        """Upload car photo slot 1-3 (JWT auth, multipart: photo + slot)."""
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        slot = (request.form.get("slot") or "1").strip()
+        if slot not in ("1", "2", "3"):
+            return jsonify({"ok": False, "error": "bad_slot"}), 400
+        col = f"car_photo_{slot}"
+        file_obj = request.files.get("photo")
+        if not file_obj:
+            return jsonify({"ok": False, "error": "no_file"}), 400
+        max_bytes = 25 * 1024 * 1024
+        try:
+            raw = file_obj.read()
+        except Exception:
+            raw = b""
+        if not raw or len(raw) > max_bytes:
+            return jsonify({"ok": False, "error": "too_large"}), 400
+        try:
+            im = Image.open(io.BytesIO(raw)).convert("RGB")
+            im.thumbnail((1200, 1200), Image.LANCZOS)
+        except Exception:
+            return jsonify({"ok": False, "error": "bad_image"}), 400
+        # SafeSearch
+        try:
+            scan = im.copy()
+            scan.thumbnail((800, 800))
+            scan_buf = io.BytesIO()
+            scan.save(scan_buf, format="JPEG", quality=80, optimize=True)
+            from google.cloud import vision
+            client = vision.ImageAnnotatorClient()
+            resp = client.safe_search_detection(image=vision.Image(content=scan_buf.getvalue()))
+            ann = getattr(resp, "safe_search_annotation", None)
+            if ann and (int(ann.adult) >= int(vision.Likelihood.LIKELY) or int(ann.racy) >= int(vision.Likelihood.LIKELY)):
+                return jsonify({"ok": False, "error": "unsafe_image"}), 400
+        except Exception:
+            return jsonify({"ok": False, "error": "scan_failed"}), 500
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=85, optimize=True)
+        bucket = (os.environ.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip()
+        base_key = f"car_photos/{u.id}/{uuid.uuid4().hex}.jpg"
+        ok = put_bytes(bucket=bucket, key=base_key, data=buf.getvalue(), content_type="image/jpeg", cache_control="public, max-age=31536000, immutable")
+        if not ok:
+            return jsonify({"ok": False, "error": "upload_failed"}), 500
+        # Delete old
+        old_key = getattr(u, col, None)
+        if old_key:
+            try:
+                delete_object(bucket, old_key)
+            except Exception:
+                pass
+        try:
+            setattr(u, col, base_key)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+        return jsonify({"ok": True, "user": _user_public(u)})
+
+    @app.post("/api/mobile/profile/car_photo/remove")
+    @api_login_required
+    def api_mobile_car_photo_remove():
+        """Remove car photo from slot (JWT auth, JSON body: { slot: "1" })."""
+        u = getattr(request, "_api_user", None)
+        if not u:
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        data = request.get_json(silent=True) or {}
+        slot = str(data.get("slot", "1")).strip()
+        if slot not in ("1", "2", "3"):
+            return jsonify({"ok": False, "error": "bad_slot"}), 400
+        col = f"car_photo_{slot}"
+        old_key = getattr(u, col, None)
+        if old_key:
+            bucket = (os.environ.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip()
+            try:
+                delete_object(bucket, old_key)
+            except Exception:
+                pass
+        try:
+            setattr(u, col, None)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "db_error"}), 500
+        return jsonify({"ok": True, "user": _user_public(u)})
+
     def _car_photo_base_url() -> str:
         """Public URL base for car photos — same bucket as profile photos."""
         cfg = (app.config.get("PROFILE_PHOTO_BASE_URL") or "").strip().rstrip("/")
@@ -8166,15 +8378,22 @@ GROUP BY UPPER(TRIM(stusps));
 
     # --- API auth endpoints (JWT) ---
     def _user_public(u: User) -> dict:
+        cphotos = []
+        for slot in (1, 2, 3):
+            url = car_photo_url(u, slot)
+            cphotos.append(url if url else None)
         return {
             "id": u.id,
             "email": u.email,
             "username": u.username,
             "created_at": u.created_at.isoformat() if getattr(u, "created_at", None) else None,
             "avatar_url": user_avatar_url(u, "lg", absolute=True),
+            "avatar_key": normalize_avatar_key(getattr(u, "avatar_key", None)),
+            "avatar_mode": getattr(u, "avatar_mode", "system") or "system",
             "car_make": getattr(u, "car_make", None),
             "car_model": getattr(u, "car_model", None),
             "car_year": getattr(u, "car_year", None),
+            "car_photo_urls": cphotos,
         }
 
     @app.get("/api/home_minimap_staticmap")

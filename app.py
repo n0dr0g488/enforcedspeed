@@ -7242,6 +7242,13 @@ GROUP BY UPPER(TRIM(stusps));
         if county_geoids:
             q = q.filter(SpeedReport.county_geoid.in_(county_geoids))
 
+        # AI verification filter
+        filter_verify = (request.args.get("verify") or "any").strip().lower()
+        if filter_verify == "verified":
+            q = q.filter(SpeedReport.verified_at.isnot(None))
+        elif filter_verify == "unverified":
+            q = q.filter(SpeedReport.verified_at.is_(None))
+
         reports = (
             q.order_by(SpeedReport.created_at.desc())
             .offset(offset)

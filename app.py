@@ -6844,6 +6844,94 @@ GROUP BY UPPER(TRIM(stusps));
             return jsonify({"ok": False, "error": "counties_unavailable"}), 200
 
 
+    @app.get("/api/county_neighbors/<geoid>")
+    def api_county_neighbors(geoid: str):
+        """Return simplified GeoJSON for counties that border the given county (ST_Touches).
+
+        Used by the mobile map to render only adjacent counties instead of ALL
+        state counties, dramatically reducing polygon/marker count.
+
+        Response shape:
+            {ok, geojson: {type: FeatureCollection, features: [...]}, center_county: {...}}
+        Each feature has properties: geoid, name, stusps.
+        """
+        geoid = (geoid or "").strip()
+        if not re.fullmatch(r"\d{5}", geoid):
+            return jsonify({"ok": False}), 400
+
+        cache_dir = "/tmp/es_county_neighbors_cache"
+        cache_key = f"es_county_neighbors_v2_{geoid}.json"
+        cache_path = os.path.join(cache_dir, cache_key)
+
+        # Check cache
+        try:
+            if os.path.exists(cache_path):
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    return Response(f.read(), mimetype="application/json")
+        except Exception:
+            pass
+
+        try:
+            # Get the center county + neighbors via ST_DWithin (tolerant of micro-gaps
+            # in TIGER/Census geometry that ST_Touches would miss).
+            # 0.005 degrees ≈ 500m — catches gaps without pulling distant counties.
+            rows = db.session.execute(
+                text("""
+                    WITH center AS (
+                        SELECT geoid, namelsad, stusps, geom
+                        FROM counties
+                        WHERE geoid = :geoid AND geom IS NOT NULL
+                        LIMIT 1
+                    )
+                    SELECT n.geoid, n.namelsad, n.stusps,
+                           ST_AsGeoJSON(ST_SimplifyPreserveTopology(n.geom, 0.005)) AS geom_json
+                    FROM counties n, center c
+                    WHERE n.geoid != c.geoid
+                      AND n.geom IS NOT NULL
+                      AND ST_DWithin(n.geom, c.geom, 0.005)
+                    ORDER BY n.namelsad
+                """),
+                {"geoid": geoid},
+            ).mappings().all()
+
+            features = []
+            for r in rows:
+                try:
+                    geom = json.loads(r["geom_json"])
+                except Exception:
+                    continue
+                features.append({
+                    "type": "Feature",
+                    "properties": {
+                        "geoid": r.get("geoid"),
+                        "name": r.get("namelsad"),
+                        "stusps": r.get("stusps"),
+                    },
+                    "geometry": geom,
+                })
+
+            result = json.dumps({
+                "ok": True,
+                "geojson": {"type": "FeatureCollection", "features": features},
+            })
+
+            try:
+                os.makedirs(cache_dir, exist_ok=True)
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    f.write(result)
+            except Exception:
+                pass
+
+            return Response(result, mimetype="application/json")
+        except Exception as e:
+            try:
+                db.session.rollback()
+                print(f"[COUNTY NEIGHBORS ERROR] {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False}), 200
+
+
     @app.get("/api/state_counties_geom/<stusps>")
     def api_state_counties_geom(stusps: str):
         """Return simplified GeoJSON for all counties in a state (for interactive map overlays)."""
@@ -7070,6 +7158,11 @@ GROUP BY UPPER(TRIM(stusps));
         # This is what enables: selected (red) + in-focus (gray) + out-of-focus (ghost) on the map.
         context_mode = (request.args.get("context_mode") == "1")
 
+        # county_scope: comma-separated list of geoids to hard-filter pins to.
+        # Used by mobile when showing only focus county + its neighbors.
+        county_scope_raw = (request.args.get("county_scope") or "").strip()
+        county_scope = [g.strip() for g in county_scope_raw.split(",") if re.fullmatch(r"\d{5}", g.strip())] if county_scope_raw else []
+
         # NOTE: We do NOT implicitly convert focus_state into a state filter here.
         # Focus is used for inside/outside coloring, while filters control which pins are loaded.
         # This allows ghosted out-of-focus pins to remain visible for context.
@@ -7151,6 +7244,10 @@ GROUP BY UPPER(TRIM(stusps));
         # so we can show out-of-county pins in a ghosted style for context.
         if filter_county_geoid and not context_mode:
             q = q.filter(SpeedReport.county_geoid == filter_county_geoid)
+
+        # county_scope: hard-filter to only these geoids (focus county + neighbors)
+        if county_scope:
+            q = q.filter(SpeedReport.county_geoid.in_(county_scope))
 
         # Map pin filter (only tickets with a user-placed pin)
         if filter_pin:

@@ -521,9 +521,10 @@ def _county_bbox_and_outline_polyline(geoid: str):
       bbox from the exterior ring we choose (not from the full raw geometry).
     """
     try:
-        # Gentler simplification than earlier versions (0.01 was too aggressive).
-        # ~0.0025 degrees is roughly ~275m in latitude; the point/URL cap below
-        # provides an additional safety net for huge/complex counties.
+        # Gentler simplification for accurate county outlines.
+        # ~0.001 degrees is roughly ~110m in latitude; preserves edges that
+        # the previous 0.0025 tolerance was sometimes clipping.
+        # The point/URL cap + Douglas-Peucker step below handles URL length.
         row = db.session.execute(
             text(
                 """
@@ -533,7 +534,7 @@ def _county_bbox_and_outline_polyline(geoid: str):
                 LIMIT 1
                 """
             ),
-            {"geoid": geoid, "tol": 0.0025},
+            {"geoid": geoid, "tol": 0.001},
         ).mappings().first()
     except Exception:
         return None
@@ -9198,6 +9199,7 @@ GROUP BY UPPER(TRIM(stusps));
                 "id": c.id,
                 "report_id": c.report_id,
                 "body": c.body,
+                "parent_id": c.parent_id,
                 "created_at": c.created_at.isoformat() if c.created_at else None,
                 "username": (c.user.username if c.user else None),
                 "user_id": c.user_id,
@@ -9225,6 +9227,18 @@ GROUP BY UPPER(TRIM(stusps));
         if len(body) > 280:
             return jsonify({"error": "comment_too_long"}), 400
 
+        # Optional parent_id for threaded replies
+        parent_id = data.get("parent_id")
+        if parent_id is not None:
+            try:
+                parent_id = int(parent_id)
+                # Verify parent exists and belongs to same report
+                parent = Comment.query.filter_by(id=parent_id, report_id=report_id).first()
+                if not parent:
+                    parent_id = None
+            except (ValueError, TypeError):
+                parent_id = None
+
         # Basic rate limit: max 5 comments / 60s / user (same as web)
         window_start = datetime.utcnow() - timedelta(seconds=60)
         recent_count = (
@@ -9238,7 +9252,7 @@ GROUP BY UPPER(TRIM(stusps));
         if getattr(report, "is_deleted", False):
             abort(404)
 
-        c = Comment(report_id=report_id, user_id=u.id, body=body)
+        c = Comment(report_id=report_id, user_id=u.id, body=body, parent_id=parent_id)
         db.session.add(c)
         db.session.commit()
 
@@ -9246,6 +9260,7 @@ GROUP BY UPPER(TRIM(stusps));
             "id": c.id,
             "report_id": c.report_id,
             "body": c.body,
+            "parent_id": c.parent_id,
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "username": u.username,
         }), 201

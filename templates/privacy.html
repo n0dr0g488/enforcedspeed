@@ -5,18 +5,17 @@
   <div class="home-center">
     <div class="card ticket-card policy-page">
       <h2 style="margin-top:0">Privacy Policy</h2>
-      <p>Effective Date: February 11, 2026<br>Last Updated: March 15, 2026</p>
-      <p>This Privacy Policy describes how Mindra LLC, a Wyoming limited liability company (“Mindra,” “Company,” “we,” “us,” or “our”), collects, uses, and discloses information in connection with the EnforcedSpeed platform available at www.enforcedspeed.com (the “Platform”).</p>
+      <p>Effective Date: February 11, 2026<br>Last Updated: April 18, 2026</p>
+      <p>This Privacy Policy describes how Mindra LLC, a Wyoming limited liability company ("Mindra," "Company," "we," "us," or "our"), collects, uses, and discloses information in connection with the EnforcedSpeed platform available at www.enforcedspeed.com and the EnforcedSpeed mobile application (the "Platform").</p>
       <p>This Privacy Policy is incorporated by reference into the Terms of Service.</p>
       <h3>1. SCOPE</h3>
       <p>This Privacy Policy applies to information collected through the Platform in connection with the Services. It does not apply to third-party websites or services that may be linked from the Platform.</p>
       <h3>2. DEFINITIONS</h3>
-      <p>For purposes of this Policy:</p>
-      <p>“Account” means your registered user account (email + password login).</p>
-      <p>“Ticket Data” means the structured fields submitted in the “Submit a Ticket” flow (e.g., state, road, posted speed, ticketed speed, overage, date, notes, and any derived fields such as verification flags and confidence indicators).</p>
-      <p>“Ticket Image” means an uploaded photo or scan associated with a ticket submission.</p>
-      <p>“Service Providers” means third-party companies that process information on our behalf (examples listed below).</p>
-      <p>“Personal Information” means information that identifies, relates to, describes, is reasonably capable of being associated with, or could reasonably be linked (directly or indirectly) with an individual or household.</p>
+      <p>"Account" means your registered user account (email + password login).</p>
+      <p>"Ticket Data" means the structured fields submitted in the "Submit a Ticket" flow (e.g., state, road, posted speed, ticketed speed, overage, date, notes, and any derived fields such as verification flags and confidence indicators).</p>
+      <p>"Ticket Image" means an uploaded photo or scan associated with a ticket submission.</p>
+      <p>"Service Providers" means third-party companies that process information on our behalf (examples listed below).</p>
+      <p>"Personal Information" means information that identifies, relates to, describes, is reasonably capable of being associated with, or could reasonably be linked (directly or indirectly) with an individual or household.</p>
       <h3>3. INFORMATION WE COLLECT</h3>
       <p><b>3.1 Information You Provide</b></p>
       <p>You may provide information when you:</p>
@@ -27,6 +26,7 @@
       <p>Email address or account identifier,</p>
       <p>Ticket-related details (jurisdiction, speeds, dates),</p>
       <p>Optionally uploaded Ticket Images.</p>
+      <p>You may also provide: profile information (username, profile photo), vehicle details (year, make, model), comments on other users' ticket submissions, and location data (when you grant location permission in the mobile application). You are solely responsible for the accuracy and content of all information you provide.</p>
       <p><b>3.2 Automated Collection</b></p>
       <p>When you access the Services, we (and our infrastructure providers) may automatically collect:</p>
       <p>Log and device data such as IP address, user-agent, browser type, operating system, timestamps, pages requested, and referring/exit pages.</p>
@@ -40,16 +40,17 @@
       <p>Structured ticket data (state, road, speeds, dates),</p>
       <p>Verification status indicators,</p>
       <p>Internal processing markers.</p>
+      <p>We also retain account and profile information (username, email, profile photo, vehicle details) for as long as your account is active. Comments and interaction data are retained as part of the public record of the Platform.</p>
       <p>We do not retain:</p>
       <p>Ticket Images,</p>
-      <p>Names, dates of birth, driver’s license numbers, other personal information</p>
+      <p>Names, dates of birth, driver's license numbers, other personal information</p>
       <p>Biometric identifiers.</p>
       <h3>6. HOW WE USE INFORMATION</h3>
       <p>We use information to:</p>
       <p>Provide and operate the Services (account login, ticket submission, feeds, maps, and analytics).</p>
-      <p>Conduct Automated Processing of Ticket Images</p>
+      <p>Conduct AI-based verification of Ticket Images.</p>
       <p>Maintain security, prevent abuse, troubleshoot, and monitor performance.</p>
-      <p>Improve and develop features, including generating aggregated and de‑identified insights (e.g., enforcement “strictness” rankings, road-level trends, confidence/density signals).</p>
+      <p>Improve and develop features, including generating aggregated and de-identified insights (e.g., enforcement "strictness" rankings, road-level trends, confidence/density signals).</p>
       <p>Communicate with you (service announcements, account notices, password resets, support).</p>
       <h3>7. SHARING OF INFORMATION</h3>
       <p><b>7.1 Third-Party Service Providers</b></p>
@@ -57,7 +58,7 @@
       <p>Render</p>
       <p>Redis</p>
       <p>Cloudflare</p>
-      <p>Google Gemini® (AI-based ticket image verification) and Google Maps</p>
+      <p>Google Gemini® (AI-based ticket image verification), Google Cloud Vision (image safety screening), and Google Maps</p>
       <p>SendGrid</p>
       <p><b>7.2 Aggregated / De-identified Information</b></p>
       <p>We may share aggregated or de-identified Ticket Data (e.g., statistics, rankings, trends) that cannot reasonably be used to identify you.</p>
@@ -65,7 +66,7 @@
       <p><b>7.3 Legal, Safety, and Business Transfers</b></p>
       <p>We may share information to comply with the law, enforce our terms, protect rights/safety, respond to lawful requests, or as part of a merger, acquisition, financing, reorganization, or sale of assets.</p>
       <h3>8. AUTOMATED DECISION-MAKING</h3>
-      <p>The Services use Automated Processing to assist with data verification. This includes the use of AI-based image analysis (Google Gemini) to evaluate whether a submitted image appears to be a genuine traffic citation and to extract speed values from it. The AI model does not extract or retain personally identifiable information from images. Image bytes are transmitted to Google's API solely for this analysis and are not stored by Google beyond their standard API data handling terms. They do not make legal determinations or decisions with legal or similarly significant effects.</p>
+      <p>The Services use Automated Processing to assist with data verification. This includes the use of AI-based image analysis (currently Google Gemini 2.5 Flash) to evaluate whether a submitted image appears to be a genuine traffic citation and to extract speed values from it. The AI model is prompted only to determine document type, extract posted speed and ticketed speed, and provide a confidence score. It is not instructed to extract names, dates of birth, license numbers, or any other personally identifiable information. Image bytes are transmitted to Google's API solely for this analysis and are not stored by Google beyond their standard API data handling terms. They do not make legal determinations or decisions with legal or similarly significant effects.</p>
       <h3>9. COOKIES AND TRACKING TECHNOLOGIES</h3>
       <p>Cookies are governed by the Cookies Policy which is incorporated herein.</p>
       <h3>10. DATA SECURITY</h3>
@@ -76,10 +77,10 @@
       <p>Request deletion of personal information,</p>
       <p>Correct inaccurate information.</p>
       <p>Requests may be subject to technical and legal limitations.</p>
-      <h3>12. CHILDREN’S PRIVACY</h3>
+      <h3>12. CHILDREN'S PRIVACY</h3>
       <p>The Services are intended for users 18 years of age or older. We do not knowingly collect information from children. If you are under 18, do not use the Services.</p>
       <h3>13. CHANGES TO THIS POLICY</h3>
-      <p>We may update this Privacy Policy from time to time. The “Last Updated” date will reflect changes. Your continued use of the Platform and/or Services after the effective date of revised terms constitutes acceptance of the changes.</p>
+      <p>We may update this Privacy Policy from time to time. The "Last Updated" date will reflect changes. Your continued use of the Platform and/or Services after the effective date of revised terms constitutes acceptance of the changes.</p>
       <h3>14. CONTACT US</h3>
       <p>Questions regarding this Privacy Policy may be directed to: contact@enforcedspeed.com</p>
     </div>

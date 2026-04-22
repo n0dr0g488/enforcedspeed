@@ -1302,7 +1302,7 @@ function startAutoLoad(){
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="feedPinTitle">
     <div class="modal-title" id="feedPinTitle">Refine pin</div>
     <div class="subtle" style="margin-top:6px;">
-      Drag the pin to the closest spot on the road. We'll snap it to the nearest road line.
+      Drag the pin to the exact spot you'd like to mark.
     </div>
     <div id="feedPinMap" style="width:100%; height:360px; margin-top:12px; border:1px solid #e5e7eb; border-radius:12px;"></div>
     <div class="subtle" id="feedPinStatus" style="margin-top:10px; display:none;"></div>
@@ -1422,7 +1422,7 @@ function startAutoLoad(){
         });
         const data = await res.json().catch(()=>({}));
         if(res.ok && data && data.ok){
-          showStatus(data.snapped ? 'Saved. Pin snapped to nearest road.' : 'Saved.');
+          showStatus('Pin saved.');
           // Reload to refresh static map image + any downstream aggregates.
           setTimeout(()=>{ window.location.reload(); }, 450);
         }else{

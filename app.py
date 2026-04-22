@@ -184,6 +184,17 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+# Rate limiting (v690): per-IP quotas on critical endpoints.
+# Uses Redis backend if REDIS_URL is set, otherwise in-memory (dev only).
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    _LIMITER_AVAILABLE = True
+except Exception:
+    _LIMITER_AVAILABLE = False
+    Limiter = None  # type: ignore
+    get_remote_address = None  # type: ignore
+
 from PIL import Image
 
 # Optional: accept iPhone HEIC/HEIF and normalize to JPEG.
@@ -1355,6 +1366,26 @@ def create_app() -> Flask:
     login_manager.login_view = "login"
     login_manager.init_app(app)
 
+    # Rate limiter (v690): prevents abuse of critical endpoints (login brute-force,
+    # spam registrations, API scraping, etc). Uses Redis for shared state across workers.
+    limiter = None
+    if _LIMITER_AVAILABLE:
+        try:
+            redis_url = os.environ.get("REDIS_URL", "").strip()
+            storage_uri = redis_url if redis_url else "memory://"
+            limiter = Limiter(
+                key_func=get_remote_address,
+                app=app,
+                default_limits=["500 per hour", "50 per minute"],  # generous global cap
+                storage_uri=storage_uri,
+                strategy="fixed-window",
+                headers_enabled=False,
+            )
+        except Exception as e:
+            print(f"[WARN] Flask-Limiter init failed: {e}")
+            limiter = None
+    app.extensions["limiter"] = limiter
+
     @login_manager.user_loader
     def load_user(user_id: str):
         # SQLAlchemy 2.x: Query.get() is legacy; use Session.get()
@@ -1684,327 +1715,17 @@ GROUP BY UPPER(TRIM(stusps));
         key = (app.config.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
         return key
 
-    def snap_to_nearest_road(lat: float, lng: float):
-        """Snap a single point to the nearest road using Google Roads API.
-
-        Requires Config.GOOGLE_MAPS_SERVER_KEY. Returns (snapped_lat, snapped_lng) or (None, None).
-        """
-        key = app.config.get("GOOGLE_MAPS_SERVER_KEY") or ""
-        if not key:
-            return None, None
-
-        try:
-            q = urllib.parse.urlencode({"points": f"{lat},{lng}", "key": key})
-            url = f"https://roads.googleapis.com/v1/nearestRoads?{q}"
-            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                payload = resp.read().decode("utf-8")
-            data = json.loads(payload)
-            pts = data.get("snappedPoints") or []
-            if not pts:
-                return None, None
-            loc = (pts[0] or {}).get("location") or {}
-            slat = loc.get("latitude")
-            slng = loc.get("longitude")
-            if slat is None or slng is None:
-                return None, None
-            return float(slat), float(slng)
-        except Exception:
-            return None, None
+    # v691/v692: Massive dead-code cleanup. Removed all Roads API snap-to-road code:
+    # - v691: Removed 350+ lines of dead highway-biased snapping helpers (nearest_roads_multi,
+    #   _confirm_location_*, _score_highway_candidate, _route_kind, _offset_latlng_m, etc.)
+    #   and the /api/confirm_location endpoint that had no live callers.
+    # - v692: Removed the small snap_to_nearest_road() function. The /api/update_ticket_pin
+    #   endpoint (used by website's "Refine pin" feature in the feed) no longer snaps —
+    #   it just saves the user's dragged coordinates verbatim. The Google Roads API is no
+    #   longer called anywhere in the codebase and can be DISABLED in Google Cloud Console.
 
 
-    def nearest_roads_multi(points: list[tuple[float, float]]):
-        """Batch Roads API nearestRoads call for multiple points.
 
-        Returns a list of snappedPoints with `originalIndex` preserved.
-        """
-        try:
-            if not points:
-                return []
-
-            # Roads API supports multiple points as a '|' separated list.
-            # Keep this bounded to avoid URL length/timeouts.
-            pts = [(float(a), float(b)) for a, b in points[:100]]
-
-            pts_str = "|".join([f"{a:.6f},{b:.6f}" for a, b in pts])
-            q = urllib.parse.urlencode({"points": pts_str, "key": app.config.get("GOOGLE_MAPS_SERVER_KEY") or ""})
-            url = f"https://roads.googleapis.com/v1/nearestRoads?{q}"
-            req = urllib.request.Request(url, headers={"User-Agent": "EnforcedSpeed/1.0"})
-            with urllib.request.urlopen(req, timeout=4) as resp:
-                payload = resp.read().decode("utf-8")
-            data = json.loads(payload)
-            return data.get("snappedPoints") or []
-        except Exception:
-            return []
-
-
-    # --- Highway-biased snapping (optional) ---
-    _HIGHWAY_PENALTY_WORDS = (
-        # Things that often show up on frontage/side roads or interchanges.
-        'ramp', 'service', 'frontage', 'access', 'collector', 'local', 'drive', 'dr', 'loop', 'spur', 'bypass',
-        'parkway', 'connector', 'circle'
-    )
-
-    def _offset_latlng_m(lat: float, lng: float, north_m: float, east_m: float):
-        """Return a lat/lng offset by meters (rough)."""
-        try:
-            dlat = north_m / 111320.0
-            dlng = east_m / (111320.0 * math.cos(math.radians(lat)) + 1e-9)
-            return lat + dlat, lng + dlng
-        except Exception:
-            return lat, lng
-
-    def _score_highway_candidate(road_label: str) -> int:
-        s = (road_label or '').strip().lower()
-        if not s:
-            return 0
-
-        score = 0
-
-        # Strongest: Interstates
-        if s.startswith('interstate ') or ' interstate ' in s:
-            score += 160
-        if re.search(r'(?<!\w)i\s*-?\s*\d{1,3}(?!\w)', s):
-            score += 140
-
-        # US routes
-        if 'us route' in s or re.search(r'(?<!\w)us\s*-?\s*\d{1,4}(?!\w)', s):
-            score += 110
-
-        # State routes often appear like "nc-33", "wa 520", etc.
-        if 'state route' in s or re.search(r'(?<!\w)[a-z]{2}\s*-?\s*\d{1,4}(?!\w)', s):
-            score += 85
-
-        # Generic highway keywords / route markers
-        if 'highway' in s or re.search(r'(?<!\w)hwy(?!\w)', s):
-            score += 70
-        if 'route' in s:
-            score += 25
-
-        # Route numbers alone (fallback)
-        if re.search(r'(?<!\w)\d{1,4}(?!\w)', s) and (
-            'rd' in s or 'road' in s or 'route' in s or 'hwy' in s or '-' in s
-        ):
-            score += 10
-
-        # Penalize common side-road artifacts.
-        for w in _HIGHWAY_PENALTY_WORDS:
-            if w in s:
-                score -= 35
-
-        # Heavy penalty for obvious local streets if we have no route-ish markers
-        if score < 50 and not re.search(r'(?<!\w)(i\s*-?\s*\d|us\s*-?\s*\d|[a-z]{2}\s*-?\s*\d|highway|hwy|route)(?!\w)', s):
-            score -= 40
-
-        return score
-
-    def _route_kind(road_label: str) -> str:
-        """Classify a road label into: interstate | numbered | local."""
-        s = (road_label or '').strip().lower()
-        if not s:
-            return 'local'
-
-        # Interstates
-        if s.startswith('interstate ') or ' interstate ' in s:
-            return 'interstate'
-        if re.search(r'(?<!\w)i\s*-?\s*\d{1,3}(?!\w)', s):
-            return 'interstate'
-
-        # Helper: avoid treating "1st/2nd/3rd" street names as numbered routes.
-        if re.search(r'(?<!\w)\d{1,2}(st|nd|rd|th)(?!\w)', s):
-            return 'local'
-
-        # Numbered routes (US routes, state routes, highways/parkways with numbers)
-        if 'us route' in s or 'u.s. route' in s:
-            return 'numbered'
-        if re.search(r'(?<!\w)us\s*-?\s*\d{1,4}(?!\w)', s):
-            return 'numbered'
-        if 'state route' in s or re.search(r'(?<!\w)[a-z]{2}\s*-?\s*\d{1,4}(?!\w)', s):
-            return 'numbered'
-        if ('highway' in s or re.search(r'(?<!\w)hwy(?!\w)', s) or 'route' in s or 'parkway' in s) and re.search(r'(?<!\w)\d{1,4}(?!\w)', s):
-            return 'numbered'
-
-        return 'local'
-
-    def _score_route_class_candidate(road_label: str, route_class: str, rstage_m: int, max_r_m: int) -> int:
-        """Score a candidate *within* a selected route_class.
-
-        route_class: interstate | numbered | local
-        Strict: if the candidate doesn't match the selected class (or is excluded), return a very negative score.
-        """
-        rc = (route_class or '').strip().lower()
-        kind = _route_kind(road_label)
-        if rc == 'interstate':
-            if kind != 'interstate':
-                return -10**9
-            base = _score_highway_candidate(road_label)
-        elif rc in ('numbered', 'us_route', 'other'):
-            # Back-compat: accept older values too.
-            if kind != 'numbered':
-                return -10**9
-            base = _score_highway_candidate(road_label)
-        elif rc == 'local':
-            # Explicitly exclude Interstate + numbered routes.
-            if kind in ('interstate', 'numbered'):
-                return -10**9
-            base = 0
-            s = (road_label or '').strip().lower()
-            # Lightly penalize obvious ramps/frontage for local too.
-            for w in _HIGHWAY_PENALTY_WORDS:
-                if w in s:
-                    base -= 15
-        else:
-            # Unknown selection: don't accept anything.
-            return -10**9
-
-        # Prefer closer candidates within the chosen class.
-        try:
-            rstage = int(rstage_m)
-        except Exception:
-            rstage = max_r_m
-        dist_bonus = int(max(0, int(max_r_m) - rstage) / 50)
-        return int(base) + dist_bonus
-
-    def _snap_and_get_road(lat: float, lng: float):
-        slat, slng = snap_to_nearest_road(lat, lng)
-        if slat is None or slng is None:
-            return None
-        road = _reverse_geocode_route(float(slat), float(slng))
-        if not road:
-            return None
-        return {
-            'snapped_lat': float(slat),
-            'snapped_lng': float(slng),
-            'road_name': road,
-        }
-
-    def _confirm_location_route_class(raw_lat: float, raw_lng: float, route_class: str, max_radius_m: int = 2500):
-        """Highway-biased snapping.
-
-        Strategy:
-        - Generate a candidate cloud around the pin.
-        - Run ONE Roads nearestRoads call for all candidates.
-        - Reverse-geocode a bounded set of unique snapped points.
-        - Pick the best highway-like match by score.
-
-        When route_class is:
-        - interstate: only accept Interstates
-        - numbered: only accept numbered routes/highways (US routes, state routes, parkways with numbers)
-        - local: reject interstate + numbered and choose a named street/road
-
-        Returns None when no match is found within the selected class.
-        """
-        try:
-            max_r = int(max_radius_m)
-        except Exception:
-            max_r = 2500
-        max_r = max(200, min(6000, max_r))
-
-        # Radii stages: close-first, then broader.
-        radii = sorted(set([0, 150, 500, 1500, max_r]))
-
-        dirs = [
-            (1, 0), (-1, 0), (0, 1), (0, -1),
-            (1, 1), (1, -1), (-1, 1), (-1, -1),
-        ]
-
-        candidates = [(raw_lat, raw_lng)]
-        meta = [0]
-        for r in radii:
-            if r == 0:
-                continue
-            for dn, de in dirs:
-                scale = (1 / math.sqrt(2)) if (dn != 0 and de != 0) else 1.0
-                c_lat, c_lng = _offset_latlng_m(raw_lat, raw_lng, dn * r * scale, de * r * scale)
-                candidates.append((c_lat, c_lng))
-                meta.append(r)
-
-        snapped = nearest_roads_multi(candidates)
-        if not snapped:
-            return None
-
-        # original_index -> (slat, slng, radius_stage)
-        idx_to: dict[int, tuple[float, float, int]] = {}
-        for sp in snapped:
-            oi = sp.get('originalIndex')
-            loc = (sp.get('location') or {}) if isinstance(sp, dict) else {}
-            if oi is None:
-                continue
-            try:
-                oi_i = int(oi)
-            except Exception:
-                continue
-            if oi_i < 0 or oi_i >= len(candidates):
-                continue
-            slat = loc.get('latitude')
-            slng = loc.get('longitude')
-            if slat is None or slng is None:
-                continue
-            idx_to[oi_i] = (float(slat), float(slng), int(meta[oi_i]))
-
-        # Deduplicate snapped points (rounded), keep smallest radius stage
-        uniq: dict[tuple[float, float], dict[str, float | int]] = {}
-        for (slat, slng, rstage) in idx_to.values():
-            key = (round(slat, 5), round(slng, 5))
-            cur = uniq.get(key)
-            if cur is None or rstage < int(cur['rstage']):
-                uniq[key] = {'slat': slat, 'slng': slng, 'rstage': rstage}
-
-        stages_present = sorted({int(u['rstage']) for u in uniq.values()})
-        stage_order = [s for s in radii if s in stages_present]
-        for s in stages_present:
-            if s not in stage_order:
-                stage_order.append(s)
-
-        best = None
-        best_score = -10**9
-
-        rc = (route_class or '').strip().lower()
-        if rc == 'interstate':
-            ACCEPT_THRESHOLD = 120
-        elif rc in ('numbered', 'us_route', 'other'):
-            # Back-compat: accept older values too.
-            ACCEPT_THRESHOLD = 90
-        elif rc == 'local':
-            ACCEPT_THRESHOLD = 10
-        else:
-            ACCEPT_THRESHOLD = 999999
-        remaining_budget = 18  # reverse-geocode budget
-
-        for rstage in stage_order:
-            stage_pts = [u for u in uniq.values() if int(u['rstage']) == rstage]
-            for u in stage_pts:
-                if remaining_budget <= 0:
-                    break
-                road = _reverse_geocode_route(float(u['slat']), float(u['slng']))
-                remaining_budget -= 1
-                if not road:
-                    continue
-                score = _score_route_class_candidate(road, rc, int(u['rstage']), max_r)
-                if score > best_score:
-                    best_score = score
-                    best = {
-                        'snapped_lat': float(u['slat']),
-                        'snapped_lng': float(u['slng']),
-                        'road_name': road,
-                    }
-
-                # If we hit a very strong match, stop early.
-                if score >= 180:
-                    break
-            if best_score >= 120:
-                break
-
-        if not best or best_score < ACCEPT_THRESHOLD:
-            return None
-
-        return best
-
-    # Backward-compatible wrapper for older clients that still send prefer_highway Yes/No.
-    def _confirm_location_prefer_highway(raw_lat: float, raw_lng: float, max_radius_m: int = 2500):
-        # Try major route types first; do NOT fall back to local streets.
-        return _confirm_location_route_class(raw_lat, raw_lng, route_class='interstate', max_radius_m=max_radius_m) or \
-               _confirm_location_route_class(raw_lat, raw_lng, route_class='us_route', max_radius_m=max_radius_m)
 
     with app.app_context():
         try:
@@ -2134,6 +1855,7 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.route("/register", methods=["GET", "POST"])
+    @(limiter.limit("10 per hour; 3 per minute", methods=["POST"]) if limiter else (lambda f: f))
     def register():
         if current_user.is_authenticated:
             return redirect(_safe_next_url('home'))
@@ -2176,6 +1898,7 @@ GROUP BY UPPER(TRIM(stusps));
         return render_template("register.html", form=form)
 
     @app.route("/login", methods=["GET", "POST"])
+    @(limiter.limit("20 per hour; 5 per minute", methods=["POST"]) if limiter else (lambda f: f))
     def login():
         if current_user.is_authenticated:
             return redirect(_safe_next_url('home'))
@@ -6189,6 +5912,7 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.post("/submit")
+    @(limiter.limit("30 per hour; 10 per minute") if limiter else (lambda f: f))
     def submit_post():
         form = SubmitTicketForm()
 
@@ -6448,99 +6172,16 @@ GROUP BY UPPER(TRIM(stusps));
 
         return redirect(url_for("home"))
 
-    @app.post("/api/confirm_location")
-    def api_confirm_location():
-        """Snap pin -> road name (server-side) for consistent web/mobile behavior."""
-        try:
-            payload = request.get_json(silent=True) or {}
-        except Exception:
-            payload = {}
-
-        try:
-            raw_lat = float(payload.get("lat"))
-            raw_lng = float(payload.get("lng"))
-        except Exception:
-            return jsonify({"ok": False, "error": "bad_lat_lng"}), 400
-
-        # New: route_class selection (web + mobile parity)
-        route_class = payload.get('route_class')
-        if route_class is None:
-            route_class = payload.get('routeClass')
-        route_class = (str(route_class).strip().lower() if route_class is not None else '')
-
-        # Backward compatibility: older clients send prefer_highway Yes/No.
-        prefer_raw = payload.get('prefer_highway')
-        if prefer_raw is None:
-            prefer_raw = payload.get('preferHighway')
-        prefer_s = str(prefer_raw).strip().lower() if prefer_raw is not None else ''
-        prefer_highway = prefer_raw is True or prefer_s in ('1', 'true', 'yes', 'y', 'on')
-
-        snapped_lat = raw_lat
-        snapped_lng = raw_lng
-        road = None
-        snapped_source = 'nearest'
-
-        # Normalize older route_class values (us_route/other) to the new buckets.
-        if route_class == 'us_route':
-            route_class = 'numbered'
-        elif route_class == 'other':
-            route_class = 'local'
-
-        if route_class in ('interstate', 'numbered', 'local'):
-            best = _confirm_location_route_class(raw_lat, raw_lng, route_class=route_class, max_radius_m=2500)
-            if not best:
-                err = {
-                    'interstate': ('no_interstate_found', 'Could not find an Interstate near that pin. Zoom out and drop closer to the Interstate.'),
-                    'numbered': ('no_numbered_found', 'Could not find a numbered route/highway near that pin. Zoom out and drop closer to the route.'),
-                    'local': ('no_local_found', 'Could not find a street/road (non-interstate, non-numbered route) near that pin. Move the pin, or pick a different road type.'),
-                }
-                code, msg = err.get(route_class, ('no_match', 'Could not match that road type near the pin.'))
-                return jsonify({"ok": False, "error": code, "message": msg}), 400
-
-            snapped_lat = float(best['snapped_lat'])
-            snapped_lng = float(best['snapped_lng'])
-            road = best.get('road_name')
-            snapped_source = f'route_class:{route_class}'
-
-        elif prefer_highway:
-            # Old behavior (Yes/No): try to find a major route-ish road.
-            best = _confirm_location_prefer_highway(raw_lat, raw_lng, max_radius_m=2500)
-            if not best:
-                return jsonify({
-                    "ok": False,
-                    "error": "no_highway_found",
-                    "message": "Could not find a major route near that pin. Zoom out and drop closer to the highway/route.",
-                }), 400
-
-            snapped_lat = float(best['snapped_lat'])
-            snapped_lng = float(best['snapped_lng'])
-            road = best.get('road_name')
-            snapped_source = 'prefer_highway'
-
-        if not road:
-            slat, slng = snap_to_nearest_road(raw_lat, raw_lng)
-            snapped_lat = float(slat) if slat is not None else raw_lat
-            snapped_lng = float(slng) if slng is not None else raw_lng
-            road = _reverse_geocode_route(snapped_lat, snapped_lng)
-
-        road = road or "Map pin"
-
-        return jsonify({
-            "ok": True,
-            "raw_lat": raw_lat,
-            "raw_lng": raw_lng,
-            "snapped_lat": snapped_lat,
-            "snapped_lng": snapped_lng,
-            "road_name": road,
-            "snapped_source": snapped_source,
-            "route_class": route_class,
-            "prefer_highway": bool(prefer_highway),
-        })
+    # NOTE: /api/confirm_location endpoint removed in v691 (was Roads API snap-to-road, never invoked from any live client).
 
     @app.post("/api/update_ticket_pin")
     @login_required
     def api_update_ticket_pin():
-        """Owner-only: update an existing ticket's pin (raw + snapped lat/lng)."""
+        """Owner-only: update an existing ticket's pin location.
+
+        v692: No longer snaps to nearest road. The user-dragged coordinates are saved
+        verbatim — pin stays exactly where the user drops it.
+        """
         try:
             payload = request.get_json(silent=True) or {}
         except Exception:
@@ -6565,23 +6206,16 @@ GROUP BY UPPER(TRIM(stusps));
         if not r.user_id or int(r.user_id) != int(current_user.id):
             return jsonify({"ok": False, "error": "forbidden"}), 403
 
+        # Save the user's pin exactly where they dropped it.
         r.raw_lat = lat
         r.raw_lng = lng
-
-        slat, slng = snap_to_nearest_road(lat, lng)
-        if slat is None or slng is None:
-            r.lat = lat
-            r.lng = lng
-            r.location_source = "user_pin"
-            snapped = False
-        else:
-            r.lat = float(slat)
-            r.lng = float(slng)
-            r.location_source = "user_pin_snapped"
-            snapped = True
+        r.lat = lat
+        r.lng = lng
+        r.location_source = "user_pin"
 
         db.session.commit()
-        return jsonify({"ok": True, "snapped": snapped, "lat": r.lat, "lng": r.lng})
+        # Keep `snapped` in response for backward compat with existing client (always false now)
+        return jsonify({"ok": True, "snapped": False, "lat": r.lat, "lng": r.lng})
 
     
 
@@ -7738,6 +7372,7 @@ GROUP BY UPPER(TRIM(stusps));
         })
 
     @app.post("/api/tickets")
+    @(limiter.limit("30 per hour; 10 per minute") if limiter else (lambda f: f))
     def api_create_ticket():
         """Create a ticket from web/mobile clients.
 
@@ -7876,11 +7511,13 @@ GROUP BY UPPER(TRIM(stusps));
             pass
 
         if lat is not None and lng is not None:
+            # v692: snap-to-road removed. raw_lat/raw_lng (if sent by older clients) are kept
+            # for backward compat but lat/lng now always equal the user's exact pin location.
             report.raw_lat = raw_lat if raw_lat is not None else lat
             report.raw_lng = raw_lng if raw_lng is not None else lng
             report.lat = lat
             report.lng = lng
-            report.location_source = 'user_pin_snapped' if (raw_lat is not None or raw_lng is not None) else 'user_pin'
+            report.location_source = 'user_pin'
 
         db.session.add(report)
         db.session.commit()
@@ -8808,6 +8445,7 @@ GROUP BY UPPER(TRIM(stusps));
             return (f"Error generating minimap: {e}", 500)
 
     @app.post("/api/auth/register")
+    @(limiter.limit("10 per hour; 3 per minute") if limiter else (lambda f: f))
     def api_auth_register():
         data = request.get_json(silent=True) or {}
         email = (data.get("email") or "").strip().lower()
@@ -8842,6 +8480,7 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.post("/api/auth/login")
+    @(limiter.limit("20 per hour; 5 per minute") if limiter else (lambda f: f))
     def api_auth_login():
         data = request.get_json(silent=True) or {}
         identifier = (data.get("identifier") or data.get("email") or data.get("username") or "").strip()
@@ -8901,6 +8540,109 @@ GROUP BY UPPER(TRIM(stusps));
             except Exception:
                 pass
         return jsonify({"ok": True}), 200
+
+
+    @app.post("/api/auth/delete-account")
+    @api_login_required
+    @(limiter.limit("5 per hour") if limiter else (lambda f: f))
+    def api_auth_delete_account():
+        """v690: Apple/Google compliance — let users delete their account from the app.
+        Removes:
+          - all SpeedReports authored by the user (and dependent likes/comments cascade)
+          - all Comments authored by the user
+          - all Likes authored by the user
+          - all FollowedCounty/FollowedState rows
+          - all DeviceTokens
+          - profile photo / car photos from R2 (best-effort)
+          - the User row itself
+        Then revokes the current JWT.
+        Body: {"confirm": "DELETE"}  — explicit confirmation required to prevent accidents.
+        """
+        u = current_user
+        try:
+            data = request.get_json(silent=True) or {}
+        except Exception:
+            data = {}
+        confirm = (data.get("confirm") or "").strip().upper()
+        if confirm != "DELETE":
+            return jsonify({"ok": False, "error": "confirm_required",
+                            "message": "Send {\"confirm\": \"DELETE\"} to proceed."}), 400
+
+        user_id = int(u.id)
+
+        # Best-effort: delete profile photo + car photos from R2
+        try:
+            bucket = (os.environ.get("R2_PROFILE_BUCKET") or app.config.get("R2_PROFILE_BUCKET") or "enforcedspeed-static").strip() or "enforcedspeed-static"
+            # Profile photo (stored as base key, with _64 / _256 suffixes)
+            base = (u.profile_photo_key or "").strip()
+            if base:
+                for suffix in ("_64.jpg", "_256.jpg"):
+                    try:
+                        delete_object(bucket, base + suffix)
+                    except Exception:
+                        pass
+            # Car photos (full keys, single objects)
+            for attr in ("car_photo_1", "car_photo_2", "car_photo_3"):
+                try:
+                    key = (getattr(u, attr, None) or "").strip()
+                    if key:
+                        delete_object(bucket, key)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # DB deletion — order matters so FKs don't blow up.
+        try:
+            # Likes by this user
+            db.session.query(Like).filter(Like.user_id == user_id).delete(synchronize_session=False)
+            # Comments by this user (do NOT cascade-delete the report's other comments)
+            db.session.query(Comment).filter(Comment.user_id == user_id).delete(synchronize_session=False)
+            # Follow rows
+            db.session.query(FollowedCounty).filter(FollowedCounty.user_id == user_id).delete(synchronize_session=False)
+            db.session.query(FollowedState).filter(FollowedState.user_id == user_id).delete(synchronize_session=False)
+            # Device tokens (push)
+            try:
+                db.session.query(DeviceToken).filter(DeviceToken.user_id == user_id).delete(synchronize_session=False)
+            except Exception:
+                pass
+            # SpeedReports authored by this user — first delete their dependent likes/comments by anyone
+            user_report_ids = [r.id for r in SpeedReport.query.with_entities(SpeedReport.id).filter(SpeedReport.user_id == user_id).all()]
+            if user_report_ids:
+                db.session.query(Like).filter(Like.report_id.in_(user_report_ids)).delete(synchronize_session=False)
+                db.session.query(Comment).filter(Comment.report_id.in_(user_report_ids)).delete(synchronize_session=False)
+                db.session.query(SpeedReport).filter(SpeedReport.id.in_(user_report_ids)).delete(synchronize_session=False)
+            # Finally the user
+            db.session.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "delete_failed", "message": str(e)[:200]}), 500
+
+        # Revoke the current JWT
+        try:
+            auth = (request.headers.get("Authorization") or "").strip()
+            if auth.lower().startswith("bearer "):
+                raw_token = auth.split(" ", 1)[1].strip()
+                try:
+                    data2 = jwt.decode(raw_token, _jwt_secret(), algorithms=["HS256"], leeway=30)
+                    jti = data2.get("jti")
+                    exp = data2.get("exp")
+                    if jti and not RevokedToken.query.filter_by(jti=jti).first():
+                        expires_at = None
+                        if exp:
+                            try:
+                                expires_at = datetime.utcfromtimestamp(int(exp))
+                            except Exception:
+                                pass
+                        db.session.add(RevokedToken(jti=jti, expires_at=expires_at))
+                        db.session.commit()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return jsonify({"ok": True, "message": "Account deleted."}), 200
 
 
     @app.post("/api/auth/forgot-password")

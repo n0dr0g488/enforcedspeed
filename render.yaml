@@ -2,9 +2,9 @@ services:
   - type: web
     name: enforcedspeed
     env: python
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --access-logfile -
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
@@ -14,3 +14,4 @@ services:
         generateValue: true
       # Render will usually provide DATABASE_URL automatically when you attach a Postgres DB.
       # If not, add DATABASE_URL in the Render dashboard env vars.
+      # REDIS_URL also auto-injected when you attach Redis. Used by Flask-Limiter.

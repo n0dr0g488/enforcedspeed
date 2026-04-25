@@ -214,7 +214,6 @@ except Exception:
 
 from config import Config
 from forms import (
-    SpeedReportForm,
     SubmitTicketForm,
     RegisterForm,
     LoginForm,
@@ -1376,7 +1375,10 @@ def create_app() -> Flask:
             limiter = Limiter(
                 key_func=get_remote_address,
                 app=app,
-                default_limits=["500 per hour", "50 per minute"],  # generous global cap
+                # v693: bumped from 500/hr + 50/min after Render health checks were
+                # tripping the per-minute cap. Tighter per-endpoint limits are still
+                # set on auth + write endpoints below.
+                default_limits=["1000 per hour", "120 per minute"],
                 storage_uri=storage_uri,
                 strategy="fixed-window",
                 headers_enabled=False,
@@ -1488,9 +1490,16 @@ def create_app() -> Flask:
 
     # --- Health check (Render) ---
     # Keep this endpoint fast and DB-independent so deploys never hang on health checks.
+    # IMPORTANT: exempt from rate limiter — Render hits this every minute and the global
+    # default (50/min) was tripping it, causing instances to fail health checks.
     @app.get("/healthz")
     def healthz():
         return f"ok {_ES_VERSION} pid={os.getpid()}", 200
+    if limiter is not None:
+        try:
+            limiter.exempt(healthz)
+        except Exception as e:
+            print(f"[WARN] Failed to exempt /healthz from limiter: {e}")
 
 
     # --- County GIS (PostGIS) ---
@@ -8504,6 +8513,7 @@ GROUP BY UPPER(TRIM(stusps));
 
     @app.post("/api/auth/refresh")
     @api_login_required
+    @(limiter.limit("60 per hour; 10 per minute", methods=["POST"]) if limiter else (lambda f: f))
     def api_auth_refresh():
         """Issue a fresh JWT for an authenticated user.
         Call this before the current token expires to stay logged in.
@@ -8646,6 +8656,7 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.post("/api/auth/forgot-password")
+    @(limiter.limit("3 per hour; 1 per minute", methods=["POST"]) if limiter else (lambda f: f))
     def api_auth_forgot_password():
         """Send a password reset email. JSON API version for mobile.
         Body: {"email": "user@example.com"}
@@ -8664,6 +8675,7 @@ GROUP BY UPPER(TRIM(stusps));
 
 
     @app.post("/api/auth/reset-password")
+    @(limiter.limit("20 per hour; 5 per minute", methods=["POST"]) if limiter else (lambda f: f))
     def api_auth_reset_password():
         """Reset password via token. JSON API version for mobile.
         Body: {"token": "...", "password": "newpassword"}
@@ -9180,6 +9192,11 @@ GROUP BY UPPER(TRIM(stusps));
     @app.get("/health")
     def health():
         return {"status": "ok"}
+    if limiter is not None:
+        try:
+            limiter.exempt(health)
+        except Exception as e:
+            print(f"[WARN] Failed to exempt /health from limiter: {e}")
 
     # Schema bootstrap for dev/local databases (additive, no destructive changes).
     # IMPORTANT (Render deploy stability): do NOT run schema bootstrap at process start in production.

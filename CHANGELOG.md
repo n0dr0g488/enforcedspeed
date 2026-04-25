@@ -5,6 +5,24 @@
 
 ---
 
+## v694 — 2026-04-25
+
+**Pre-launch hardening: rate-limited remaining auth endpoints + cleanup**
+- Added rate limits to previously-unprotected auth endpoints:
+  - `/api/auth/forgot-password`: 3/hour, 1/minute (prevents email enumeration + SendGrid quota abuse)
+  - `/api/auth/reset-password`: 20/hour, 5/minute (prevents reset token brute-forcing)
+  - `/api/auth/refresh`: 60/hour, 10/minute (prevents token refresh spam from compromised clients)
+- Removed unused `SpeedReportForm` import from `app.py`.
+- Documented all required environment variables in `render.yaml` (Maps keys, Gemini key, SendGrid, R2, public URLs, admin emails). Values still set in Render dashboard — `render.yaml` now serves as a discoverability index for what env vars are required, useful for disaster recovery and onboarding.
+
+## v693 — 2026-04-25
+
+**HOTFIX: Rate limiter was killing the production server**
+- Render's health check (`/healthz`) hits every minute from a fixed Render IP. The global rate limit default of "50 per minute" was tripping against that IP, causing health checks to return HTTP 429, which Render interpreted as instance failure → repeated restarts every hour for 12+ hours.
+- **Fix:** Both `/healthz` and `/health` are now exempted from the rate limiter via `limiter.exempt()` (called conditionally so it's safe even if Flask-Limiter init fails).
+- **Also:** Bumped global default from "500/hour, 50/min" to "1000/hour, 120/min". The tight per-endpoint limits on auth/write endpoints (login, register, submit, etc.) are still in place — the global default only catches truly abusive traffic patterns.
+- **Lesson:** When introducing a global rate limit, always exempt health check endpoints first. Cloud providers hammer them on a fixed cadence and they look like one client to a per-IP limiter.
+
 ## v692 — 2026-04-18
 
 **Snap-to-road feature fully removed (was already legacy)**

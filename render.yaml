@@ -8,10 +8,46 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     envVars:
+      # ---- Auto-generated / managed by Render ----
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
         generateValue: true
-      # Render will usually provide DATABASE_URL automatically when you attach a Postgres DB.
-      # If not, add DATABASE_URL in the Render dashboard env vars.
-      # REDIS_URL also auto-injected when you attach Redis. Used by Flask-Limiter.
+
+      # ---- Auto-injected when DBs are attached in Render UI ----
+      # DATABASE_URL: Render injects this when you attach a Postgres service
+      # REDIS_URL: Render injects this when you attach a Redis service (used by Flask-Limiter)
+
+      # ---- REQUIRED: set values manually in the Render dashboard ----
+      # Documented here so they're discoverable; values are sensitive so we don't commit them.
+      #
+      # Google Maps Platform:
+      #   - GOOGLE_MAPS_API_KEY        (browser key, restricted by HTTP referrer to enforcedspeed.com)
+      #   - GOOGLE_MAPS_SERVER_KEY     (server key for /api/staticmap proxy, restricted to Render IPs)
+      #
+      # Google Cloud (Gemini AI ticket verification):
+      #   - GEMINI_API_KEY             (API key bound to vertex-express service account, restricted to Render IPs)
+      #
+      # Email (SendGrid for password reset, account notifications):
+      #   - SENDGRID_API_KEY
+      #   - SENDGRID_FROM_EMAIL        (e.g. noreply@enforcedspeed.com)
+      #
+      # Cloudflare R2 (object storage for ticket photos + profile photos):
+      #   - R2_ACCESS_KEY_ID
+      #   - R2_SECRET_ACCESS_KEY
+      #   - R2_ENDPOINT_URL
+      #   - R2_BUCKET                  (default ticket photo bucket)
+      #   - R2_PROFILE_BUCKET          (optional, separate bucket for profile photos)
+      #   - R2_PROFILE_PREFIX          (default 'profile_photos/')
+      #
+      # Public URLs (used to construct externally reachable image URLs for Google Static Maps):
+      #   - PUBLIC_BASE_URL            (e.g. https://enforcedspeed.com)
+      #   - STATIC_PIN_BASE_URL        (e.g. https://static.enforcedspeed.com/pins)
+      #   - PROFILE_PHOTO_BASE_URL     (e.g. https://static.enforcedspeed.com/profile_photos)
+      #
+      # Admin:
+      #   - ADMIN_EMAIL or ADMIN_EMAILS   (comma-separated for multiple admins)
+      #
+      # Optional tunables:
+      #   - MAX_CONTENT_LENGTH         (default 30 MB; max upload size in bytes)
+      #   - PROFILE_PHOTO_MAX_BYTES    (default 5 MB; max profile photo size)
